@@ -52,3 +52,13 @@ La aplicacion Next.js vive en `apps/web` y se ejecuta desde el workspace con pnp
 ```bash
 pnpm --filter @courier/web dev
 ```
+
+## Backend API
+
+La aplicacion NestJS vive en `apps/api` y expone `GET /health` en el puerto 4000 por defecto.
+
+```bash
+pnpm --filter @courier/api dev
+pnpm --filter @courier/api test
+pnpm --filter @courier/api test:e2e
+```
