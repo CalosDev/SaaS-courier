@@ -1,0 +1,19 @@
+digraph G {
+  graph [rankdir=TB, bgcolor="white", pad="0.25", nodesep="0.35", ranksep="0.45", fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#EEF4F8", color="#2C5F8A", fontname="Arial", fontsize=10, margin="0.15,0.10"];
+  edge [color="#66727F", arrowsize=0.7];
+  git [label="Repositorio Git\nMonorepo pnpm + Turborepo"];
+  ci [label="CI\nLint · Typecheck · Test · Build"];
+  mig [label="Job único de migración\nprisma migrate deploy", fillcolor="#FFF4E5", color="#9A5B13"];
+  reg [label="Registro de imágenes\ncourier-web / courier-api"];
+  stage [label="Staging\nWeb + API + DB aislada"];
+  prod [label="Producción\nWeb + API escalables"];
+  db [shape=cylinder, label="PostgreSQL administrado\nBackups y restauración", fillcolor="#F4F1FA", color="#665191"];
+  git -> ci;
+  ci -> reg;
+  ci -> stage;
+  stage -> mig;
+  mig -> prod;
+  reg -> prod;
+  prod -> db;
+}

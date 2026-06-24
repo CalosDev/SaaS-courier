@@ -1,0 +1,28 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad="0.25", nodesep="0.30", ranksep="0.48", fontname="Arial"];
+  node [shape=record, style="filled", fillcolor="#F7FAFC", color="#2C5F8A", fontname="Arial", fontsize=9.2];
+  edge [color="#66727F", arrowsize=0.6];
+
+  org [label="{organizations|tenant y configuración}", fillcolor="#DCE8F1"];
+  fac [label="{facilities|almacenes, hubs, sucursales}"];
+  usr [label="{users / sessions|identidad y tenant activo}"];
+  emp [label="{employees / employee_facilities|roles y alcance físico}"];
+  cus [label="{customers|casillero y perfil}"];
+  car [label="{carriers|transportistas normalizados}"];
+  svc [label="{services|servicios configurables}", fillcolor="#E9F5EF", color="#2E6F4E"];
+  pkg [label="{packages / package_events|estado actual e historial}"];
+  sto [label="{storage_locations|rack / zona / estante}"];
+  tra [label="{transfers / transfer_items|manifiestos}"];
+  rat [label="{rate_rules|tarifas por servicio y facility}"];
+  inv [label="{invoices / invoice_items|facturación histórica}"];
+  pay [label="{payments / allocations|pagos parciales}"];
+  aud [label="{audit_logs|trazabilidad sensible}"];
+
+  org -> fac; org -> emp; org -> cus; org -> car; org -> svc; org -> pkg; org -> rat; org -> inv; org -> pay; org -> aud;
+  usr -> emp; usr -> cus;
+  fac -> sto; fac -> pkg; fac -> tra;
+  car -> pkg; svc -> pkg; svc -> rat;
+  cus -> pkg; cus -> inv; cus -> pay;
+  pkg -> tra; pkg -> inv;
+  inv -> pay;
+}

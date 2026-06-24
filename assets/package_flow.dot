@@ -1,0 +1,14 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad="0.2", nodesep="0.28", ranksep="0.35", fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#EEF4F8", color="#2C5F8A", fontname="Arial", fontsize=9.5, margin="0.12,0.08"];
+  edge [color="#66727F", arrowsize=0.65];
+  a [label="PRE_ALERTED"];
+  b [label="RECEIVED"];
+  c [label="IN_TRANSIT"];
+  d [label="RECEIVED_AT_FACILITY"];
+  e [label="AVAILABLE", fillcolor="#E9F5EF", color="#2E6F4E"];
+  f [label="PICKED_UP", fillcolor="#DCE8F1"];
+  x [label="Excepciones\nHELD · LOST · RETURNED · CANCELLED", fillcolor="#FFF0F0", color="#8D3A3A"];
+  a -> b -> c -> d -> e -> f;
+  a -> x [style=dashed]; b -> x [style=dashed]; c -> x [style=dashed]; d -> x [style=dashed]; e -> x [style=dashed];
+}

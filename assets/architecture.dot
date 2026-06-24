@@ -1,0 +1,32 @@
+digraph G {
+  graph [rankdir=LR, bgcolor="white", pad="0.3", nodesep="0.35", ranksep="0.55", fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#EEF4F8", color="#2C5F8A", fontname="Arial", fontsize=10, margin="0.15,0.10"];
+  edge [color="#66727F", arrowsize=0.7, fontname="Arial", fontsize=9];
+
+  browser [label="Navegador / PWA"];
+  proxy [label="Proxy / TLS / CDN\nProducción", fillcolor="#DCE8F1"];
+  web [label="Contenedor Web\nNext.js + React + TypeScript", fillcolor="#EAF4FF"];
+  api [label="Contenedor API\nNestJS + Prisma", fillcolor="#E9F5EF", color="#2E6F4E"];
+  db [shape=cylinder, label="PostgreSQL administrado\nFuente de verdad", fillcolor="#F4F1FA", color="#665191"];
+  s3 [shape=cylinder, label="Almacenamiento S3\nArchivos privados", fillcolor="#FFF4E5", color="#9A5B13"];
+  logs [label="Logs · Métricas · Alertas\nrequest_id correlacionado", fillcolor="#F6F7F8", color="#66727F"];
+
+  browser -> proxy [label="HTTPS"];
+  proxy -> web;
+  web -> api [label="REST/JSON"];
+  api -> db [label="Prisma / SQL"];
+  api -> s3 [label="URLs firmadas"];
+  web -> logs [style=dashed];
+  api -> logs [style=dashed];
+
+  subgraph cluster_dev {
+    label="Desarrollo híbrido";
+    color="#A9BBC9";
+    style="rounded,dashed";
+    devweb [label="Next.js local\nHot reload", fillcolor="white"];
+    devapi [label="NestJS local\nDepuración", fillcolor="white"];
+    devdb [shape=cylinder, label="PostgreSQL en Docker", fillcolor="white"];
+    devweb -> devapi;
+    devapi -> devdb;
+  }
+}

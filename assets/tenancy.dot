@@ -1,0 +1,25 @@
+digraph G {
+  graph [rankdir=TB, bgcolor="white", pad="0.25", nodesep="0.42", ranksep="0.55", fontname="Arial"];
+  node [shape=box, style="rounded,filled", fillcolor="#EEF4F8", color="#2C5F8A", fontname="Arial", fontsize=10, margin="0.14,0.09"];
+  edge [color="#66727F", arrowsize=0.7, fontname="Arial", fontsize=9];
+
+  platform [label="PLATAFORMA SaaS\nAdministración global", fillcolor="#173F67", fontcolor="white"];
+  orgA [label="Organization A\nCourier independiente", fillcolor="#DCE8F1"];
+  orgB [label="Organization B\nCourier independiente", fillcolor="#DCE8F1"];
+  orgC [label="Organization C\nCourier independiente", fillcolor="#DCE8F1"];
+  fa [label="Facilities\nAlmacén internacional · Hub · Sucursales · Agencias"];
+  da [label="Datos aislados\nClientes · Paquetes · Tarifas · Facturas · Pagos"];
+  fb [label="Facilities y datos propios"];
+  fc [label="Facilities y datos propios"];
+
+  platform -> orgA;
+  platform -> orgB;
+  platform -> orgC;
+  orgA -> fa;
+  orgA -> da;
+  orgB -> fb;
+  orgC -> fc;
+
+  iso [shape=note, label="Regla: ninguna consulta operativa cruza organizations.", fillcolor="#FFF4E5", color="#9A5B13"];
+  da -> iso [style=dashed, arrowhead=none];
+}
