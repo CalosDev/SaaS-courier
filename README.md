@@ -76,3 +76,14 @@ pnpm db:down
 ```
 
 `pnpm db:down` detiene los contenedores sin eliminar el volumen `postgres_data`.
+
+## Prisma
+
+Prisma vive dentro de `apps/api` y usa la variable `DATABASE_URL` del archivo `.env` de la raiz. El cliente generado no se versiona y se puede regenerar cuando sea necesario.
+
+```bash
+pnpm db:format
+pnpm db:validate
+pnpm db:generate
+pnpm db:check
+```
