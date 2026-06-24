@@ -9,3 +9,88 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum OrganizationStatus {
+  TRIAL
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+
+  @@map("organization_status")
+}
+
+enum FacilityType {
+  INTERNATIONAL_WAREHOUSE
+  DISTRIBUTION_CENTER
+  BRANCH
+  AGENCY
+  PICKUP_POINT
+  OFFICE
+  CUSTOMS_WAREHOUSE
+
+  @@map("facility_type")
+}
+
+enum FacilityOwnershipType {
+  OWNED
+  AGENCY
+  PARTNER
+
+  @@map("facility_ownership_type")
+}
+
+model Organization {
+  id             String             @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
+  legalName      String             @map("legal_name") @db.VarChar(200)
+  commercialName String             @map("commercial_name") @db.VarChar(120)
+  slug           String             @unique(map: "organizations_slug_key") @db.VarChar(80)
+  rnc            String?            @db.VarChar(20)
+  email          String?            @db.VarChar(320)
+  phone          String?            @db.VarChar(32)
+  countryCode    String             @default("DO") @map("country_code") @db.Char(2)
+  currencyCode   String             @default("DOP") @map("currency_code") @db.Char(3)
+  timezone       String             @default("America/Santo_Domingo") @db.VarChar(64)
+  status         OrganizationStatus @default(TRIAL)
+  planCode       String             @default("PILOT") @map("plan_code") @db.VarChar(40)
+  maxUsers       Int                @default(5) @map("max_users")
+  maxFacilities  Int                @default(2) @map("max_facilities")
+  trialEndsAt    DateTime?          @map("trial_ends_at") @db.Timestamptz(3)
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?          @map("deleted_at") @db.Timestamptz(3)
+  facilities     Facility[]
+
+  @@index([status], map: "organizations_status_idx")
+  @@index([deletedAt], map: "organizations_deleted_at_idx")
+  @@map("organizations")
+}
+
+model Facility {
+  id                   String                @id(map: "facilities_pkey") @default(uuid()) @db.Uuid
+  organizationId       String                @map("organization_id") @db.Uuid
+  code                 String                @db.VarChar(40)
+  name                 String                @db.VarChar(120)
+  type                 FacilityType
+  ownershipType        FacilityOwnershipType @default(OWNED) @map("ownership_type")
+  countryCode          String                @default("DO") @map("country_code") @db.Char(2)
+  province             String?               @db.VarChar(80)
+  city                 String?               @db.VarChar(80)
+  addressLine1         String?               @map("address_line_1") @db.VarChar(200)
+  addressLine2         String?               @map("address_line_2") @db.VarChar(200)
+  phone                String?               @db.VarChar(32)
+  email                String?               @db.VarChar(320)
+  isCustomerFacing     Boolean               @default(true) @map("is_customer_facing")
+  isPackageOrigin      Boolean               @default(false) @map("is_package_origin")
+  isDistributionCenter Boolean               @default(false) @map("is_distribution_center")
+  isActive             Boolean               @default(true) @map("is_active")
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt            DateTime?             @map("deleted_at") @db.Timestamptz(3)
+  organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "facilities_organization_id_fkey")
+
+  @@unique([organizationId, code], map: "facilities_organization_id_code_key")
+  @@index([organizationId, type], map: "facilities_organization_id_type_idx")
+  @@index([organizationId, isActive], map: "facilities_organization_id_is_active_idx")
+  @@index([organizationId, deletedAt], map: "facilities_organization_id_deleted_at_idx")
+  @@map("facilities")
+}

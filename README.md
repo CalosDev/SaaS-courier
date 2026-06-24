@@ -87,3 +87,12 @@ pnpm db:validate
 pnpm db:generate
 pnpm db:check
 ```
+
+Para crear y revisar migraciones versionadas:
+
+```bash
+pnpm db:migrate:dev --name <nombre> --create-only
+pnpm db:migrate:dev
+pnpm db:migrate:status
+pnpm db:generate
+```

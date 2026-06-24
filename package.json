@@ -12,6 +12,8 @@
     "db:validate": "pnpm --filter @courier/api prisma:validate",
     "db:generate": "pnpm --filter @courier/api prisma:generate",
     "db:check": "pnpm --filter @courier/api prisma:check",
+    "db:migrate:dev": "pnpm --filter @courier/api prisma:migrate:dev",
+    "db:migrate:status": "pnpm --filter @courier/api prisma:migrate:status",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
