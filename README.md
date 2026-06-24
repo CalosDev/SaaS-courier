@@ -44,3 +44,11 @@ pnpm lint
 pnpm typecheck
 pnpm test
 ```
+
+## Frontend web
+
+La aplicacion Next.js vive en `apps/web` y se ejecuta desde el workspace con pnpm.
+
+```bash
+pnpm --filter @courier/web dev
+```
