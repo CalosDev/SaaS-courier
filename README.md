@@ -32,3 +32,15 @@ Paquete de documentación para iniciar el desarrollo de una plataforma SaaS mult
 6. Continuar por las fases del plan de implementación.
 
 Esta carpeta contiene documentación y plantillas; no es todavía la aplicación ejecutable.
+
+## Comandos raiz
+
+El repositorio usa pnpm workspaces y Turborepo desde la raiz. Por ahora las carpetas `apps/` y `packages/` solo reservan la estructura del monorepo.
+
+```bash
+pnpm dev
+pnpm build
+pnpm lint
+pnpm typecheck
+pnpm test
+```
