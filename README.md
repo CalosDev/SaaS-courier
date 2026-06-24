@@ -62,3 +62,17 @@ pnpm --filter @courier/api dev
 pnpm --filter @courier/api test
 pnpm --filter @courier/api test:e2e
 ```
+
+## Base de datos local
+
+PostgreSQL se ejecuta en Docker para desarrollo local. Copia los valores de ejemplo antes de iniciar el servicio:
+
+```bash
+cp .env.example .env
+pnpm db:up
+pnpm db:status
+pnpm db:logs
+pnpm db:down
+```
+
+`pnpm db:down` detiene los contenedores sin eliminar el volumen `postgres_data`.

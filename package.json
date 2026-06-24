@@ -3,6 +3,11 @@
   "private": true,
   "packageManager": "pnpm@10.30.2",
   "scripts": {
+    "db:config": "docker compose -f compose.dev.yml config",
+    "db:up": "docker compose -f compose.dev.yml up -d postgres",
+    "db:down": "docker compose -f compose.dev.yml down",
+    "db:status": "docker compose -f compose.dev.yml ps",
+    "db:logs": "docker compose -f compose.dev.yml logs -f postgres",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",
