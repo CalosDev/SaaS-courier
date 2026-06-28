@@ -63,6 +63,8 @@ pnpm --filter @courier/api test
 pnpm --filter @courier/api test:e2e
 ```
 
+Las pruebas e2e del API requieren PostgreSQL activo porque inicializan Prisma durante el ciclo de vida de NestJS.
+
 ## Base de datos local
 
 PostgreSQL se ejecuta en Docker para desarrollo local. Copia los valores de ejemplo antes de iniciar el servicio:

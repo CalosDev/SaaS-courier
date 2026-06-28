@@ -3,6 +3,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { AppModule } from '../src/app.module';
 
+const LOCAL_DATABASE_URL =
+  'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
+
 interface HealthBody {
   status: string;
   service: string;
@@ -13,6 +16,8 @@ describe('Health endpoint', () => {
   let app: INestApplication;
 
   beforeAll(async () => {
+    process.env.DATABASE_URL ??= LOCAL_DATABASE_URL;
+
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     }).compile();
