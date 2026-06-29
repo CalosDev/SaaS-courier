@@ -21,6 +21,7 @@
     "prisma:check": "ts-node scripts/check-database.ts",
     "prisma:migrate:dev": "prisma migrate dev --config ./prisma.config.ts",
     "prisma:migrate:status": "prisma migrate status --config ./prisma.config.ts",
+    "rbac:sync-permissions": "ts-node scripts/sync-permissions.ts",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

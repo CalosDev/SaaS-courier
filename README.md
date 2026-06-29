@@ -88,6 +88,7 @@ pnpm db:format
 pnpm db:validate
 pnpm db:generate
 pnpm db:check
+pnpm rbac:sync-permissions
 ```
 
 Para crear y revisar migraciones versionadas:
