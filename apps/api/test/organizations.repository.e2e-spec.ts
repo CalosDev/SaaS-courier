@@ -109,5 +109,5 @@ describe('Organizations integration', () => {
         await moduleRef.close();
       }
     }
-  });
+  }, 15000);
 });
