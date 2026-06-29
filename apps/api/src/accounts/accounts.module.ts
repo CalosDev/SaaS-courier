@@ -22,6 +22,6 @@ import { PrismaAccountsRepository } from './prisma-accounts.repository';
       useClass: Argon2PasswordHasher,
     },
   ],
-  exports: [AccountsService],
+  exports: [AccountsService, PasswordHasher],
 })
 export class AccountsModule {}
