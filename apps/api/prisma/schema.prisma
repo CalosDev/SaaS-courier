@@ -57,6 +57,17 @@ enum EmployeeStatus {
   @@map("employee_status")
 }
 
+enum SessionRevocationReason {
+  LOGOUT
+  ROTATED
+  REUSE_DETECTED
+  IDLE_TIMEOUT
+  ADMIN_REVOKED
+  ACCOUNT_CHANGED
+
+  @@map("session_revocation_reason")
+}
+
 model Organization {
   id                 String             @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
   legalName          String             @map("legal_name") @db.VarChar(200)
@@ -204,20 +215,27 @@ model EmployeeFacility {
 }
 
 model UserSession {
-  id             String       @id(map: "user_sessions_pkey") @default(uuid()) @db.Uuid
-  organizationId String       @map("organization_id") @db.Uuid
-  employeeId     String       @map("employee_id") @db.Uuid
-  tokenHash      String       @unique(map: "user_sessions_token_hash_key") @map("token_hash") @db.VarChar(255)
-  expiresAt      DateTime     @map("expires_at") @db.Timestamptz(3)
-  revokedAt      DateTime?    @map("revoked_at") @db.Timestamptz(3)
-  lastSeenAt     DateTime?    @map("last_seen_at") @db.Timestamptz(3)
-  ipAddress      String?      @map("ip_address") @db.VarChar(64)
-  userAgent      String?      @map("user_agent") @db.VarChar(512)
-  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "user_sessions_organization_id_fkey")
-  employee       Employee     @relation(fields: [organizationId, employeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "user_sessions_organization_id_employee_id_fkey")
+  id                   String                   @id(map: "user_sessions_pkey") @default(uuid()) @db.Uuid
+  familyId             String                   @map("family_id") @db.Uuid
+  organizationId       String                   @map("organization_id") @db.Uuid
+  employeeId           String                   @map("employee_id") @db.Uuid
+  tokenHash            String                   @unique(map: "user_sessions_token_hash_key") @map("token_hash") @db.VarChar(255)
+  expiresAt            DateTime                 @map("expires_at") @db.Timestamptz(3)
+  revokedAt            DateTime?                @map("revoked_at") @db.Timestamptz(3)
+  revocationReason     SessionRevocationReason? @map("revocation_reason")
+  rotatedFromSessionId String?                  @map("rotated_from_session_id") @db.Uuid
+  lastSeenAt           DateTime?                @map("last_seen_at") @db.Timestamptz(3)
+  ipAddress            String?                  @map("ip_address") @db.VarChar(64)
+  userAgent            String?                  @map("user_agent") @db.VarChar(512)
+  createdAt            DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization         Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "user_sessions_organization_id_fkey")
+  employee             Employee                 @relation(fields: [organizationId, employeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "user_sessions_organization_id_employee_id_fkey")
+  rotatedFromSession   UserSession?             @relation("UserSessionRotation", fields: [familyId, rotatedFromSessionId], references: [familyId, id], onDelete: Restrict, onUpdate: Cascade, map: "user_sessions_family_id_rotated_from_session_id_fkey")
+  rotatedToSessions    UserSession[]            @relation("UserSessionRotation")
 
+  @@unique([familyId, id], map: "user_sessions_family_id_id_key")
+  @@unique([rotatedFromSessionId], map: "user_sessions_rotated_from_session_id_key")
   @@index([organizationId, employeeId], map: "user_sessions_organization_id_employee_id_idx")
   @@index([expiresAt], map: "user_sessions_expires_at_idx")
   @@index([revokedAt], map: "user_sessions_revoked_at_idx")

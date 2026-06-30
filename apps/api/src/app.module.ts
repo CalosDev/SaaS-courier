@@ -7,6 +7,7 @@ import { HealthModule } from './health/health.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RbacModule } from './rbac/rbac.module';
+import { SessionsModule } from './sessions/sessions.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RbacModule } from './rbac/rbac.module';
     PrismaModule,
     OrganizationsModule,
     RbacModule,
+    SessionsModule,
   ],
 })
 export class AppModule {}
