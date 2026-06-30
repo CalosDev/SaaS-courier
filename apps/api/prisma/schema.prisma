@@ -147,6 +147,7 @@ model User {
   deletedAt           DateTime?             @map("deleted_at") @db.Timestamptz(3)
   employees           Employee[]
   activationTokens    UserActivationToken[]
+  loginChallenges     LoginChallenge[]
 
   @@index([status], map: "users_status_idx")
   @@index([deletedAt], map: "users_deleted_at_idx")
@@ -168,6 +169,22 @@ model UserActivationToken {
   @@index([consumedAt], map: "user_activation_tokens_consumed_at_idx")
   @@index([invalidatedAt], map: "user_activation_tokens_invalidated_at_idx")
   @@map("user_activation_tokens")
+}
+
+model LoginChallenge {
+  id            String    @id(map: "login_challenges_pkey") @default(uuid()) @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  tokenHash     String    @unique(map: "login_challenges_token_hash_key") @map("token_hash") @db.VarChar(64)
+  expiresAt     DateTime  @map("expires_at") @db.Timestamptz(3)
+  consumedAt    DateTime? @map("consumed_at") @db.Timestamptz(3)
+  invalidatedAt DateTime? @map("invalidated_at") @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  user          User      @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "login_challenges_user_id_fkey")
+
+  @@index([userId, expiresAt], map: "login_challenges_user_id_expires_at_idx")
+  @@index([consumedAt], map: "login_challenges_consumed_at_idx")
+  @@index([invalidatedAt], map: "login_challenges_invalidated_at_idx")
+  @@map("login_challenges")
 }
 
 model Employee {

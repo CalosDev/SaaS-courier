@@ -1,0 +1,98 @@
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Post,
+  Req,
+  Res,
+} from '@nestjs/common';
+import type { Response } from 'express';
+import { Throttle } from '@nestjs/throttler';
+
+import type { SessionContext } from '../../sessions/session.types';
+import { AuthHttpService } from './auth-http.service';
+import type { AuthenticatedRequest } from './authenticated-request.type';
+import { CurrentSession } from './current-session.decorator';
+import { LoginDto } from './dto/login.dto';
+import { SelectOrganizationDto } from './dto/select-organization.dto';
+import { Public } from './public.decorator';
+
+@Controller('auth')
+export class AuthController {
+  constructor(private readonly authHttpService: AuthHttpService) {}
+
+  @Get('csrf')
+  @Public()
+  @Throttle({
+    default: {
+      limit: 60,
+      ttl: 60_000,
+    },
+  })
+  getCsrf(@Res({ passthrough: true }) response: Response) {
+    return this.authHttpService.issueCsrfToken(response);
+  }
+
+  @Post('login')
+  @Public()
+  @HttpCode(200)
+  @Throttle({
+    default: {
+      limit: 10,
+      ttl: 300_000,
+    },
+  })
+  login(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+    @Body() body: LoginDto,
+  ) {
+    return this.authHttpService.login(request, response, body);
+  }
+
+  @Post('select-organization')
+  @Public()
+  @HttpCode(200)
+  @Throttle({
+    default: {
+      limit: 20,
+      ttl: 300_000,
+    },
+  })
+  selectOrganization(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+    @Body() body: SelectOrganizationDto,
+  ) {
+    return this.authHttpService.selectOrganization(request, response, body);
+  }
+
+  @Get('session')
+  getSession(
+    @CurrentSession() session: SessionContext,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return this.authHttpService.getCurrentSession(response, session);
+  }
+
+  @Post('session/rotate')
+  @HttpCode(204)
+  async rotateSession(
+    @Req() request: AuthenticatedRequest,
+    @CurrentSession() _session: SessionContext,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    await this.authHttpService.rotateSession(request, response);
+  }
+
+  @Post('logout')
+  @Public()
+  @HttpCode(204)
+  async logout(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<void> {
+    await this.authHttpService.logout(request, response);
+  }
+}

@@ -65,6 +65,19 @@ pnpm --filter @courier/api test:e2e
 
 Las pruebas e2e del API requieren PostgreSQL activo porque inicializan Prisma durante el ciclo de vida de NestJS.
 
+## Autenticacion HTTP
+
+El backend expone autenticacion con cookies HttpOnly y proteccion CSRF. En desarrollo local:
+
+```bash
+CORS_ORIGINS=http://localhost:3000
+COOKIE_SECURE=false
+```
+
+El frontend debe pedir primero `GET /auth/csrf`, enviar el token devuelto en `X-CSRF-Token` y usar `credentials: include` en cada `fetch` autenticado.
+
+El throttling actual usa almacenamiento en memoria por proceso. En produccion con multiples instancias se necesitara almacenamiento compartido.
+
 ## Base de datos local
 
 PostgreSQL se ejecuta en Docker para desarrollo local. Copia los valores de ejemplo antes de iniciar el servicio:
