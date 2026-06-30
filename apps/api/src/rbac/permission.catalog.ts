@@ -49,11 +49,12 @@ const permissionCatalog = [
   },
 ] as const satisfies readonly PermissionDefinition[];
 
-export const PERMISSION_CATALOG: readonly PermissionDefinition[] =
-  Object.freeze(
-    permissionCatalog.map((definition) => Object.freeze({ ...definition })),
-  );
+export type PermissionCode = (typeof permissionCatalog)[number]['code'];
 
-export const PERMISSION_CATALOG_CODES = new Set(
+export const PERMISSION_CATALOG = Object.freeze(
+  permissionCatalog.map((definition) => Object.freeze({ ...definition })),
+) as readonly (typeof permissionCatalog)[number][];
+
+export const PERMISSION_CATALOG_CODES = new Set<PermissionCode>(
   PERMISSION_CATALOG.map((definition) => definition.code),
 );

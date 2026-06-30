@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   PERMISSION_CATALOG,
   PERMISSION_CATALOG_CODES,
+  type PermissionCode,
 } from './permission.catalog';
 import {
   InvalidRoleInputError,
@@ -139,11 +140,11 @@ export class RbacService {
     );
   }
 
-  private normalizePermissionCode(permissionCode: string): string {
+  private normalizePermissionCode(permissionCode: string): PermissionCode {
     const normalizedCode = this.normalizeRequiredField(
       permissionCode,
       'permissionCode',
-    ).toLowerCase();
+    ).toLowerCase() as PermissionCode;
 
     if (!PERMISSION_CATALOG_CODES.has(normalizedCode)) {
       throw new UnknownPermissionCodeError(normalizedCode);

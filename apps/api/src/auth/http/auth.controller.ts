@@ -11,6 +11,7 @@ import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 
 import type { SessionContext } from '../../sessions/session.types';
+import { AuthenticatedOnly } from '../../rbac/http/authenticated-only.decorator';
 import { AuthHttpService } from './auth-http.service';
 import type { AuthenticatedRequest } from './authenticated-request.type';
 import { CurrentSession } from './current-session.decorator';
@@ -69,6 +70,7 @@ export class AuthController {
   }
 
   @Get('session')
+  @AuthenticatedOnly()
   getSession(
     @CurrentSession() session: SessionContext,
     @Res({ passthrough: true }) response: Response,
@@ -77,6 +79,7 @@ export class AuthController {
   }
 
   @Post('session/rotate')
+  @AuthenticatedOnly()
   @HttpCode(204)
   async rotateSession(
     @Req() request: AuthenticatedRequest,

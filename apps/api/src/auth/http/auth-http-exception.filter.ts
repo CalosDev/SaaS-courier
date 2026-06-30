@@ -9,6 +9,10 @@ import {
 import { ThrottlerException } from '@nestjs/throttler';
 
 import {
+  AuthorizationPolicyMissingError,
+  InsufficientPermissionsError,
+} from '../../rbac/http/authorization.errors';
+import {
   AccountTemporarilyLockedError,
   InvalidAuthenticationInputError,
   InvalidCredentialsError,
@@ -88,7 +92,9 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
     if (
       exception instanceof OrganizationAccessDeniedError ||
       exception instanceof SessionCreationDeniedError ||
-      exception instanceof CsrfValidationError
+      exception instanceof CsrfValidationError ||
+      exception instanceof InsufficientPermissionsError ||
+      exception instanceof AuthorizationPolicyMissingError
     ) {
       return {
         status: 403,
@@ -99,7 +105,9 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
         message:
           exception instanceof CsrfValidationError
             ? 'CSRF validation failed.'
-            : 'Forbidden.',
+            : exception instanceof InsufficientPermissionsError
+              ? 'You do not have permission to perform this action.'
+              : 'Forbidden.',
       };
     }
 

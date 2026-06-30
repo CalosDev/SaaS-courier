@@ -4,6 +4,8 @@ import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AccountsModule } from '../accounts/accounts.module';
 import { PrismaModule } from '../prisma/prisma.module';
+import { RbacModule } from '../rbac/rbac.module';
+import { PermissionsGuard } from '../rbac/http/permissions.guard';
 import { SessionsModule } from '../sessions/sessions.module';
 import { AuthRepository } from './auth.repository';
 import { AuthService } from './auth.service';
@@ -25,6 +27,7 @@ import { PrismaAuthRepository } from './prisma-auth.repository';
   imports: [
     PrismaModule,
     AccountsModule,
+    RbacModule,
     SessionsModule,
     ThrottlerModule.forRoot({
       throttlers: [
@@ -76,6 +79,10 @@ import { PrismaAuthRepository } from './prisma-auth.repository';
     {
       provide: APP_GUARD,
       useClass: SessionAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: PermissionsGuard,
     },
     {
       provide: APP_GUARD,
