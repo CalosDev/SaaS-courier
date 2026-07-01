@@ -13,6 +13,18 @@ import {
   InsufficientPermissionsError,
 } from '../../rbac/http/authorization.errors';
 import {
+  FacilityCodeConflictError,
+  FacilityLimitReachedError,
+  FacilityNotFoundError,
+  FacilityOrganizationUnavailableError,
+  InvalidFacilityInputError,
+} from '../../facilities/facility.errors';
+import {
+  InvalidOrganizationInputError,
+  OrganizationNotFoundError,
+  OrganizationSlugConflictError,
+} from '../../organizations/organization.errors';
+import {
   AccountTemporarilyLockedError,
   InvalidAuthenticationInputError,
   InvalidCredentialsError,
@@ -37,7 +49,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
     const request = context.getRequest<{ path?: string }>();
     const mappedError = this.mapException(exception);
 
-    if (request.path?.startsWith('/auth')) {
+    if (this.requiresNoStore(request.path)) {
       response.setHeader('Cache-Control', 'no-store');
     }
 
@@ -58,6 +70,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof InvalidAuthenticationInputError ||
       exception instanceof InvalidSessionInputError ||
       exception instanceof InvalidLoginChallengeInputError ||
+      exception instanceof InvalidOrganizationInputError ||
+      exception instanceof InvalidFacilityInputError ||
       exception instanceof BadRequestException
     ) {
       return {
@@ -112,6 +126,33 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
     }
 
     if (
+      exception instanceof OrganizationNotFoundError ||
+      exception instanceof FacilityNotFoundError ||
+      exception instanceof FacilityOrganizationUnavailableError
+    ) {
+      return {
+        status: 404,
+        code: exception.code,
+        message: 'Not found.',
+      };
+    }
+
+    if (
+      exception instanceof OrganizationSlugConflictError ||
+      exception instanceof FacilityCodeConflictError ||
+      exception instanceof FacilityLimitReachedError
+    ) {
+      return {
+        status: 409,
+        code: exception.code,
+        message:
+          exception instanceof FacilityLimitReachedError
+            ? 'Facility limit reached.'
+            : 'Conflict.',
+      };
+    }
+
+    if (
       exception instanceof AccountTemporarilyLockedError ||
       exception instanceof ThrottlerException
     ) {
@@ -157,5 +198,14 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       default:
         return 'Request failed.';
     }
+  }
+
+  private requiresNoStore(path: string | undefined): boolean {
+    return (
+      typeof path === 'string' &&
+      (path.startsWith('/auth') ||
+        path.startsWith('/organizations') ||
+        path.startsWith('/facilities'))
+    );
   }
 }

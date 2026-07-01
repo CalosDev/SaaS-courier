@@ -8,6 +8,8 @@ import type {
   CreateOrganizationInput,
   CreateOrganizationRecord,
   OrganizationRecord,
+  UpdateOrganizationProfileInput,
+  UpdateOrganizationProfileRecord,
 } from './organization.types';
 import { OrganizationsRepository } from './organizations.repository';
 
@@ -58,6 +60,21 @@ export class OrganizationsService {
     return organization;
   }
 
+  async updateProfile(
+    organizationId: string,
+    input: UpdateOrganizationProfileInput,
+  ): Promise<OrganizationRecord> {
+    const record = this.normalizeUpdateProfileInput(organizationId, input);
+    const organization =
+      await this.organizationsRepository.updateProfile(record);
+
+    if (!organization) {
+      throw new OrganizationNotFoundError(record.organizationId);
+    }
+
+    return organization;
+  }
+
   private normalizeCreateInput(
     input: CreateOrganizationInput,
   ): CreateOrganizationRecord {
@@ -82,6 +99,53 @@ export class OrganizationsService {
       email: this.normalizeOptionalField(input.email)?.toLowerCase() ?? null,
       phone: this.normalizeOptionalField(input.phone),
     };
+  }
+
+  private normalizeUpdateProfileInput(
+    organizationId: string,
+    input: UpdateOrganizationProfileInput,
+  ): UpdateOrganizationProfileRecord {
+    const record: UpdateOrganizationProfileRecord = {
+      organizationId: this.normalizeRequiredField(
+        organizationId,
+        'organizationId',
+      ),
+    };
+
+    if ('legalName' in input) {
+      record.legalName = this.normalizeRequiredField(
+        input.legalName ?? '',
+        'legalName',
+      );
+    }
+
+    if ('commercialName' in input) {
+      record.commercialName = this.normalizeRequiredField(
+        input.commercialName ?? '',
+        'commercialName',
+      );
+    }
+
+    if ('rnc' in input) {
+      record.rnc = this.normalizeOptionalField(input.rnc);
+    }
+
+    if ('email' in input) {
+      record.email =
+        this.normalizeOptionalField(input.email)?.toLowerCase() ?? null;
+    }
+
+    if ('phone' in input) {
+      record.phone = this.normalizeOptionalField(input.phone);
+    }
+
+    if (Object.keys(record).length === 1) {
+      throw new InvalidOrganizationInputError(
+        'Invalid organization input: at least one field is required',
+      );
+    }
+
+    return record;
   }
 
   private normalizeRequiredField(value: string, field: string): string {

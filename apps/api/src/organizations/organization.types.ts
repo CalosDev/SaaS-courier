@@ -18,6 +18,23 @@ export interface CreateOrganizationRecord {
   phone: string | null;
 }
 
+export interface UpdateOrganizationProfileInput {
+  legalName?: string;
+  commercialName?: string;
+  rnc?: string;
+  email?: string;
+  phone?: string;
+}
+
+export interface UpdateOrganizationProfileRecord {
+  organizationId: string;
+  legalName?: string;
+  commercialName?: string;
+  rnc?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
 export interface OrganizationRecord {
   id: string;
   legalName: string;

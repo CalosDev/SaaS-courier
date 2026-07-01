@@ -41,6 +41,7 @@ describe('OrganizationsService', () => {
     create: jest.fn<Promise<OrganizationRecord>, [CreateOrganizationRecord]>(),
     findById: jest.fn<Promise<OrganizationRecord | null>, [string]>(),
     findBySlug: jest.fn<Promise<OrganizationRecord | null>, [string]>(),
+    updateProfile: jest.fn<Promise<OrganizationRecord | null>, [unknown]>(),
   };
 
   const service = new OrganizationsService(repository);
@@ -183,6 +184,106 @@ describe('OrganizationsService', () => {
 
     await expect(service.getBySlug('missing-slug')).rejects.toBeInstanceOf(
       OrganizationNotFoundError,
+    );
+  });
+
+  it('updateProfile normalizes names before persisting', async () => {
+    const organization = buildOrganizationRecord({
+      legalName: 'Updated Legal Name',
+      commercialName: 'Updated Commercial Name',
+    });
+    repository.updateProfile.mockResolvedValueOnce(organization);
+
+    await service.updateProfile(organization.id, {
+      legalName: '  Updated Legal Name  ',
+      commercialName: '  Updated Commercial Name  ',
+    });
+
+    expect(repository.updateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: organization.id,
+        legalName: 'Updated Legal Name',
+        commercialName: 'Updated Commercial Name',
+      }),
+    );
+  });
+
+  it('updateProfile normalizes email to lowercase and trims it', async () => {
+    const organization = buildOrganizationRecord({
+      email: 'updated@courier.test',
+    });
+    repository.updateProfile.mockResolvedValueOnce(organization);
+
+    await service.updateProfile(organization.id, {
+      email: '  Updated@Courier.Test  ',
+    });
+
+    expect(repository.updateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: organization.id,
+        email: 'updated@courier.test',
+      }),
+    );
+  });
+
+  it('updateProfile stores optional empty strings as null', async () => {
+    const organization = buildOrganizationRecord({
+      rnc: null,
+      email: null,
+      phone: null,
+    });
+    repository.updateProfile.mockResolvedValueOnce(organization);
+
+    await service.updateProfile(organization.id, {
+      rnc: '   ',
+      email: '   ',
+      phone: '   ',
+    });
+
+    expect(repository.updateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: organization.id,
+        rnc: null,
+        email: null,
+        phone: null,
+      }),
+    );
+  });
+
+  it('updateProfile rejects an empty body', async () => {
+    await expect(
+      service.updateProfile('c0ea1ef1-5171-4e29-a214-aa2b734f9697', {}),
+    ).rejects.toBeInstanceOf(InvalidOrganizationInputError);
+  });
+
+  it('updateProfile rejects an empty legalName when provided', async () => {
+    await expect(
+      service.updateProfile('f702d292-d74a-4107-9b74-1d0bda1dc39f', {
+        legalName: '   ',
+      }),
+    ).rejects.toBeInstanceOf(InvalidOrganizationInputError);
+  });
+
+  it('updateProfile rejects an empty commercialName when provided', async () => {
+    await expect(
+      service.updateProfile('b233c8f3-725b-4735-af0b-7ce86c5dc82a', {
+        commercialName: '   ',
+      }),
+    ).rejects.toBeInstanceOf(InvalidOrganizationInputError);
+  });
+
+  it('updateProfile uses the organizationId passed by the caller', async () => {
+    const organization = buildOrganizationRecord();
+    repository.updateProfile.mockResolvedValueOnce(organization);
+
+    await service.updateProfile(organization.id, {
+      phone: ' 809-555-0110 ',
+    });
+
+    expect(repository.updateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: organization.id,
+      }),
     );
   });
 });

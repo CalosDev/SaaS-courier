@@ -6,6 +6,7 @@ import { OrganizationSlugConflictError } from './organization.errors';
 import type {
   CreateOrganizationRecord,
   OrganizationRecord,
+  UpdateOrganizationProfileRecord,
 } from './organization.types';
 import { OrganizationsRepository } from './organizations.repository';
 
@@ -54,6 +55,34 @@ export class PrismaOrganizationsRepository implements OrganizationsRepository {
         deletedAt: null,
       },
     });
+
+    return organization ? this.toOrganizationRecord(organization) : null;
+  }
+
+  async updateProfile(
+    input: UpdateOrganizationProfileRecord,
+  ): Promise<OrganizationRecord | null> {
+    const organizations =
+      await this.prismaService.organization.updateManyAndReturn({
+        where: {
+          id: input.organizationId,
+          deletedAt: null,
+        },
+        data: {
+          ...(input.legalName !== undefined
+            ? { legalName: input.legalName }
+            : {}),
+          ...(input.commercialName !== undefined
+            ? { commercialName: input.commercialName }
+            : {}),
+          ...(input.rnc !== undefined ? { rnc: input.rnc } : {}),
+          ...(input.email !== undefined ? { email: input.email } : {}),
+          ...(input.phone !== undefined ? { phone: input.phone } : {}),
+        },
+        limit: 1,
+      });
+
+    const organization = organizations[0];
 
     return organization ? this.toOrganizationRecord(organization) : null;
   }

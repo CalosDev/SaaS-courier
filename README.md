@@ -65,6 +65,15 @@ pnpm --filter @courier/api test:e2e
 
 Las pruebas e2e del API requieren PostgreSQL activo porque inicializan Prisma durante el ciclo de vida de NestJS.
 
+Los primeros endpoints administrativos protegidos disponibles actualmente son:
+
+- `GET /organizations/current`
+- `PATCH /organizations/current`
+- `GET /facilities`
+- `POST /facilities`
+- `GET /facilities/:facilityId`
+- `PATCH /facilities/:facilityId`
+
 ## Autenticacion HTTP
 
 El backend expone autenticacion con cookies HttpOnly y proteccion CSRF. En desarrollo local:
