@@ -151,6 +151,10 @@ describe('HTTP authorization with effective permissions', () => {
       });
 
       expect(permissionCatalog.map((permission) => permission.code)).toEqual([
+        'customers.customs.manage',
+        'customers.customs.read',
+        'customers.manage',
+        'customers.read',
         'employees.manage',
         'employees.read',
         'facilities.manage',

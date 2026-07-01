@@ -68,32 +68,87 @@ enum SessionRevocationReason {
   @@map("session_revocation_reason")
 }
 
+enum CustomerType {
+  INDIVIDUAL
+  BUSINESS
+
+  @@map("customer_type")
+}
+
+enum CustomerStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CLOSED
+
+  @@map("customer_status")
+}
+
+enum CustomerAddressType {
+  HOME
+  WORK
+  BILLING
+  DELIVERY
+  OTHER
+
+  @@map("customer_address_type")
+}
+
+enum CustomerIdentityDocumentType {
+  CEDULA
+  PASSPORT
+  RNC
+
+  @@map("customer_identity_document_type")
+}
+
+enum CustomsRegistrationStatus {
+  UNKNOWN
+  PENDING
+  REGISTERED
+  NOT_REGISTERED
+  VERIFICATION_FAILED
+
+  @@map("customs_registration_status")
+}
+
+enum CustomsVerificationSource {
+  MANUAL
+  DGA_PORTAL
+  OFFICIAL_INTEGRATION
+
+  @@map("customs_verification_source")
+}
+
 model Organization {
-  id                 String             @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
-  legalName          String             @map("legal_name") @db.VarChar(200)
-  commercialName     String             @map("commercial_name") @db.VarChar(120)
-  slug               String             @unique(map: "organizations_slug_key") @db.VarChar(80)
-  rnc                String?            @db.VarChar(20)
-  email              String?            @db.VarChar(320)
-  phone              String?            @db.VarChar(32)
-  countryCode        String             @default("DO") @map("country_code") @db.Char(2)
-  currencyCode       String             @default("DOP") @map("currency_code") @db.Char(3)
-  timezone           String             @default("America/Santo_Domingo") @db.VarChar(64)
-  status             OrganizationStatus @default(TRIAL)
-  planCode           String             @default("PILOT") @map("plan_code") @db.VarChar(40)
-  maxUsers           Int                @default(5) @map("max_users")
-  maxFacilities      Int                @default(2) @map("max_facilities")
-  trialEndsAt        DateTime?          @map("trial_ends_at") @db.Timestamptz(3)
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt          DateTime?          @map("deleted_at") @db.Timestamptz(3)
-  facilities         Facility[]
-  employees          Employee[]
-  employeeFacilities EmployeeFacility[]
-  roles              Role[]
-  employeeRoles      EmployeeRole[]
-  rolePermissions    RolePermission[]
-  userSessions       UserSession[]
+  id                      String                   @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
+  legalName               String                   @map("legal_name") @db.VarChar(200)
+  commercialName          String                   @map("commercial_name") @db.VarChar(120)
+  slug                    String                   @unique(map: "organizations_slug_key") @db.VarChar(80)
+  rnc                     String?                  @db.VarChar(20)
+  email                   String?                  @db.VarChar(320)
+  phone                   String?                  @db.VarChar(32)
+  countryCode             String                   @default("DO") @map("country_code") @db.Char(2)
+  currencyCode            String                   @default("DOP") @map("currency_code") @db.Char(3)
+  timezone                String                   @default("America/Santo_Domingo") @db.VarChar(64)
+  status                  OrganizationStatus       @default(TRIAL)
+  planCode                String                   @default("PILOT") @map("plan_code") @db.VarChar(40)
+  maxUsers                Int                      @default(5) @map("max_users")
+  maxFacilities           Int                      @default(2) @map("max_facilities")
+  trialEndsAt             DateTime?                @map("trial_ends_at") @db.Timestamptz(3)
+  createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt               DateTime?                @map("deleted_at") @db.Timestamptz(3)
+  facilities              Facility[]
+  customers               Customer[]
+  customerAddresses       CustomerAddress[]
+  customerCustomsProfiles CustomerCustomsProfile[]
+  employees               Employee[]
+  employeeFacilities      EmployeeFacility[]
+  roles                   Role[]
+  employeeRoles           EmployeeRole[]
+  rolePermissions         RolePermission[]
+  userSessions            UserSession[]
 
   @@index([status], map: "organizations_status_idx")
   @@index([deletedAt], map: "organizations_deleted_at_idx")
@@ -130,6 +185,87 @@ model Facility {
   @@index([organizationId, isActive], map: "facilities_organization_id_is_active_idx")
   @@index([organizationId, deletedAt], map: "facilities_organization_id_deleted_at_idx")
   @@map("facilities")
+}
+
+model Customer {
+  id             String                  @id(map: "customers_pkey") @default(uuid()) @db.Uuid
+  organizationId String                  @map("organization_id") @db.Uuid
+  customerCode   String                  @map("customer_code") @db.VarChar(40)
+  type           CustomerType
+  firstName      String?                 @map("first_name") @db.VarChar(120)
+  lastName       String?                 @map("last_name") @db.VarChar(120)
+  businessName   String?                 @map("business_name") @db.VarChar(200)
+  email          String?                 @db.VarChar(320)
+  phone          String?                 @db.VarChar(32)
+  mobilePhone    String?                 @map("mobile_phone") @db.VarChar(32)
+  status         CustomerStatus          @default(PENDING)
+  notes          String?                 @db.VarChar(1000)
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?               @map("deleted_at") @db.Timestamptz(3)
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "customers_organization_id_fkey")
+  addresses      CustomerAddress[]
+  customsProfile CustomerCustomsProfile?
+
+  @@unique([organizationId, customerCode], map: "customers_organization_id_customer_code_key")
+  @@unique([organizationId, id], map: "customers_organization_id_id_key")
+  @@index([organizationId, status], map: "customers_organization_id_status_idx")
+  @@index([organizationId, type], map: "customers_organization_id_type_idx")
+  @@index([organizationId, deletedAt], map: "customers_organization_id_deleted_at_idx")
+  @@map("customers")
+}
+
+model CustomerAddress {
+  id             String              @id(map: "customer_addresses_pkey") @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  customerId     String              @map("customer_id") @db.Uuid
+  type           CustomerAddressType
+  label          String?             @db.VarChar(120)
+  recipientName  String?             @map("recipient_name") @db.VarChar(160)
+  phone          String?             @db.VarChar(32)
+  addressLine1   String              @map("address_line_1") @db.VarChar(200)
+  addressLine2   String?             @map("address_line_2") @db.VarChar(200)
+  city           String              @db.VarChar(80)
+  province       String              @db.VarChar(80)
+  postalCode     String?             @map("postal_code") @db.VarChar(32)
+  countryCode    String              @default("DO") @map("country_code") @db.Char(2)
+  isPrimary      Boolean             @default(false) @map("is_primary")
+  isActive       Boolean             @default(true) @map("is_active")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?           @map("deleted_at") @db.Timestamptz(3)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "customer_addresses_organization_id_fkey")
+  customer       Customer            @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "customer_addresses_organization_id_customer_id_fkey")
+
+  @@unique([organizationId, id], map: "customer_addresses_organization_id_id_key")
+  @@index([organizationId, customerId], map: "customer_addresses_organization_id_customer_id_idx")
+  @@index([organizationId, customerId, type], map: "customer_addresses_organization_id_customer_id_type_idx")
+  @@index([organizationId, deletedAt], map: "customer_addresses_organization_id_deleted_at_idx")
+  @@map("customer_addresses")
+}
+
+model CustomerCustomsProfile {
+  id                 String                       @id(map: "customer_customs_profiles_pkey") @default(uuid()) @db.Uuid
+  organizationId     String                       @map("organization_id") @db.Uuid
+  customerId         String                       @map("customer_id") @db.Uuid
+  documentType       CustomerIdentityDocumentType @map("document_type")
+  documentNumber     String                       @map("document_number") @db.VarChar(30)
+  ruaStatus          CustomsRegistrationStatus    @default(UNKNOWN) @map("rua_status")
+  verificationSource CustomsVerificationSource?   @map("verification_source")
+  lastCheckedAt      DateTime?                    @map("last_checked_at") @db.Timestamptz(3)
+  verifiedAt         DateTime?                    @map("verified_at") @db.Timestamptz(3)
+  externalReference  String?                      @map("external_reference") @db.VarChar(120)
+  notes              String?                      @db.VarChar(1000)
+  createdAt          DateTime                     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                     @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization       Organization                 @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "customer_customs_profiles_organization_id_fkey")
+  customer           Customer                     @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "customer_customs_profiles_organization_id_customer_id_fkey")
+
+  @@unique([organizationId, customerId], map: "customer_customs_profiles_organization_id_customer_id_key")
+  @@unique([organizationId, documentType, documentNumber], map: "customer_customs_profiles_org_doc_key")
+  @@unique([organizationId, id], map: "customer_customs_profiles_organization_id_id_key")
+  @@index([organizationId, ruaStatus], map: "customer_customs_profiles_organization_id_rua_status_idx")
+  @@map("customer_customs_profiles")
 }
 
 model User {
@@ -253,7 +389,9 @@ model UserSession {
 
   @@unique([familyId, id], map: "user_sessions_family_id_id_key")
   @@unique([rotatedFromSessionId], map: "user_sessions_rotated_from_session_id_key")
+  @@index([familyId, revokedAt], map: "user_sessions_family_id_revoked_at_idx")
   @@index([organizationId, employeeId], map: "user_sessions_organization_id_employee_id_idx")
+  @@index([organizationId, employeeId, revokedAt, expiresAt], map: "user_sessions_organization_id_employee_id_revoked_at_expires_at")
   @@index([expiresAt], map: "user_sessions_expires_at_idx")
   @@index([revokedAt], map: "user_sessions_revoked_at_idx")
   @@map("user_sessions")

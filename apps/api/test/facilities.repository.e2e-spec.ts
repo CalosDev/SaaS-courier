@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaPg } from '@prisma/adapter-pg';
 import { randomUUID } from 'node:crypto';
 
 import { AppModule } from '../src/app.module';
@@ -9,7 +10,12 @@ import {
   FacilityNotFoundError,
 } from '../src/facilities/facility.errors';
 import { FacilitiesRepository } from '../src/facilities/facilities.repository';
-import type { FacilityRecord } from '../src/facilities/facility.types';
+import type {
+  CreateFacilityRecord,
+  FacilityRecord,
+} from '../src/facilities/facility.types';
+import { PrismaClient } from '../src/generated/prisma/client';
+import { PrismaFacilitiesRepository } from '../src/facilities/prisma-facilities.repository';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const LOCAL_DATABASE_URL =
@@ -20,6 +26,7 @@ describe('Facilities repository integration', () => {
     let app: INestApplication | null = null;
     let moduleRef: TestingModule | null = null;
     let prismaService: PrismaService | null = null;
+    const concurrentClients: PrismaClient[] = [];
     const cleanup = {
       organizationIds: [] as string[],
       facilityIds: [] as string[],
@@ -203,7 +210,7 @@ describe('Facilities repository integration', () => {
       expect(activeList.items).toHaveLength(1);
       expect(activeList.items[0]?.id).toBe(facilityOrgOne.id);
 
-      const limitedCreateOne = facilitiesRepository.create({
+      const limitedCreateOneInput: CreateFacilityRecord = {
         organizationId: organizationLimited.id,
         code: 'LIM-1',
         name: 'Limited One',
@@ -220,8 +227,8 @@ describe('Facilities repository integration', () => {
         isPackageOrigin: false,
         isDistributionCenter: false,
         isActive: true,
-      });
-      const limitedCreateTwo = facilitiesRepository.create({
+      };
+      const limitedCreateTwoInput: CreateFacilityRecord = {
         organizationId: organizationLimited.id,
         code: 'LIM-2',
         name: 'Limited Two',
@@ -238,11 +245,29 @@ describe('Facilities repository integration', () => {
         isPackageOrigin: false,
         isDistributionCenter: false,
         isActive: true,
+      };
+
+      const concurrentPrismaOne = new PrismaClient({
+        adapter: new PrismaPg({ connectionString: LOCAL_DATABASE_URL }),
       });
+      const concurrentPrismaTwo = new PrismaClient({
+        adapter: new PrismaPg({ connectionString: LOCAL_DATABASE_URL }),
+      });
+      concurrentClients.push(concurrentPrismaOne, concurrentPrismaTwo);
+      await Promise.all([
+        concurrentPrismaOne.$connect(),
+        concurrentPrismaTwo.$connect(),
+      ]);
+      const concurrentRepositoryOne = new PrismaFacilitiesRepository(
+        concurrentPrismaOne as unknown as PrismaService,
+      );
+      const concurrentRepositoryTwo = new PrismaFacilitiesRepository(
+        concurrentPrismaTwo as unknown as PrismaService,
+      );
 
       const limitedResults = await Promise.allSettled([
-        limitedCreateOne,
-        limitedCreateTwo,
+        concurrentRepositoryOne.create(limitedCreateOneInput),
+        concurrentRepositoryTwo.create(limitedCreateTwoInput),
       ]);
       const successfulLimitedCreates = limitedResults.filter(
         (result): result is PromiseFulfilledResult<FacilityRecord> =>
@@ -271,6 +296,10 @@ describe('Facilities repository integration', () => {
       });
       expect(persistedLimitedFacilities).toBe(1);
     } finally {
+      for (const client of concurrentClients) {
+        await client.$disconnect();
+      }
+
       if (prismaService) {
         await prismaService.employeeFacility.deleteMany({
           where: {

@@ -73,6 +73,18 @@ Los primeros endpoints administrativos protegidos disponibles actualmente son:
 - `POST /facilities`
 - `GET /facilities/:facilityId`
 - `PATCH /facilities/:facilityId`
+- `GET /customers`
+- `POST /customers`
+- `GET /customers/:customerId`
+- `PATCH /customers/:customerId`
+- `GET /customers/:customerId/addresses`
+- `POST /customers/:customerId/addresses`
+- `PATCH /customers/:customerId/addresses/:addressId`
+- `GET /customers/:customerId/customs-profile`
+- `PUT /customers/:customerId/customs-profile`
+- `PATCH /customers/:customerId/customs-profile/verification`
+
+La identificacion aduanera de clientes se guarda en `CustomerCustomsProfile`. El listado general `GET /customers` no expone cedulas, pasaportes, RNC ni estado RUA.
 
 ## Autenticacion HTTP
 

@@ -47,6 +47,28 @@ const permissionCatalog = [
     name: 'Read permissions',
     description: 'Allows reading the permission catalog.',
   },
+  {
+    code: 'customers.read',
+    name: 'Read customers',
+    description: 'Allows reading customer data within the current tenant.',
+  },
+  {
+    code: 'customers.manage',
+    name: 'Manage customers',
+    description: 'Allows managing customer records within the current tenant.',
+  },
+  {
+    code: 'customers.customs.read',
+    name: 'Read customer customs profiles',
+    description:
+      'Allows reading customer customs identity and RUA verification data within the current tenant.',
+  },
+  {
+    code: 'customers.customs.manage',
+    name: 'Manage customer customs profiles',
+    description:
+      'Allows managing customer customs identity and RUA verification data within the current tenant.',
+  },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionCode = (typeof permissionCatalog)[number]['code'];

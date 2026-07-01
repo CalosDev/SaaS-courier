@@ -20,6 +20,15 @@ import {
   InvalidFacilityInputError,
 } from '../../facilities/facility.errors';
 import {
+  CustomerAddressNotFoundError,
+  CustomerCodeGenerationError,
+  CustomerCustomsProfileNotFoundError,
+  CustomerIdentityConflictError,
+  CustomerNotFoundError,
+  InvalidCustomerCustomsProfileError,
+  InvalidCustomerInputError,
+} from '../../customers/customer.errors';
+import {
   InvalidOrganizationInputError,
   OrganizationNotFoundError,
   OrganizationSlugConflictError,
@@ -72,6 +81,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof InvalidLoginChallengeInputError ||
       exception instanceof InvalidOrganizationInputError ||
       exception instanceof InvalidFacilityInputError ||
+      exception instanceof InvalidCustomerInputError ||
+      exception instanceof InvalidCustomerCustomsProfileError ||
       exception instanceof BadRequestException
     ) {
       return {
@@ -128,7 +139,10 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
     if (
       exception instanceof OrganizationNotFoundError ||
       exception instanceof FacilityNotFoundError ||
-      exception instanceof FacilityOrganizationUnavailableError
+      exception instanceof FacilityOrganizationUnavailableError ||
+      exception instanceof CustomerNotFoundError ||
+      exception instanceof CustomerAddressNotFoundError ||
+      exception instanceof CustomerCustomsProfileNotFoundError
     ) {
       return {
         status: 404,
@@ -140,7 +154,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
     if (
       exception instanceof OrganizationSlugConflictError ||
       exception instanceof FacilityCodeConflictError ||
-      exception instanceof FacilityLimitReachedError
+      exception instanceof FacilityLimitReachedError ||
+      exception instanceof CustomerIdentityConflictError
     ) {
       return {
         status: 409,
@@ -149,6 +164,14 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
           exception instanceof FacilityLimitReachedError
             ? 'Facility limit reached.'
             : 'Conflict.',
+      };
+    }
+
+    if (exception instanceof CustomerCodeGenerationError) {
+      return {
+        status: 500,
+        code: exception.code,
+        message: 'Internal server error.',
       };
     }
 
@@ -205,7 +228,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       typeof path === 'string' &&
       (path.startsWith('/auth') ||
         path.startsWith('/organizations') ||
-        path.startsWith('/facilities'))
+        path.startsWith('/facilities') ||
+        path.startsWith('/customers'))
     );
   }
 }
