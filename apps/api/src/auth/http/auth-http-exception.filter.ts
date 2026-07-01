@@ -9,9 +9,33 @@ import {
 import { ThrottlerException } from '@nestjs/throttler';
 
 import {
+  InvalidActivationTokenError,
+  InvalidAccountInputError,
+  InvalidPasswordError,
+} from '../../accounts/account.errors';
+import {
+  EmployeeCodeConflictError,
+  EmployeeFacilityNotFoundError,
+  EmployeeInvitationUserUnavailableError,
+  EmployeeMaxUsersExceededError,
+  EmployeeMembershipConflictError,
+  EmployeeNotFoundError,
+  EmployeeRoleNotFoundError,
+  EmployeeSelfManagementError,
+  InvalidEmployeeInputError,
+} from '../../employees/employee.errors';
+import {
   AuthorizationPolicyMissingError,
   InsufficientPermissionsError,
 } from '../../rbac/http/authorization.errors';
+import {
+  InvalidRoleInputError,
+  PermissionCatalogNotSynchronizedError,
+  RoleCodeConflictError,
+  RoleNotFoundError,
+  SystemRoleImmutableError,
+  UnknownPermissionCodeError,
+} from '../../rbac/rbac.errors';
 import {
   FacilityCodeConflictError,
   FacilityLimitReachedError,
@@ -83,6 +107,11 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof InvalidFacilityInputError ||
       exception instanceof InvalidCustomerInputError ||
       exception instanceof InvalidCustomerCustomsProfileError ||
+      exception instanceof InvalidEmployeeInputError ||
+      exception instanceof InvalidRoleInputError ||
+      exception instanceof InvalidAccountInputError ||
+      exception instanceof InvalidPasswordError ||
+      exception instanceof UnknownPermissionCodeError ||
       exception instanceof BadRequestException
     ) {
       return {
@@ -105,7 +134,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
 
     if (
       exception instanceof InvalidSessionTokenError ||
-      exception instanceof InvalidLoginChallengeError
+      exception instanceof InvalidLoginChallengeError ||
+      exception instanceof InvalidActivationTokenError
     ) {
       return {
         status: 401,
@@ -119,7 +149,9 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof SessionCreationDeniedError ||
       exception instanceof CsrfValidationError ||
       exception instanceof InsufficientPermissionsError ||
-      exception instanceof AuthorizationPolicyMissingError
+      exception instanceof AuthorizationPolicyMissingError ||
+      exception instanceof EmployeeSelfManagementError ||
+      exception instanceof SystemRoleImmutableError
     ) {
       return {
         status: 403,
@@ -142,7 +174,11 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof FacilityOrganizationUnavailableError ||
       exception instanceof CustomerNotFoundError ||
       exception instanceof CustomerAddressNotFoundError ||
-      exception instanceof CustomerCustomsProfileNotFoundError
+      exception instanceof CustomerCustomsProfileNotFoundError ||
+      exception instanceof EmployeeNotFoundError ||
+      exception instanceof EmployeeFacilityNotFoundError ||
+      exception instanceof EmployeeRoleNotFoundError ||
+      exception instanceof RoleNotFoundError
     ) {
       return {
         status: 404,
@@ -155,7 +191,13 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof OrganizationSlugConflictError ||
       exception instanceof FacilityCodeConflictError ||
       exception instanceof FacilityLimitReachedError ||
-      exception instanceof CustomerIdentityConflictError
+      exception instanceof CustomerIdentityConflictError ||
+      exception instanceof EmployeeCodeConflictError ||
+      exception instanceof EmployeeMembershipConflictError ||
+      exception instanceof EmployeeMaxUsersExceededError ||
+      exception instanceof EmployeeInvitationUserUnavailableError ||
+      exception instanceof RoleCodeConflictError ||
+      exception instanceof PermissionCatalogNotSynchronizedError
     ) {
       return {
         status: 409,
@@ -227,6 +269,10 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
     return (
       typeof path === 'string' &&
       (path.startsWith('/auth') ||
+        path.startsWith('/accounts') ||
+        path.startsWith('/employees') ||
+        path.startsWith('/roles') ||
+        path.startsWith('/permissions') ||
         path.startsWith('/organizations') ||
         path.startsWith('/facilities') ||
         path.startsWith('/customers'))

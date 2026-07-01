@@ -7,9 +7,14 @@ import {
 import type {
   AssignRoleToEmployeeRecord,
   CreateRoleRecord,
+  ListRolesRecord,
+  PermissionListItem,
   PermissionCatalogSyncResult,
   PermissionEvaluationRecord,
   RoleRecord,
+  RoleDetailRecord,
+  ReplaceRolePermissionsRecord,
+  UpdateRoleRecord,
 } from './rbac.types';
 import { RbacService } from './rbac.service';
 
@@ -46,6 +51,25 @@ describe('RbacService', () => {
       Promise<void>,
       [AssignRoleToEmployeeRecord]
     >(),
+    listRoles: jest.fn<
+      Promise<{
+        items: RoleRecord[];
+        pagination: {
+          page: number;
+          pageSize: number;
+          totalItems: number;
+          totalPages: number;
+        };
+      }>,
+      [ListRolesRecord]
+    >(),
+    findRoleById: jest.fn<Promise<RoleDetailRecord | null>, [string, string]>(),
+    updateRole: jest.fn<Promise<RoleDetailRecord | null>, [UpdateRoleRecord]>(),
+    replaceRolePermissions: jest.fn<
+      Promise<RoleDetailRecord | null>,
+      [ReplaceRolePermissionsRecord]
+    >(),
+    listActivePermissions: jest.fn<Promise<PermissionListItem[]>, []>(),
     findEffectivePermissionCodes: jest.fn<
       Promise<string[]>,
       [PermissionEvaluationRecord]
@@ -269,5 +293,91 @@ describe('RbacService', () => {
         employeeId: randomUUID(),
       }),
     ).resolves.toEqual(['organizations.read', 'roles.read']);
+  });
+
+  it('lists roles with normalized query and default pagination', async () => {
+    repository.listRoles.mockResolvedValueOnce({
+      items: [buildRoleRecord()],
+      pagination: {
+        page: 1,
+        pageSize: 20,
+        totalItems: 1,
+        totalPages: 1,
+      },
+    });
+
+    const result = await service.listRoles({
+      organizationId: randomUUID(),
+      q: '  ops  ',
+    });
+
+    expect(repository.listRoles).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 1,
+        pageSize: 20,
+        q: 'ops',
+      }),
+    );
+    expect(result.pagination.totalItems).toBe(1);
+  });
+
+  it('normalizes role code, name, and permission codes when updating role metadata and permissions', async () => {
+    repository.updateRole.mockResolvedValueOnce(
+      buildRoleRecord({
+        code: 'OPS_SUPPORT',
+        name: 'Ops Support',
+      }) as unknown as RoleDetailRecord,
+    );
+    repository.replaceRolePermissions.mockResolvedValueOnce(
+      buildRoleRecord({
+        permissionCodes: ['employees.read', 'roles.read'],
+      }) as unknown as RoleDetailRecord,
+    );
+
+    await service.updateRole({
+      organizationId: randomUUID(),
+      roleId: randomUUID(),
+      code: '  ops_support  ',
+      name: '  Ops Support  ',
+      description: '  Updated  ',
+      isActive: true,
+    });
+
+    await service.replaceRolePermissions({
+      organizationId: randomUUID(),
+      roleId: randomUUID(),
+      permissionCodes: [' ROLES.READ ', 'employees.read', 'roles.read'],
+    });
+
+    expect(repository.updateRole).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: 'OPS_SUPPORT',
+        name: 'Ops Support',
+        description: 'Updated',
+      }),
+    );
+    expect(repository.replaceRolePermissions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        permissionCodes: ['employees.read', 'roles.read'],
+      }),
+    );
+  });
+
+  it('lists only active permissions through the repository', async () => {
+    repository.listActivePermissions.mockResolvedValueOnce([
+      {
+        code: 'employees.read',
+        name: 'Employees read',
+        description: 'Read employees',
+      },
+    ]);
+
+    await expect(service.listActivePermissions()).resolves.toEqual([
+      {
+        code: 'employees.read',
+        name: 'Employees read',
+        description: 'Read employees',
+      },
+    ]);
   });
 });

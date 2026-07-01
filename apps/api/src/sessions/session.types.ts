@@ -36,6 +36,12 @@ export interface RevokeAllUserSessionsInput {
   reason: AdministrativeSessionRevocationReason;
 }
 
+export interface RevokeEmployeeSessionsInput {
+  organizationId: string;
+  employeeId: string;
+  reason: AdministrativeSessionRevocationReason;
+}
+
 export interface SessionTokenSecret {
   token: string;
   tokenHash: string;
@@ -130,6 +136,13 @@ export interface RevokeSessionRecordInput {
 
 export interface RevokeAllUserSessionsRecordInput {
   userId: string;
+  revokedAt: Date;
+  reason: AdministrativeSessionRevocationReason;
+}
+
+export interface RevokeEmployeeSessionsRecordInput {
+  organizationId: string;
+  employeeId: string;
   revokedAt: Date;
   reason: AdministrativeSessionRevocationReason;
 }

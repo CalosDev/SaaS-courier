@@ -62,3 +62,11 @@ export class RbacScopeMismatchError extends RbacError {
     super('RBAC scope mismatch');
   }
 }
+
+export class SystemRoleImmutableError extends RbacError {
+  readonly code = 'RBAC_SYSTEM_ROLE_IMMUTABLE';
+
+  constructor() {
+    super('System roles cannot be modified');
+  }
+}

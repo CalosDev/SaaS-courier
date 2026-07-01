@@ -8,6 +8,7 @@ import { SessionsService } from './sessions.service';
 import type {
   CreateSessionRecordInput,
   RevokeAllUserSessionsInput,
+  RevokeEmployeeSessionsInput,
   SessionContext,
   SessionTokenSecret,
   SessionValidationRecord,
@@ -57,6 +58,7 @@ describe('SessionsService', () => {
   const rotateSessionRecordMock = jest.fn();
   const revokeSessionRecordMock = jest.fn();
   const revokeAllUserSessionsRecordMock = jest.fn();
+  const revokeEmployeeSessionsRecordMock = jest.fn();
 
   const repository: jest.Mocked<SessionsRepository> = {
     findSessionCreationContext: findCreateContextMock,
@@ -65,6 +67,7 @@ describe('SessionsService', () => {
     rotateSessionRecord: rotateSessionRecordMock,
     revokeSessionRecord: revokeSessionRecordMock,
     revokeAllUserSessionsRecord: revokeAllUserSessionsRecordMock,
+    revokeEmployeeSessionsRecord: revokeEmployeeSessionsRecordMock,
   };
 
   const createSecretMock = jest.fn<SessionTokenSecret, []>();
@@ -230,6 +233,34 @@ describe('SessionsService', () => {
         userId: '05b1a8bf-5f6b-4c1a-a3de-60060206e513',
         reason: 'LOGOUT',
       } as unknown as RevokeAllUserSessionsInput),
+    ).rejects.toBeInstanceOf(InvalidSessionInputError);
+  });
+
+  it('revokeEmployeeSessions is scoped by organizationId and employeeId and only accepts administrative reasons', async () => {
+    revokeEmployeeSessionsRecordMock.mockResolvedValueOnce(1);
+
+    await expect(
+      service.revokeEmployeeSessions({
+        organizationId: '7d59c8f2-34f1-41fd-9868-a7b80ff4db89',
+        employeeId: '3f81ba20-bafb-4680-a8d6-af2adf6d5060',
+        reason: 'ADMIN_REVOKED',
+      }),
+    ).resolves.toBe(1);
+
+    expect(revokeEmployeeSessionsRecordMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: '7d59c8f2-34f1-41fd-9868-a7b80ff4db89',
+        employeeId: '3f81ba20-bafb-4680-a8d6-af2adf6d5060',
+        reason: 'ADMIN_REVOKED',
+      }),
+    );
+
+    await expect(
+      service.revokeEmployeeSessions({
+        organizationId: '7d59c8f2-34f1-41fd-9868-a7b80ff4db89',
+        employeeId: '3f81ba20-bafb-4680-a8d6-af2adf6d5060',
+        reason: 'LOGOUT',
+      } as unknown as RevokeEmployeeSessionsInput),
     ).rejects.toBeInstanceOf(InvalidSessionInputError);
   });
 });

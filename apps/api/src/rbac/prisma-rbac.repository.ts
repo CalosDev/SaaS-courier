@@ -8,15 +8,22 @@ import {
   RbacScopeMismatchError,
   RoleCodeConflictError,
   RoleNotFoundError,
+  SystemRoleImmutableError,
 } from './rbac.errors';
 import { RbacRepository } from './rbac.repository';
 import type {
   AssignRoleToEmployeeRecord,
   CreateRoleRecord,
+  ListRolesRecord,
+  PermissionListItem,
   PermissionCatalogSyncResult,
   PermissionDefinition,
   PermissionEvaluationRecord,
+  ReplaceRolePermissionsRecord,
+  RoleDetailRecord,
+  RoleListResult,
   RoleRecord,
+  UpdateRoleRecord,
 } from './rbac.types';
 
 type RoleWithPermissions = Prisma.RoleGetPayload<{
@@ -28,6 +35,25 @@ type RoleWithPermissions = Prisma.RoleGetPayload<{
             code: true;
           };
         };
+      };
+    };
+  };
+}>;
+
+type RoleDetailWithCounts = Prisma.RoleGetPayload<{
+  include: {
+    rolePermissions: {
+      include: {
+        permission: {
+          select: {
+            code: true;
+          };
+        };
+      };
+    };
+    _count: {
+      select: {
+        employeeRoles: true;
       };
     };
   };
@@ -260,6 +286,255 @@ export class PrismaRbacRepository implements RbacRepository {
     }
   }
 
+  async listRoles(input: ListRolesRecord): Promise<RoleListResult> {
+    const where: Prisma.RoleWhereInput = {
+      organizationId: input.organizationId,
+      deletedAt: null,
+      ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+      ...(input.q
+        ? {
+            OR: [
+              { code: { contains: input.q, mode: 'insensitive' } },
+              { name: { contains: input.q, mode: 'insensitive' } },
+              { description: { contains: input.q, mode: 'insensitive' } },
+            ],
+          }
+        : {}),
+    };
+    const skip = (input.page - 1) * input.pageSize;
+    const [totalItems, roles] = await this.prismaService.$transaction([
+      this.prismaService.role.count({ where }),
+      this.prismaService.role.findMany({
+        where,
+        orderBy: [{ code: 'asc' }, { id: 'asc' }],
+        skip,
+        take: input.pageSize,
+        include: {
+          rolePermissions: {
+            include: {
+              permission: {
+                select: {
+                  code: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      items: roles.map((role) => this.toRoleRecord(role)),
+      pagination: {
+        page: input.page,
+        pageSize: input.pageSize,
+        totalItems,
+        totalPages:
+          totalItems === 0 ? 0 : Math.ceil(totalItems / input.pageSize),
+      },
+    };
+  }
+
+  async findRoleById(
+    organizationId: string,
+    roleId: string,
+  ): Promise<RoleDetailRecord | null> {
+    const role = await this.prismaService.role.findFirst({
+      where: {
+        organizationId,
+        id: roleId,
+        deletedAt: null,
+      },
+      include: {
+        rolePermissions: {
+          include: {
+            permission: {
+              select: {
+                code: true,
+              },
+            },
+          },
+        },
+        _count: {
+          select: {
+            employeeRoles: {
+              where: {
+                employee: {
+                  deletedAt: null,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return role ? this.toRoleDetailRecord(role) : null;
+  }
+
+  async updateRole(input: UpdateRoleRecord): Promise<RoleDetailRecord | null> {
+    try {
+      const role = await this.prismaService.role.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          id: input.roleId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          isSystem: true,
+        },
+      });
+
+      if (!role) {
+        return null;
+      }
+
+      if (role.isSystem) {
+        throw new SystemRoleImmutableError();
+      }
+
+      await this.prismaService.role.update({
+        where: {
+          id: input.roleId,
+        },
+        data: {
+          ...(input.code !== undefined ? { code: input.code } : {}),
+          ...(input.name !== undefined ? { name: input.name } : {}),
+          ...(input.description !== undefined
+            ? { description: input.description }
+            : {}),
+          ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
+        },
+      });
+
+      return this.findRoleById(input.organizationId, input.roleId);
+    } catch (error) {
+      if (error instanceof SystemRoleImmutableError) {
+        throw error;
+      }
+
+      if (this.isRoleCodeConflictError(error)) {
+        throw new RoleCodeConflictError(input.code ?? '');
+      }
+
+      throw error;
+    }
+  }
+
+  async replaceRolePermissions(
+    input: ReplaceRolePermissionsRecord,
+  ): Promise<RoleDetailRecord | null> {
+    return this.prismaService.$transaction(async (tx) => {
+      const role = await tx.role.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          id: input.roleId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          isSystem: true,
+        },
+      });
+
+      if (!role) {
+        return null;
+      }
+
+      if (role.isSystem) {
+        throw new SystemRoleImmutableError();
+      }
+
+      const permissions =
+        input.permissionCodes.length === 0
+          ? []
+          : await tx.permission.findMany({
+              where: {
+                code: {
+                  in: input.permissionCodes,
+                },
+                isActive: true,
+              },
+              select: {
+                id: true,
+                code: true,
+              },
+            });
+
+      if (permissions.length !== input.permissionCodes.length) {
+        throw new PermissionCatalogNotSynchronizedError();
+      }
+
+      await tx.rolePermission.deleteMany({
+        where: {
+          organizationId: input.organizationId,
+          roleId: input.roleId,
+        },
+      });
+
+      if (permissions.length > 0) {
+        await tx.rolePermission.createMany({
+          data: permissions.map((permission) => ({
+            organizationId: input.organizationId,
+            roleId: input.roleId,
+            permissionId: permission.id,
+          })),
+        });
+      }
+
+      const persistedRole = await tx.role.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          id: input.roleId,
+          deletedAt: null,
+        },
+        include: {
+          rolePermissions: {
+            include: {
+              permission: {
+                select: {
+                  code: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              employeeRoles: {
+                where: {
+                  employee: {
+                    deletedAt: null,
+                  },
+                },
+              },
+            },
+          },
+        },
+      });
+
+      return persistedRole ? this.toRoleDetailRecord(persistedRole) : null;
+    });
+  }
+
+  async listActivePermissions(): Promise<PermissionListItem[]> {
+    const permissions = await this.prismaService.permission.findMany({
+      where: {
+        isActive: true,
+      },
+      select: {
+        code: true,
+        name: true,
+        description: true,
+      },
+      orderBy: {
+        code: 'asc',
+      },
+    });
+
+    return permissions;
+  }
+
   async findEffectivePermissionCodes(
     input: PermissionEvaluationRecord,
   ): Promise<string[]> {
@@ -392,6 +667,13 @@ export class PrismaRbacRepository implements RbacRepository {
       permissionCodes: role.rolePermissions
         .map((rolePermission) => rolePermission.permission.code)
         .sort((left, right) => left.localeCompare(right)),
+    };
+  }
+
+  private toRoleDetailRecord(role: RoleDetailWithCounts): RoleDetailRecord {
+    return {
+      ...this.toRoleRecord(role),
+      assignedEmployeeCount: role._count.employeeRoles,
     };
   }
 }

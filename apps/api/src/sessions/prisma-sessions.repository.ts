@@ -6,6 +6,7 @@ import { SessionsRepository } from './sessions.repository';
 import type {
   CreateSessionRecordInput,
   RevokeAllUserSessionsRecordInput,
+  RevokeEmployeeSessionsRecordInput,
   RevokeSessionRecordInput,
   RotateSessionRecordInput,
   SessionContext,
@@ -274,6 +275,27 @@ export class PrismaSessionsRepository implements SessionsRepository {
         revokedAt: null,
         employee: {
           userId: input.userId,
+        },
+      },
+      data: {
+        revokedAt: input.revokedAt,
+        revocationReason: input.reason,
+      },
+    });
+
+    return result.count;
+  }
+
+  async revokeEmployeeSessionsRecord(
+    input: RevokeEmployeeSessionsRecordInput,
+  ): Promise<number> {
+    const result = await this.prismaService.userSession.updateMany({
+      where: {
+        organizationId: input.organizationId,
+        employeeId: input.employeeId,
+        revokedAt: null,
+        expiresAt: {
+          gt: input.revokedAt,
         },
       },
       data: {

@@ -4,6 +4,7 @@ import { resolve } from 'node:path';
 import { AccountsModule } from './accounts/accounts.module';
 import { AuthModule } from './auth/auth.module';
 import { CustomersModule } from './customers/customers.module';
+import { EmployeesModule } from './employees/employees.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { HealthModule } from './health/health.module';
 import { OrganizationsModule } from './organizations/organizations.module';
@@ -23,6 +24,7 @@ import { SessionsModule } from './sessions/sessions.module';
     AccountsModule,
     AuthModule,
     CustomersModule,
+    EmployeesModule,
     FacilitiesModule,
     HealthModule,
     PrismaModule,

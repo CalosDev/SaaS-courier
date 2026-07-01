@@ -1,6 +1,7 @@
 import type {
   CreateSessionRecordInput,
   RevokeAllUserSessionsRecordInput,
+  RevokeEmployeeSessionsRecordInput,
   RevokeSessionRecordInput,
   RotateSessionRecordInput,
   SessionPrincipalContext,
@@ -31,5 +32,9 @@ export abstract class SessionsRepository {
 
   abstract revokeAllUserSessionsRecord(
     input: RevokeAllUserSessionsRecordInput,
+  ): Promise<number>;
+
+  abstract revokeEmployeeSessionsRecord(
+    input: RevokeEmployeeSessionsRecordInput,
   ): Promise<number>;
 }

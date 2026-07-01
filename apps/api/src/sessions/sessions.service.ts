@@ -18,6 +18,7 @@ import type {
   CreateSessionInput,
   CreatedSessionResult,
   RevokeAllUserSessionsInput,
+  RevokeEmployeeSessionsInput,
   RevokeSessionInput,
   RotateSessionInput,
   RotatedSessionResult,
@@ -134,6 +135,27 @@ export class SessionsService {
 
     return this.sessionsRepository.revokeAllUserSessionsRecord({
       userId,
+      revokedAt: new Date(),
+      reason,
+    });
+  }
+
+  async revokeEmployeeSessions(
+    input: RevokeEmployeeSessionsInput,
+  ): Promise<number> {
+    const organizationId = this.normalizeRequiredString(
+      input.organizationId,
+      'organizationId',
+    );
+    const employeeId = this.normalizeRequiredString(
+      input.employeeId,
+      'employeeId',
+    );
+    const reason = this.assertAdministrativeReason(input.reason);
+
+    return this.sessionsRepository.revokeEmployeeSessionsRecord({
+      organizationId,
+      employeeId,
       revokedAt: new Date(),
       reason,
     });
