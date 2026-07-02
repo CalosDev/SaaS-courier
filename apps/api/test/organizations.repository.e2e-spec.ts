@@ -88,6 +88,9 @@ describe('Organizations integration', () => {
           });
 
         if (existingOrganization) {
+          await prismaService.organizationSettings.deleteMany({
+            where: { organizationId: createdOrganizationId },
+          });
           await prismaService.organization.delete({
             where: { id: createdOrganizationId },
           });

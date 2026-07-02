@@ -69,6 +69,11 @@ Los primeros endpoints administrativos protegidos disponibles actualmente son:
 
 - `GET /organizations/current`
 - `PATCH /organizations/current`
+- `GET /organizations/current/settings`
+- `PATCH /organizations/current/settings`
+- `GET /organizations/current/capabilities`
+- `GET /organizations/current/onboarding`
+- `POST /organizations/current/onboarding/complete`
 - `GET /facilities`
 - `POST /facilities`
 - `GET /facilities/:facilityId`
@@ -83,8 +88,16 @@ Los primeros endpoints administrativos protegidos disponibles actualmente son:
 - `GET /customers/:customerId/customs-profile`
 - `PUT /customers/:customerId/customs-profile`
 - `PATCH /customers/:customerId/customs-profile/verification`
+- `GET /customer-imports`
+- `POST /customer-imports`
+- `GET /customer-imports/:importId`
+- `POST /customer-imports/:importId/validate`
+- `POST /customer-imports/:importId/commit`
+- `POST /customer-imports/:importId/cancel`
 
 La identificacion aduanera de clientes se guarda en `CustomerCustomsProfile`. El listado general `GET /customers` no expone cedulas, pasaportes, RNC ni estado RUA.
+
+La importacion inicial de clientes usa staging JSON en base de datos y requiere el flujo `create -> validate -> commit`. En este punto no hay CSV, Excel, archivos ni S3.
 
 ## Autenticacion HTTP
 

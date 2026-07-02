@@ -120,6 +120,55 @@ enum CustomsVerificationSource {
   @@map("customs_verification_source")
 }
 
+enum CustomerCodeStrategy {
+  AUTO_RANDOM
+  AUTO_SEQUENTIAL
+
+  @@map("customer_code_strategy")
+}
+
+enum WeightUnit {
+  LB
+  KG
+
+  @@map("weight_unit")
+}
+
+enum DimensionUnit {
+  IN
+  CM
+
+  @@map("dimension_unit")
+}
+
+enum DateDisplayFormat {
+  DMY
+  MDY
+  YMD
+
+  @@map("date_display_format")
+}
+
+enum CustomerImportJobStatus {
+  DRAFT
+  VALIDATED
+  IMPORTING
+  COMPLETED
+  FAILED
+  CANCELLED
+
+  @@map("customer_import_job_status")
+}
+
+enum CustomerImportRowStatus {
+  PENDING
+  VALID
+  INVALID
+  IMPORTED
+
+  @@map("customer_import_row_status")
+}
+
 model Organization {
   id                      String                   @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
   legalName               String                   @map("legal_name") @db.VarChar(200)
@@ -149,6 +198,9 @@ model Organization {
   employeeRoles           EmployeeRole[]
   rolePermissions         RolePermission[]
   userSessions            UserSession[]
+  settings                OrganizationSettings?
+  customerImportJobs      CustomerImportJob[]
+  customerImportRows      CustomerImportRow[]
 
   @@index([status], map: "organizations_status_idx")
   @@index([deletedAt], map: "organizations_deleted_at_idx")
@@ -206,6 +258,7 @@ model Customer {
   organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "customers_organization_id_fkey")
   addresses      CustomerAddress[]
   customsProfile CustomerCustomsProfile?
+  importRows     CustomerImportRow[]
 
   @@unique([organizationId, customerCode], map: "customers_organization_id_customer_code_key")
   @@unique([organizationId, id], map: "customers_organization_id_id_key")
@@ -213,6 +266,77 @@ model Customer {
   @@index([organizationId, type], map: "customers_organization_id_type_idx")
   @@index([organizationId, deletedAt], map: "customers_organization_id_deleted_at_idx")
   @@map("customers")
+}
+
+model OrganizationSettings {
+  organizationId              String               @id(map: "organization_settings_pkey") @map("organization_id") @db.Uuid
+  locale                      String               @default("es-DO") @db.VarChar(10)
+  dateFormat                  DateDisplayFormat    @default(DMY) @map("date_format")
+  weightUnit                  WeightUnit           @default(LB) @map("weight_unit")
+  dimensionUnit               DimensionUnit        @default(IN) @map("dimension_unit")
+  customerCodeStrategy        CustomerCodeStrategy @default(AUTO_RANDOM) @map("customer_code_strategy")
+  customerCodePrefix          String               @default("C") @map("customer_code_prefix") @db.VarChar(8)
+  customerCodeRandomLength    Int                  @default(8) @map("customer_code_random_length")
+  customerCodeSequencePadding Int                  @default(6) @map("customer_code_sequence_padding")
+  nextCustomerSequence        BigInt               @default(1) @map("next_customer_sequence") @db.BigInt
+  onboardingCompletedAt       DateTime?            @map("onboarding_completed_at") @db.Timestamptz(3)
+  createdAt                   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                   DateTime             @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization                Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "organization_settings_organization_id_fkey")
+
+  @@map("organization_settings")
+}
+
+model CustomerImportJob {
+  id                    String                  @id(map: "customer_import_jobs_pkey") @default(uuid()) @db.Uuid
+  organizationId        String                  @map("organization_id") @db.Uuid
+  createdByEmployeeId   String                  @map("created_by_employee_id") @db.Uuid
+  name                  String?                 @db.VarChar(160)
+  status                CustomerImportJobStatus
+  preserveCustomerCodes Boolean                 @default(false) @map("preserve_customer_codes")
+  totalRows             Int                     @default(0) @map("total_rows")
+  validRows             Int                     @default(0) @map("valid_rows")
+  invalidRows           Int                     @default(0) @map("invalid_rows")
+  importedRows          Int                     @default(0) @map("imported_rows")
+  validationSummary     Json?                   @map("validation_summary")
+  failureCode           String?                 @map("failure_code") @db.VarChar(80)
+  validatedAt           DateTime?               @map("validated_at") @db.Timestamptz(3)
+  startedAt             DateTime?               @map("started_at") @db.Timestamptz(3)
+  completedAt           DateTime?               @map("completed_at") @db.Timestamptz(3)
+  cancelledAt           DateTime?               @map("cancelled_at") @db.Timestamptz(3)
+  createdAt             DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization          Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "customer_import_jobs_organization_id_fkey")
+  createdByEmployee     Employee                @relation(fields: [organizationId, createdByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "customer_import_jobs_created_by_employee_fkey")
+  rows                  CustomerImportRow[]
+
+  @@unique([organizationId, id], map: "customer_import_jobs_organization_id_id_key")
+  @@index([organizationId, status], map: "customer_import_jobs_organization_id_status_idx")
+  @@index([organizationId, createdByEmployeeId], map: "customer_import_jobs_organization_id_created_by_employee_id_idx")
+  @@map("customer_import_jobs")
+}
+
+model CustomerImportRow {
+  id                 String                  @id(map: "customer_import_rows_pkey") @default(uuid()) @db.Uuid
+  organizationId     String                  @map("organization_id") @db.Uuid
+  importJobId        String                  @map("import_job_id") @db.Uuid
+  rowNumber          Int                     @map("row_number")
+  rawData            Json                    @map("raw_data")
+  normalizedData     Json?                   @map("normalized_data")
+  status             CustomerImportRowStatus @default(PENDING)
+  validationErrors   Json?                   @map("validation_errors")
+  importedCustomerId String?                 @map("imported_customer_id") @db.Uuid
+  createdAt          DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization       Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "customer_import_rows_organization_id_fkey")
+  importJob          CustomerImportJob       @relation(fields: [organizationId, importJobId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "customer_import_rows_organization_id_import_job_id_fkey")
+  importedCustomer   Customer?               @relation(fields: [organizationId, importedCustomerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "customer_import_rows_organization_id_imported_customer_id_fkey")
+
+  @@unique([organizationId, importJobId, rowNumber], map: "customer_import_rows_org_job_row_key")
+  @@index([organizationId, importJobId], map: "customer_import_rows_organization_id_import_job_id_idx")
+  @@index([organizationId, status], map: "customer_import_rows_organization_id_status_idx")
+  @@index([organizationId, importedCustomerId], map: "customer_import_rows_organization_id_imported_customer_id_idx")
+  @@map("customer_import_rows")
 }
 
 model CustomerAddress {
@@ -324,22 +448,23 @@ model LoginChallenge {
 }
 
 model Employee {
-  id                 String             @id(map: "employees_pkey") @default(uuid()) @db.Uuid
-  organizationId     String             @map("organization_id") @db.Uuid
-  userId             String             @map("user_id") @db.Uuid
-  employeeCode       String?            @map("employee_code") @db.VarChar(40)
-  firstName          String             @map("first_name") @db.VarChar(120)
-  lastName           String             @map("last_name") @db.VarChar(120)
-  phone              String?            @db.VarChar(32)
-  status             EmployeeStatus     @default(PENDING)
-  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt          DateTime?          @map("deleted_at") @db.Timestamptz(3)
-  organization       Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "employees_organization_id_fkey")
-  user               User               @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "employees_user_id_fkey")
+  id                 String              @id(map: "employees_pkey") @default(uuid()) @db.Uuid
+  organizationId     String              @map("organization_id") @db.Uuid
+  userId             String              @map("user_id") @db.Uuid
+  employeeCode       String?             @map("employee_code") @db.VarChar(40)
+  firstName          String              @map("first_name") @db.VarChar(120)
+  lastName           String              @map("last_name") @db.VarChar(120)
+  phone              String?             @db.VarChar(32)
+  status             EmployeeStatus      @default(PENDING)
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt          DateTime?           @map("deleted_at") @db.Timestamptz(3)
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "employees_organization_id_fkey")
+  user               User                @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "employees_user_id_fkey")
   employeeFacilities EmployeeFacility[]
   employeeRoles      EmployeeRole[]
   userSessions       UserSession[]
+  customerImportJobs CustomerImportJob[]
 
   @@unique([organizationId, userId], map: "employees_organization_id_user_id_key")
   @@unique([organizationId, employeeCode], map: "employees_organization_id_employee_code_key")

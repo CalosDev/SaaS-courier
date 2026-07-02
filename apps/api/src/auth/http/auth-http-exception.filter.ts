@@ -53,10 +53,22 @@ import {
   InvalidCustomerInputError,
 } from '../../customers/customer.errors';
 import {
+  CustomerImportJobNotFoundError,
+  CustomerImportStateConflictError,
+  CustomerImportValidationError,
+  InvalidCustomerImportInputError,
+} from '../../customer-imports/customer-imports.errors';
+import {
   InvalidOrganizationInputError,
   OrganizationNotFoundError,
   OrganizationSlugConflictError,
 } from '../../organizations/organization.errors';
+import {
+  InvalidOrganizationSettingsInputError,
+  OnboardingAlreadyCompletedError,
+  OnboardingRequirementsIncompleteError,
+  OrganizationSettingsNotFoundError,
+} from '../../organization-settings/organization-settings.errors';
 import {
   AccountTemporarilyLockedError,
   InvalidAuthenticationInputError,
@@ -106,11 +118,13 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof InvalidOrganizationInputError ||
       exception instanceof InvalidFacilityInputError ||
       exception instanceof InvalidCustomerInputError ||
+      exception instanceof InvalidCustomerImportInputError ||
       exception instanceof InvalidCustomerCustomsProfileError ||
       exception instanceof InvalidEmployeeInputError ||
       exception instanceof InvalidRoleInputError ||
       exception instanceof InvalidAccountInputError ||
       exception instanceof InvalidPasswordError ||
+      exception instanceof InvalidOrganizationSettingsInputError ||
       exception instanceof UnknownPermissionCodeError ||
       exception instanceof BadRequestException
     ) {
@@ -173,12 +187,14 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof FacilityNotFoundError ||
       exception instanceof FacilityOrganizationUnavailableError ||
       exception instanceof CustomerNotFoundError ||
+      exception instanceof CustomerImportJobNotFoundError ||
       exception instanceof CustomerAddressNotFoundError ||
       exception instanceof CustomerCustomsProfileNotFoundError ||
       exception instanceof EmployeeNotFoundError ||
       exception instanceof EmployeeFacilityNotFoundError ||
       exception instanceof EmployeeRoleNotFoundError ||
-      exception instanceof RoleNotFoundError
+      exception instanceof RoleNotFoundError ||
+      exception instanceof OrganizationSettingsNotFoundError
     ) {
       return {
         status: 404,
@@ -197,7 +213,11 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof EmployeeMaxUsersExceededError ||
       exception instanceof EmployeeInvitationUserUnavailableError ||
       exception instanceof RoleCodeConflictError ||
-      exception instanceof PermissionCatalogNotSynchronizedError
+      exception instanceof PermissionCatalogNotSynchronizedError ||
+      exception instanceof CustomerImportValidationError ||
+      exception instanceof CustomerImportStateConflictError ||
+      exception instanceof OnboardingRequirementsIncompleteError ||
+      exception instanceof OnboardingAlreadyCompletedError
     ) {
       return {
         status: 409,
@@ -275,7 +295,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
         path.startsWith('/permissions') ||
         path.startsWith('/organizations') ||
         path.startsWith('/facilities') ||
-        path.startsWith('/customers'))
+        path.startsWith('/customers') ||
+        path.startsWith('/customer-imports'))
     );
   }
 }

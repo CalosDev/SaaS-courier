@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma, type Customer } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { InvalidCustomerInputError } from './customer.errors';
+import {
+  CustomerCodeGenerationError,
+  InvalidCustomerInputError,
+} from './customer.errors';
+import { CustomerCodeService } from './customer-code.service';
 import { CustomersRepository } from './customers.repository';
 import type {
   CreateCustomerRecord,
@@ -11,9 +15,41 @@ import type {
   UpdateCustomerRecord,
 } from './customer.types';
 
+type LockedOrganizationSettingsRow = {
+  organization_id: string;
+  customer_code_strategy: 'AUTO_RANDOM' | 'AUTO_SEQUENTIAL';
+  customer_code_prefix: string;
+  customer_code_random_length: number;
+  customer_code_sequence_padding: number;
+  next_customer_sequence: bigint;
+};
+
+const RANDOM_CODE_GENERATION_ATTEMPTS = 10;
+const SEQUENTIAL_CODE_GENERATION_ATTEMPTS = 1000;
+
 @Injectable()
 export class PrismaCustomersRepository implements CustomersRepository {
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly customerCodeService: CustomerCodeService,
+  ) {}
+
+  async createWithGeneratedCode(
+    input: Omit<CreateCustomerRecord, 'customerCode'>,
+  ): Promise<CustomerRecord> {
+    return this.prismaService.$transaction(async (tx) => {
+      const settings = await this.lockOrganizationSettings(
+        tx,
+        input.organizationId,
+      );
+
+      if (settings.customer_code_strategy === 'AUTO_SEQUENTIAL') {
+        return this.createWithSequentialCode(tx, input, settings);
+      }
+
+      return this.createWithRandomCode(tx, input, settings);
+    });
+  }
 
   async create(input: CreateCustomerRecord): Promise<CustomerRecord> {
     const customer = await this.prismaService.customer.create({
@@ -207,5 +243,147 @@ export class PrismaCustomersRepository implements CustomersRepository {
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,
     };
+  }
+
+  private async createWithRandomCode(
+    tx: Prisma.TransactionClient,
+    input: Omit<CreateCustomerRecord, 'customerCode'>,
+    settings: LockedOrganizationSettingsRow,
+  ): Promise<CustomerRecord> {
+    for (
+      let attempt = 0;
+      attempt < RANDOM_CODE_GENERATION_ATTEMPTS;
+      attempt += 1
+    ) {
+      try {
+        const customer = await tx.customer.create({
+          data: {
+            ...input,
+            customerCode: this.customerCodeService.generateRandom({
+              prefix: settings.customer_code_prefix,
+              randomLength: settings.customer_code_random_length,
+            }),
+          },
+        });
+
+        return this.toCustomerRecord(customer);
+      } catch (error) {
+        if (this.isCustomerCodeConflictError(error)) {
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new CustomerCodeGenerationError();
+  }
+
+  private async createWithSequentialCode(
+    tx: Prisma.TransactionClient,
+    input: Omit<CreateCustomerRecord, 'customerCode'>,
+    settings: LockedOrganizationSettingsRow,
+  ): Promise<CustomerRecord> {
+    let nextSequence = Number(settings.next_customer_sequence);
+
+    for (
+      let attempt = 0;
+      attempt < SEQUENTIAL_CODE_GENERATION_ATTEMPTS;
+      attempt += 1
+    ) {
+      const customerCode = this.customerCodeService.formatSequential({
+        prefix: settings.customer_code_prefix,
+        sequence: nextSequence,
+        padding: settings.customer_code_sequence_padding,
+      });
+
+      try {
+        const customer = await tx.customer.create({
+          data: {
+            ...input,
+            customerCode,
+          },
+        });
+
+        await tx.organizationSettings.update({
+          where: {
+            organizationId: input.organizationId,
+          },
+          data: {
+            nextCustomerSequence: BigInt(nextSequence + 1),
+          },
+        });
+
+        return this.toCustomerRecord(customer);
+      } catch (error) {
+        if (this.isCustomerCodeConflictError(error)) {
+          nextSequence += 1;
+          continue;
+        }
+
+        throw error;
+      }
+    }
+
+    throw new CustomerCodeGenerationError();
+  }
+
+  private async lockOrganizationSettings(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+  ): Promise<LockedOrganizationSettingsRow> {
+    const rows = await tx.$queryRaw<LockedOrganizationSettingsRow[]>(Prisma.sql`
+      SELECT
+        organization_id,
+        customer_code_strategy,
+        customer_code_prefix,
+        customer_code_random_length,
+        customer_code_sequence_padding,
+        next_customer_sequence
+      FROM organization_settings
+      WHERE organization_id = ${organizationId}
+      FOR UPDATE
+    `);
+    const settings = rows[0];
+
+    if (!settings) {
+      throw new InvalidCustomerInputError(
+        'Invalid customer input: organization settings are not available',
+      );
+    }
+
+    return settings;
+  }
+
+  private isCustomerCodeConflictError(error: unknown): boolean {
+    if (error instanceof Error && error.message === 'P2002') {
+      return true;
+    }
+
+    if (!(error instanceof Error) || !('code' in error)) {
+      return false;
+    }
+
+    const candidate = error as Error & {
+      code?: unknown;
+      meta?: { modelName?: unknown; target?: unknown };
+    };
+
+    if (candidate.code !== 'P2002') {
+      return false;
+    }
+
+    const target = candidate.meta?.target;
+    const targetText = Array.isArray(target)
+      ? target.join(',')
+      : typeof target === 'string'
+        ? target
+        : '';
+
+    return (
+      candidate.meta?.modelName === 'Customer' ||
+      targetText.includes('customers_organization_id_customer_code_key') ||
+      targetText.includes('customerCode')
+    );
   }
 }

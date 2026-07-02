@@ -17,6 +17,10 @@ import { PrismaService } from '../src/prisma/prisma.service';
 const LOCAL_DATABASE_URL =
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 
+function daysFromNow(days: number): Date {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+}
+
 describe('Employees repository integration', () => {
   it('enforces maxUsers concurrency, reuses global users correctly, scopes roles and facilities, and revokes only organization employee sessions', async () => {
     let app: INestApplication | null = null;
@@ -142,7 +146,7 @@ describe('Employees repository integration', () => {
         primaryFacilityId: facilityOne.id,
         roleIds: [roleOne.id],
         activationTokenHash: newSecret.tokenHash,
-        activationTokenExpiresAt: new Date('2026-07-02T00:00:00.000Z'),
+        activationTokenExpiresAt: daysFromNow(1),
         invitedAt: new Date('2026-07-01T00:00:00.000Z'),
       });
 
@@ -201,7 +205,7 @@ describe('Employees repository integration', () => {
         data: {
           userId: invitedUser.id,
           tokenHash: previousSecret.tokenHash,
-          expiresAt: new Date('2026-07-02T00:00:00.000Z'),
+          expiresAt: daysFromNow(1),
         },
       });
       cleanup.tokenIds.push(previousToken.id);
@@ -218,7 +222,7 @@ describe('Employees repository integration', () => {
         primaryFacilityId: null,
         roleIds: [],
         activationTokenHash: replacementSecret.tokenHash,
-        activationTokenExpiresAt: new Date('2026-07-03T00:00:00.000Z'),
+        activationTokenExpiresAt: daysFromNow(2),
         invitedAt: new Date('2026-07-01T12:00:00.000Z'),
       });
       cleanup.employeeIds.push(reusedInvitedUser.employee.id);
@@ -294,7 +298,7 @@ describe('Employees repository integration', () => {
           primaryFacilityId: null,
           roleIds: [],
           activationTokenHash: replacementSecret.tokenHash,
-          activationTokenExpiresAt: new Date('2026-07-03T00:00:00.000Z'),
+          activationTokenExpiresAt: daysFromNow(2),
           invitedAt: new Date('2026-07-01T00:00:00.000Z'),
         }),
       ).rejects.toBeInstanceOf(EmployeeCodeConflictError);
@@ -311,7 +315,7 @@ describe('Employees repository integration', () => {
           primaryFacilityId: facilityOtherTenant.id,
           roleIds: [],
           activationTokenHash: newSecret.tokenHash,
-          activationTokenExpiresAt: new Date('2026-07-03T00:00:00.000Z'),
+          activationTokenExpiresAt: daysFromNow(2),
           invitedAt: new Date('2026-07-01T00:00:00.000Z'),
         }),
       ).rejects.toThrow();
@@ -344,7 +348,7 @@ describe('Employees repository integration', () => {
         primaryFacilityId: null,
         roleIds: [],
         activationTokenHash: activationTokenService.createSecret().tokenHash,
-        activationTokenExpiresAt: new Date('2026-07-03T00:00:00.000Z'),
+        activationTokenExpiresAt: daysFromNow(2),
         invitedAt: new Date('2026-07-01T00:00:00.000Z'),
       });
       const limitedInviteTwo = employeesRepository.inviteEmployee({
@@ -358,7 +362,7 @@ describe('Employees repository integration', () => {
         primaryFacilityId: null,
         roleIds: [],
         activationTokenHash: activationTokenService.createSecret().tokenHash,
-        activationTokenExpiresAt: new Date('2026-07-03T00:00:00.000Z'),
+        activationTokenExpiresAt: daysFromNow(2),
         invitedAt: new Date('2026-07-01T00:00:00.000Z'),
       });
       const limitedResults = await Promise.allSettled([

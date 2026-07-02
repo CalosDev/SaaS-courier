@@ -61,6 +61,11 @@ describe('Customers repository integration', () => {
         },
       });
       cleanup.organizationIds.push(organizationOne.id);
+      await prisma.organizationSettings.create({
+        data: {
+          organizationId: organizationOne.id,
+        },
+      });
 
       const organizationTwo = await prisma.organization.create({
         data: {
@@ -71,6 +76,11 @@ describe('Customers repository integration', () => {
         },
       });
       cleanup.organizationIds.push(organizationTwo.id);
+      await prisma.organizationSettings.create({
+        data: {
+          organizationId: organizationTwo.id,
+        },
+      });
 
       const manualCustomerOne = await customersRepository.create({
         organizationId: organizationOne.id,
@@ -389,6 +399,13 @@ describe('Customers repository integration', () => {
           });
         }
         if (cleanup.organizationIds.length > 0) {
+          await prismaService.organizationSettings.deleteMany({
+            where: {
+              organizationId: {
+                in: cleanup.organizationIds,
+              },
+            },
+          });
           await prismaService.organization.deleteMany({
             where: {
               id: {

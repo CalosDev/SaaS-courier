@@ -1,5 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { randomUUID } from 'node:crypto';
 
 import { AppModule } from '../src/app.module';
 import {
@@ -18,6 +19,7 @@ describe('Accounts integration', () => {
     let app: INestApplication | null = null;
     let moduleRef: TestingModule | null = null;
     let prismaService: PrismaService | null = null;
+    let initialSessionCount = 0;
     const cleanup = {
       tokenIds: [] as string[],
       userIds: [] as string[],
@@ -36,15 +38,19 @@ describe('Accounts integration', () => {
       const accountsService = moduleRef.get<AccountsService>(AccountsService);
       const passwordHasher = moduleRef.get<PasswordHasher>(PasswordHasher);
       prismaService = moduleRef.get<PrismaService>(PrismaService);
+      initialSessionCount = await prismaService.userSession.count();
+      const suffix = randomUUID();
+      const invitedEmail = `invited.user.${suffix}@courier.test`;
+      const expiredEmail = `expired.user.${suffix}@courier.test`;
 
       const invited = await accountsService.inviteUser({
-        email: '  invited.user@courier.test  ',
+        email: `  ${invitedEmail}  `,
       });
 
       cleanup.userIds.push(invited.user.id);
 
       expect(invited.user.status).toBe('INVITED');
-      expect(invited.user.email).toBe('invited.user@courier.test');
+      expect(invited.user.email).toBe(invitedEmail);
       expect(invited.user.passwordChangedAt).toBeNull();
       expect(invited.user.emailVerifiedAt).toBeNull();
       expect(invited.expiresAt).toBeInstanceOf(Date);
@@ -112,12 +118,12 @@ describe('Accounts integration', () => {
 
       await expect(
         accountsService.inviteUser({
-          email: 'invited.user@courier.test',
+          email: invitedEmail,
         }),
       ).rejects.toBeInstanceOf(UserEmailConflictError);
 
       const expiredUser = await accountsService.inviteUser({
-        email: 'expired.user@courier.test',
+        email: expiredEmail,
       });
       cleanup.userIds.push(expiredUser.user.id);
 
@@ -148,7 +154,7 @@ describe('Accounts integration', () => {
 
       const sessionCount = await prismaService.userSession.count();
 
-      expect(sessionCount).toBe(0);
+      expect(sessionCount).toBe(initialSessionCount);
     } finally {
       if (prismaService) {
         for (const tokenId of cleanup.tokenIds) {

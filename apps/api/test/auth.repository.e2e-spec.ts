@@ -422,9 +422,25 @@ describe('Auth integration', () => {
         );
       }
 
-      expect(await prismaService.userSession.count()).toBe(0);
+      expect(
+        await prismaService.userSession.count({
+          where: {
+            organizationId: {
+              in: cleanup.organizationIds,
+            },
+          },
+        }),
+      ).toBe(0);
     } finally {
       if (prismaService) {
+        for (const organizationId of cleanup.organizationIds) {
+          await prismaService.userSession.deleteMany({
+            where: {
+              organizationId,
+            },
+          });
+        }
+
         for (const employeeFacilityId of cleanup.employeeFacilityIds) {
           await prismaService.employeeFacility.deleteMany({
             where: {

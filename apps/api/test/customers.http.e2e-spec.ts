@@ -164,6 +164,11 @@ describe('Customers admin HTTP', () => {
         },
       });
       cleanup.organizationIds.push(organization.id);
+      await prisma.organizationSettings.create({
+        data: {
+          organizationId: organization.id,
+        },
+      });
 
       const otherOrganization = await prisma.organization.create({
         data: {
@@ -174,6 +179,11 @@ describe('Customers admin HTTP', () => {
         },
       });
       cleanup.organizationIds.push(otherOrganization.id);
+      await prisma.organizationSettings.create({
+        data: {
+          organizationId: otherOrganization.id,
+        },
+      });
 
       const user = await prisma.user.create({
         data: {
@@ -730,6 +740,13 @@ describe('Customers admin HTTP', () => {
           });
         }
         if (cleanup.organizationIds.length > 0) {
+          await prismaService.organizationSettings.deleteMany({
+            where: {
+              organizationId: {
+                in: cleanup.organizationIds,
+              },
+            },
+          });
           await prismaService.organization.deleteMany({
             where: {
               id: {

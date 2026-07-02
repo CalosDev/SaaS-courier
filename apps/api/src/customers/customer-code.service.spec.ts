@@ -3,23 +3,45 @@ import { CustomerCodeService } from './customer-code.service';
 describe('CustomerCodeService', () => {
   const service = new CustomerCodeService();
 
-  it('generates the default customerCode format', () => {
-    const code = service.generate();
+  it('generates the default random customerCode format', () => {
+    const code = service.generateRandom({
+      prefix: 'C',
+      randomLength: 8,
+    });
 
     expect(code).toMatch(/^C[A-HJ-NP-Z2-9]{8}$/);
   });
 
   it('does not generate ambiguous characters', () => {
-    const code = service.generate();
+    const code = service.generateRandom({
+      prefix: 'C',
+      randomLength: 8,
+    });
 
     expect(code).not.toMatch(/[IO10]/);
   });
 
   it('generates different codes', () => {
-    const first = service.generate();
-    const second = service.generate();
+    const first = service.generateRandom({
+      prefix: 'CF-',
+      randomLength: 6,
+    });
+    const second = service.generateRandom({
+      prefix: 'CF-',
+      randomLength: 6,
+    });
 
     expect(first).not.toBe(second);
+  });
+
+  it('formats sequential customer codes with left padding', () => {
+    expect(
+      service.formatSequential({
+        prefix: 'CF-',
+        sequence: 42,
+        padding: 6,
+      }),
+    ).toBe('CF-000042');
   });
 
   it('does not define the storage format as exclusively random', () => {

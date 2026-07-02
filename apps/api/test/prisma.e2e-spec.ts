@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 
 import { AppModule } from '../src/app.module';
+import { Prisma } from '../src/generated/prisma/client';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const LOCAL_DATABASE_URL =
@@ -30,7 +31,9 @@ describe('Prisma integration', () => {
 
       const prisma = app.get(PrismaService);
       disconnectSpy = jest.spyOn(prisma, '$disconnect');
-      const rows = await prisma.$queryRaw<SelectOneRow[]>`SELECT 1 AS result`;
+      const rows = await prisma.$queryRaw<SelectOneRow[]>(
+        Prisma.sql`SELECT 1 AS result`,
+      );
 
       expect(Number(rows[0]?.result)).toBe(1);
     } finally {

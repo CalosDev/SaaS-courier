@@ -2,19 +2,27 @@ import { Injectable } from '@nestjs/common';
 import { randomBytes } from 'node:crypto';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-const DEFAULT_CODE_PREFIX = 'C';
-const DEFAULT_CODE_LENGTH = 8;
 
 @Injectable()
 export class CustomerCodeService {
-  generate(): string {
-    const bytes = randomBytes(DEFAULT_CODE_LENGTH);
+  generateRandom(input: { prefix: string; randomLength: number }): string {
+    const bytes = randomBytes(input.randomLength);
     let suffix = '';
 
-    for (let index = 0; index < DEFAULT_CODE_LENGTH; index += 1) {
+    for (let index = 0; index < input.randomLength; index += 1) {
       suffix += ALPHABET.charAt(bytes[index] % ALPHABET.length);
     }
 
-    return `${DEFAULT_CODE_PREFIX}${suffix}`;
+    return `${input.prefix}${suffix}`;
+  }
+
+  formatSequential(input: {
+    prefix: string;
+    sequence: number | bigint;
+    padding: number;
+  }): string {
+    const sequence = input.sequence.toString().padStart(input.padding, '0');
+
+    return `${input.prefix}${sequence}`;
   }
 }

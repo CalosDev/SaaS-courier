@@ -1,11 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 
 import {
-  CustomerCodeGenerationError,
   CustomerNotFoundError,
   InvalidCustomerInputError,
 } from './customer.errors';
-import { CustomerCodeService } from './customer-code.service';
 import { CustomersRepository } from './customers.repository';
 import {
   CUSTOMER_STATUS_VALUES,
@@ -25,42 +23,20 @@ import {
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_PAGE_SIZE = 100;
-const CUSTOMER_CODE_GENERATION_ATTEMPTS = 3;
-
 @Injectable()
 export class CustomersService {
   constructor(
     @Inject(CustomersRepository)
     private readonly customersRepository: CustomersRepository,
-    private readonly customerCodeService: CustomerCodeService,
   ) {}
 
   async create(
     organizationId: string,
     input: CreateCustomerInput,
   ): Promise<CustomerRecord> {
-    const baseRecord = this.normalizeCreateInput(organizationId, input);
-
-    for (
-      let attempt = 0;
-      attempt < CUSTOMER_CODE_GENERATION_ATTEMPTS;
-      attempt += 1
-    ) {
-      try {
-        return await this.customersRepository.create({
-          ...baseRecord,
-          customerCode: this.customerCodeService.generate(),
-        });
-      } catch (error) {
-        if (this.isCustomerCodeConflictError(error)) {
-          continue;
-        }
-
-        throw error;
-      }
-    }
-
-    throw new CustomerCodeGenerationError();
+    return this.customersRepository.createWithGeneratedCode(
+      this.normalizeCreateInput(organizationId, input),
+    );
   }
 
   async getById(
@@ -293,37 +269,5 @@ export class CustomersService {
     const normalizedValue = this.normalizeOptionalField(value);
 
     return normalizedValue ?? undefined;
-  }
-
-  private isCustomerCodeConflictError(error: unknown): boolean {
-    if (error instanceof Error && error.message === 'P2002') {
-      return true;
-    }
-
-    if (!(error instanceof Error) || !('code' in error)) {
-      return false;
-    }
-
-    const candidate = error as Error & {
-      code?: unknown;
-      meta?: { modelName?: unknown; target?: unknown };
-    };
-
-    if (candidate.code !== 'P2002') {
-      return false;
-    }
-
-    const target = candidate.meta?.target;
-    const targetText = Array.isArray(target)
-      ? target.join(',')
-      : typeof target === 'string'
-        ? target
-        : '';
-
-    return (
-      candidate.meta?.modelName === 'Customer' ||
-      targetText.includes('customers_organization_id_customer_code_key') ||
-      targetText.includes('customerCode')
-    );
   }
 }

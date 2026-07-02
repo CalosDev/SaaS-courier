@@ -3,9 +3,18 @@ import {
   CustomerNotFoundError,
   InvalidCustomerInputError,
 } from './customer.errors';
+import type {
+  CreateCustomerRecord,
+  CustomerListResult,
+  CustomerRecord,
+  ListCustomersRecord,
+  UpdateCustomerRecord,
+} from './customer.types';
 import { CustomersService } from './customers.service';
 
-function buildCustomerRecord(overrides: Record<string, unknown> = {}) {
+function buildCustomerRecord(
+  overrides: Partial<CustomerRecord> = {},
+): CustomerRecord {
   const now = new Date('2026-07-01T00:00:00.000Z');
 
   return {
@@ -28,18 +37,16 @@ function buildCustomerRecord(overrides: Record<string, unknown> = {}) {
 
 describe('CustomersService', () => {
   const customersRepository = {
-    create: jest.fn(),
-    findById: jest.fn(),
-    list: jest.fn(),
-    update: jest.fn(),
+    create: jest.fn<Promise<CustomerRecord>, [CreateCustomerRecord]>(),
+    createWithGeneratedCode: jest.fn<
+      Promise<CustomerRecord>,
+      [Omit<CreateCustomerRecord, 'customerCode'>]
+    >(),
+    findById: jest.fn<Promise<CustomerRecord | null>, [string, string]>(),
+    list: jest.fn<Promise<CustomerListResult>, [ListCustomersRecord]>(),
+    update: jest.fn<Promise<CustomerRecord | null>, [UpdateCustomerRecord]>(),
   };
-  const customerCodeService = {
-    generate: jest.fn(),
-  };
-  const service = new CustomersService(
-    customersRepository,
-    customerCodeService,
-  );
+  const service = new CustomersService(customersRepository);
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -47,8 +54,7 @@ describe('CustomersService', () => {
 
   it('creates a valid INDIVIDUAL customer', async () => {
     const customer = buildCustomerRecord();
-    customerCodeService.generate.mockReturnValueOnce('C7KMP4TX9');
-    customersRepository.create.mockResolvedValueOnce(customer);
+    customersRepository.createWithGeneratedCode.mockResolvedValueOnce(customer);
 
     await expect(
       service.create('95de12bf-18d0-48d1-b2dd-33c65b954f3d', {
@@ -60,9 +66,8 @@ describe('CustomersService', () => {
       }),
     ).resolves.toEqual(customer);
 
-    expect(customersRepository.create).toHaveBeenCalledWith({
+    expect(customersRepository.createWithGeneratedCode).toHaveBeenCalledWith({
       organizationId: '95de12bf-18d0-48d1-b2dd-33c65b954f3d',
-      customerCode: 'C7KMP4TX9',
       type: 'INDIVIDUAL',
       firstName: 'Ada',
       lastName: 'Lovelace',
@@ -82,8 +87,7 @@ describe('CustomersService', () => {
       lastName: null,
       businessName: 'ACME Courier',
     });
-    customerCodeService.generate.mockReturnValueOnce('C8WQ2MRP7');
-    customersRepository.create.mockResolvedValueOnce(customer);
+    customersRepository.createWithGeneratedCode.mockResolvedValueOnce(customer);
 
     await service.create('345c13f5-5920-4bd7-9fa6-5a52c0e7dcfe', {
       type: 'BUSINESS',
@@ -91,10 +95,9 @@ describe('CustomersService', () => {
       email: '  CONTACT@ACME.TEST ',
     });
 
-    expect(customersRepository.create).toHaveBeenCalledWith(
+    expect(customersRepository.createWithGeneratedCode).toHaveBeenCalledWith(
       expect.objectContaining({
         organizationId: '345c13f5-5920-4bd7-9fa6-5a52c0e7dcfe',
-        customerCode: 'C8WQ2MRP7',
         type: 'BUSINESS',
         firstName: null,
         lastName: null,
@@ -132,8 +135,7 @@ describe('CustomersService', () => {
   });
 
   it('normalizes email and optional fields', async () => {
-    customerCodeService.generate.mockReturnValueOnce('CKMP4TX92');
-    customersRepository.create.mockResolvedValueOnce(
+    customersRepository.createWithGeneratedCode.mockResolvedValueOnce(
       buildCustomerRecord({
         email: null,
         phone: null,
@@ -152,7 +154,7 @@ describe('CustomersService', () => {
       notes: '   ',
     });
 
-    expect(customersRepository.create).toHaveBeenCalledWith(
+    expect(customersRepository.createWithGeneratedCode).toHaveBeenCalledWith(
       expect.objectContaining({
         email: null,
         phone: null,
@@ -163,21 +165,26 @@ describe('CustomersService', () => {
   });
 
   it('does not accept customerCode from HTTP input', async () => {
-    customerCodeService.generate.mockReturnValueOnce('C9MR2TKQ7');
-    customersRepository.create.mockResolvedValueOnce(buildCustomerRecord());
-
-    await service.create('1f96d22e-aac4-49ee-9e4f-4ebc92070ea0', {
-      type: 'INDIVIDUAL',
+    customersRepository.createWithGeneratedCode.mockResolvedValueOnce(
+      buildCustomerRecord(),
+    );
+    const inputWithCustomerCode = {
+      type: 'INDIVIDUAL' as const,
       firstName: 'Ada',
       lastName: 'Lovelace',
       customerCode: 'MANUAL-001',
-    } as never);
+    };
 
-    expect(customersRepository.create).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customerCode: 'C9MR2TKQ7',
-      }),
+    await service.create(
+      '1f96d22e-aac4-49ee-9e4f-4ebc92070ea0',
+      inputWithCustomerCode,
     );
+
+    const createCall = customersRepository.createWithGeneratedCode.mock
+      .calls[0]?.[0] as Record<string, unknown> | undefined;
+
+    expect(createCall).toBeDefined();
+    expect(createCall).not.toHaveProperty('customerCode');
   });
 
   it('updates only allowed fields', async () => {
@@ -265,11 +272,9 @@ describe('CustomersService', () => {
   });
 
   it('fails safely when a customerCode cannot be generated after retries', async () => {
-    customerCodeService.generate
-      .mockReturnValueOnce('C9MR2TKQ7')
-      .mockReturnValueOnce('C9MR2TKQ7')
-      .mockReturnValueOnce('C9MR2TKQ7');
-    customersRepository.create.mockRejectedValue(new Error('P2002'));
+    customersRepository.createWithGeneratedCode.mockRejectedValue(
+      new CustomerCodeGenerationError(),
+    );
 
     await expect(
       service.create('534eb83f-e15f-4a32-83ab-bbdc28b2daf5', {

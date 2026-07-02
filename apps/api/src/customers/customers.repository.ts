@@ -7,6 +7,9 @@ import type {
 } from './customer.types';
 
 export abstract class CustomersRepository {
+  abstract createWithGeneratedCode(
+    input: Omit<CreateCustomerRecord, 'customerCode'>,
+  ): Promise<CustomerRecord>;
   abstract create(input: CreateCustomerRecord): Promise<CustomerRecord>;
   abstract findById(
     organizationId: string,

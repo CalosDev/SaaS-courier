@@ -16,16 +16,21 @@ export class PrismaOrganizationsRepository implements OrganizationsRepository {
 
   async create(input: CreateOrganizationRecord): Promise<OrganizationRecord> {
     try {
-      const organization = await this.prismaService.organization.create({
-        data: {
-          legalName: input.legalName,
-          commercialName: input.commercialName,
-          slug: input.slug,
-          rnc: input.rnc,
-          email: input.email,
-          phone: input.phone,
-        },
-      });
+      const organization = await this.prismaService.$transaction(async (tx) =>
+        tx.organization.create({
+          data: {
+            legalName: input.legalName,
+            commercialName: input.commercialName,
+            slug: input.slug,
+            rnc: input.rnc,
+            email: input.email,
+            phone: input.phone,
+            settings: {
+              create: {},
+            },
+          },
+        }),
+      );
 
       return this.toOrganizationRecord(organization);
     } catch (error) {
