@@ -108,8 +108,8 @@ export class PrismaOrganizationSettingsRepository implements OrganizationSetting
     }
 
     const [users, facilities, customers] =
-      await this.prismaService.$transaction([
-        this.prismaService.employee.count({
+      await this.prismaService.$transaction(async (tx) => {
+        const employeeCount = await tx.employee.count({
           where: {
             organizationId,
             deletedAt: null,
@@ -117,20 +117,22 @@ export class PrismaOrganizationSettingsRepository implements OrganizationSetting
               in: ['PENDING', 'ACTIVE', 'SUSPENDED'],
             },
           },
-        }),
-        this.prismaService.facility.count({
+        });
+        const facilityCount = await tx.facility.count({
           where: {
             organizationId,
             deletedAt: null,
           },
-        }),
-        this.prismaService.customer.count({
+        });
+        const customerCount = await tx.customer.count({
           where: {
             organizationId,
             deletedAt: null,
           },
-        }),
-      ]);
+        });
+
+        return [employeeCount, facilityCount, customerCount] as const;
+      });
 
     return {
       organization,
@@ -152,22 +154,22 @@ export class PrismaOrganizationSettingsRepository implements OrganizationSetting
     }
 
     const [activeFacilities, activeEmployees, activeRolesWithPermissions] =
-      await this.prismaService.$transaction([
-        this.prismaService.facility.count({
+      await this.prismaService.$transaction(async (tx) => {
+        const facilityCount = await tx.facility.count({
           where: {
             organizationId,
             deletedAt: null,
             isActive: true,
           },
-        }),
-        this.prismaService.employee.count({
+        });
+        const employeeCount = await tx.employee.count({
           where: {
             organizationId,
             deletedAt: null,
             status: 'ACTIVE',
           },
-        }),
-        this.prismaService.role.count({
+        });
+        const roleCount = await tx.role.count({
           where: {
             organizationId,
             deletedAt: null,
@@ -176,8 +178,10 @@ export class PrismaOrganizationSettingsRepository implements OrganizationSetting
               some: {},
             },
           },
-        }),
-      ]);
+        });
+
+        return [facilityCount, employeeCount, roleCount] as const;
+      });
 
     return {
       organizationProfileCompleted:

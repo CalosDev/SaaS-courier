@@ -60,168 +60,177 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
     input: InviteEmployeeRecord,
   ): Promise<EmployeeInvitationRepositoryResult> {
     try {
-      return await this.prismaService.$transaction(async (tx) => {
-        const existingUser = await tx.user.findUnique({
-          where: {
-            email: input.email,
-          },
-        });
+      const invitedEmployee = await this.prismaService.$transaction(
+        async (tx) => {
+          const existingUser = await tx.user.findUnique({
+            where: {
+              email: input.email,
+            },
+          });
 
-        if (existingUser) {
-          if (
-            existingUser.deletedAt !== null ||
-            existingUser.status === 'SUSPENDED' ||
-            existingUser.status === 'DISABLED'
-          ) {
-            throw new EmployeeInvitationUserUnavailableError();
+          if (existingUser) {
+            if (
+              existingUser.deletedAt !== null ||
+              existingUser.status === 'SUSPENDED' ||
+              existingUser.status === 'DISABLED'
+            ) {
+              throw new EmployeeInvitationUserUnavailableError();
+            }
           }
-        }
 
-        let userId = existingUser?.id ?? null;
-        let invitationStatus: 'invited' | 'membership_created' =
-          existingUser?.status === 'ACTIVE' ? 'membership_created' : 'invited';
-        let activation:
-          | EmployeeInvitationRepositoryResult['activation']
-          | null = null;
+          let userId = existingUser?.id ?? null;
+          let invitationStatus: 'invited' | 'membership_created' =
+            existingUser?.status === 'ACTIVE'
+              ? 'membership_created'
+              : 'invited';
+          let activation:
+            | EmployeeInvitationRepositoryResult['activation']
+            | null = null;
 
-        const existingMembership = userId
-          ? await tx.employee.findFirst({
+          const existingMembership = userId
+            ? await tx.employee.findFirst({
+                where: {
+                  organizationId: input.organizationId,
+                  userId,
+                  deletedAt: null,
+                },
+                select: {
+                  id: true,
+                },
+              })
+            : null;
+
+          if (existingMembership) {
+            throw new EmployeeMembershipConflictError();
+          }
+
+          if (input.employeeCode) {
+            const employeeCodeConflict = await tx.employee.findFirst({
               where: {
                 organizationId: input.organizationId,
-                userId,
+                employeeCode: input.employeeCode,
                 deletedAt: null,
               },
               select: {
                 id: true,
               },
-            })
-          : null;
+            });
 
-        if (existingMembership) {
-          throw new EmployeeMembershipConflictError();
-        }
-
-        if (input.employeeCode) {
-          const employeeCodeConflict = await tx.employee.findFirst({
-            where: {
-              organizationId: input.organizationId,
-              employeeCode: input.employeeCode,
-              deletedAt: null,
-            },
-            select: {
-              id: true,
-            },
-          });
-
-          if (employeeCodeConflict) {
-            throw new EmployeeCodeConflictError(input.employeeCode);
+            if (employeeCodeConflict) {
+              throw new EmployeeCodeConflictError(input.employeeCode);
+            }
           }
-        }
 
-        await this.assertFacilitiesBelongToOrganization(
-          tx,
-          input.organizationId,
-          input.facilityIds,
-        );
-        await this.assertRolesBelongToOrganization(
-          tx,
-          input.organizationId,
-          input.roleIds,
-        );
-        await this.lockOrganization(tx, input.organizationId);
-        await this.assertMaxUsersAvailable(tx, input.organizationId);
-
-        if (!existingUser) {
-          const createdUser = await tx.user.create({
-            data: {
-              email: input.email,
-              status: 'INVITED',
-              passwordHash: null,
-            },
-          });
-
-          userId = createdUser.id;
-          invitationStatus = 'invited';
-          activation = await this.createActivationToken(
+          await this.assertFacilitiesBelongToOrganization(
             tx,
-            createdUser.id,
-            input,
+            input.organizationId,
+            input.facilityIds,
           );
-        } else if (existingUser.status === 'INVITED') {
-          await tx.userActivationToken.updateMany({
-            where: {
-              userId: existingUser.id,
-              consumedAt: null,
-              invalidatedAt: null,
-            },
-            data: {
-              invalidatedAt: new Date(),
-            },
-          });
-          activation = await this.createActivationToken(
+          await this.assertRolesBelongToOrganization(
             tx,
-            existingUser.id,
-            input,
+            input.organizationId,
+            input.roleIds,
           );
-        }
+          await this.lockOrganization(tx, input.organizationId);
+          await this.assertMaxUsersAvailable(tx, input.organizationId);
 
-        if (!userId) {
-          throw new InvalidEmployeeInputError(
-            'Invalid employee input: user could not be resolved for invitation',
-          );
-        }
+          if (!existingUser) {
+            const createdUser = await tx.user.create({
+              data: {
+                email: input.email,
+                status: 'INVITED',
+                passwordHash: null,
+              },
+            });
 
-        const employee = await tx.employee.create({
-          data: {
-            organizationId: input.organizationId,
-            userId,
-            employeeCode: input.employeeCode,
-            firstName: input.firstName,
-            lastName: input.lastName,
-            phone: input.phone,
-            status: 'ACTIVE',
-          },
-        });
+            userId = createdUser.id;
+            invitationStatus = 'invited';
+            activation = await this.createActivationToken(
+              tx,
+              createdUser.id,
+              input,
+            );
+          } else if (existingUser.status === 'INVITED') {
+            await tx.userActivationToken.updateMany({
+              where: {
+                userId: existingUser.id,
+                consumedAt: null,
+                invalidatedAt: null,
+              },
+              data: {
+                invalidatedAt: new Date(),
+              },
+            });
+            activation = await this.createActivationToken(
+              tx,
+              existingUser.id,
+              input,
+            );
+          }
 
-        if (input.facilityIds.length > 0) {
-          await tx.employeeFacility.createMany({
-            data: input.facilityIds.map((facilityId) => ({
+          if (!userId) {
+            throw new InvalidEmployeeInputError(
+              'Invalid employee input: user could not be resolved for invitation',
+            );
+          }
+
+          const employee = await tx.employee.create({
+            data: {
               organizationId: input.organizationId,
-              employeeId: employee.id,
-              facilityId,
-              isPrimary: facilityId === input.primaryFacilityId,
-            })),
+              userId,
+              employeeCode: input.employeeCode,
+              firstName: input.firstName,
+              lastName: input.lastName,
+              phone: input.phone,
+              status: 'ACTIVE',
+            },
           });
-        }
 
-        if (input.roleIds.length > 0) {
-          await tx.employeeRole.createMany({
-            data: input.roleIds.map((roleId) => ({
-              organizationId: input.organizationId,
-              employeeId: employee.id,
-              roleId,
-            })),
-          });
-        }
+          if (input.facilityIds.length > 0) {
+            await tx.employeeFacility.createMany({
+              data: input.facilityIds.map((facilityId) => ({
+                organizationId: input.organizationId,
+                employeeId: employee.id,
+                facilityId,
+                isPrimary: facilityId === input.primaryFacilityId,
+              })),
+            });
+          }
 
-        const persistedEmployee = await this.findEmployeeByIdWithTx(
-          tx,
-          input.organizationId,
-          employee.id,
+          if (input.roleIds.length > 0) {
+            await tx.employeeRole.createMany({
+              data: input.roleIds.map((roleId) => ({
+                organizationId: input.organizationId,
+                employeeId: employee.id,
+                roleId,
+              })),
+            });
+          }
+
+          return {
+            status: invitationStatus,
+            employeeId: employee.id,
+            activation,
+          };
+        },
+      );
+
+      const employee = await this.findEmployeeById(
+        input.organizationId,
+        invitedEmployee.employeeId,
+      );
+
+      if (!employee) {
+        throw new InvalidEmployeeInputError(
+          'Invalid employee input: employee could not be loaded after invite',
         );
+      }
 
-        if (!persistedEmployee) {
-          throw new InvalidEmployeeInputError(
-            'Invalid employee input: employee could not be loaded after invite',
-          );
-        }
-
-        return {
-          status: invitationStatus,
-          employee: this.toEmployeeDetailRecord(persistedEmployee),
-          activation,
-        };
-      });
+      return {
+        status: invitedEmployee.status,
+        employee,
+        activation: invitedEmployee.activation,
+      };
     } catch (error) {
       if (error instanceof Error) {
         if (
@@ -303,16 +312,14 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
         : {}),
     };
     const skip = (input.page - 1) * input.pageSize;
-    const [totalItems, employees] = await this.prismaService.$transaction([
-      this.prismaService.employee.count({ where }),
-      this.prismaService.employee.findMany({
-        where,
-        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
-        skip,
-        take: input.pageSize,
-        include: this.employeeInclude,
-      }),
-    ]);
+    const totalItems = await this.prismaService.employee.count({ where });
+    const employees = await this.prismaService.employee.findMany({
+      where,
+      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { id: 'asc' }],
+      skip,
+      take: input.pageSize,
+      include: this.employeeInclude,
+    });
 
     return {
       items: employees.map((employee) => this.toEmployeeDetailRecord(employee)),
@@ -330,11 +337,14 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
     organizationId: string,
     employeeId: string,
   ): Promise<EmployeeDetailRecord | null> {
-    const employee = await this.findEmployeeByIdWithTx(
-      this.prismaService,
-      organizationId,
-      employeeId,
-    );
+    const employee = await this.prismaService.employee.findFirst({
+      where: {
+        organizationId,
+        id: employeeId,
+        deletedAt: null,
+      },
+      include: this.employeeInclude,
+    });
 
     return employee ? this.toEmployeeDetailRecord(employee) : null;
   }
@@ -381,7 +391,7 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
   async replaceEmployeeFacilities(
     input: ReplaceEmployeeFacilitiesRecord,
   ): Promise<EmployeeDetailRecord | null> {
-    return this.prismaService.$transaction(async (tx) => {
+    const employeeId = await this.prismaService.$transaction(async (tx) => {
       const employee = await tx.employee.findFirst({
         where: {
           organizationId: input.organizationId,
@@ -428,22 +438,18 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
         });
       }
 
-      const persistedEmployee = await this.findEmployeeByIdWithTx(
-        tx,
-        input.organizationId,
-        input.employeeId,
-      );
-
-      return persistedEmployee
-        ? this.toEmployeeDetailRecord(persistedEmployee)
-        : null;
+      return input.employeeId;
     });
+
+    return employeeId
+      ? this.findEmployeeById(input.organizationId, employeeId)
+      : null;
   }
 
   async replaceEmployeeRoles(
     input: ReplaceEmployeeRolesRecord,
   ): Promise<EmployeeDetailRecord | null> {
-    return this.prismaService.$transaction(async (tx) => {
+    const employeeId = await this.prismaService.$transaction(async (tx) => {
       const employee = await tx.employee.findFirst({
         where: {
           organizationId: input.organizationId,
@@ -489,16 +495,12 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
         });
       }
 
-      const persistedEmployee = await this.findEmployeeByIdWithTx(
-        tx,
-        input.organizationId,
-        input.employeeId,
-      );
-
-      return persistedEmployee
-        ? this.toEmployeeDetailRecord(persistedEmployee)
-        : null;
+      return input.employeeId;
     });
+
+    return employeeId
+      ? this.findEmployeeById(input.organizationId, employeeId)
+      : null;
   }
 
   private get employeeInclude() {
@@ -549,21 +551,6 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
         },
       },
     } satisfies Prisma.EmployeeInclude;
-  }
-
-  private async findEmployeeByIdWithTx(
-    prisma: PrismaService | Prisma.TransactionClient,
-    organizationId: string,
-    employeeId: string,
-  ): Promise<EmployeeWithRelations | null> {
-    return prisma.employee.findFirst({
-      where: {
-        organizationId,
-        id: employeeId,
-        deletedAt: null,
-      },
-      include: this.employeeInclude,
-    });
   }
 
   private async createActivationToken(

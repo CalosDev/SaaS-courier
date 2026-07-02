@@ -302,26 +302,30 @@ export class PrismaRbacRepository implements RbacRepository {
         : {}),
     };
     const skip = (input.page - 1) * input.pageSize;
-    const [totalItems, roles] = await this.prismaService.$transaction([
-      this.prismaService.role.count({ where }),
-      this.prismaService.role.findMany({
-        where,
-        orderBy: [{ code: 'asc' }, { id: 'asc' }],
-        skip,
-        take: input.pageSize,
-        include: {
-          rolePermissions: {
-            include: {
-              permission: {
-                select: {
-                  code: true,
+    const [totalItems, roles] = await this.prismaService.$transaction(
+      async (tx) => {
+        const totalCount = await tx.role.count({ where });
+        const roleRows = await tx.role.findMany({
+          where,
+          orderBy: [{ code: 'asc' }, { id: 'asc' }],
+          skip,
+          take: input.pageSize,
+          include: {
+            rolePermissions: {
+              include: {
+                permission: {
+                  select: {
+                    code: true,
+                  },
                 },
               },
             },
           },
-        },
-      }),
-    ]);
+        });
+
+        return [totalCount, roleRows] as const;
+      },
+    );
 
     return {
       items: roles.map((role) => this.toRoleRecord(role)),

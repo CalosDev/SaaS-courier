@@ -96,15 +96,19 @@ export class PrismaFacilitiesRepository implements FacilitiesRepository {
       ...(input.type !== undefined ? { type: input.type } : {}),
     };
     const skip = (input.page - 1) * input.pageSize;
-    const [totalItems, facilities] = await this.prismaService.$transaction([
-      this.prismaService.facility.count({ where }),
-      this.prismaService.facility.findMany({
-        where,
-        orderBy: [{ code: 'asc' }, { id: 'asc' }],
-        skip,
-        take: input.pageSize,
-      }),
-    ]);
+    const [totalItems, facilities] = await this.prismaService.$transaction(
+      async (tx) => {
+        const totalCount = await tx.facility.count({ where });
+        const facilityRows = await tx.facility.findMany({
+          where,
+          orderBy: [{ code: 'asc' }, { id: 'asc' }],
+          skip,
+          take: input.pageSize,
+        });
+
+        return [totalCount, facilityRows] as const;
+      },
+    );
 
     return {
       items: facilities.map((facility) => this.toFacilityRecord(facility)),

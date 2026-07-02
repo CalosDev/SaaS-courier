@@ -195,10 +195,10 @@ describe('Customers repository integration', () => {
       cleanup.addressIds.push(workAddress.id);
 
       const concurrentPrismaOne = new PrismaClient({
-        adapter: new PrismaPg({ connectionString: LOCAL_DATABASE_URL }),
+        adapter: new PrismaPg(LOCAL_DATABASE_URL),
       });
       const concurrentPrismaTwo = new PrismaClient({
-        adapter: new PrismaPg({ connectionString: LOCAL_DATABASE_URL }),
+        adapter: new PrismaPg(LOCAL_DATABASE_URL),
       });
       concurrentClients.push(concurrentPrismaOne, concurrentPrismaTwo);
       await Promise.all([

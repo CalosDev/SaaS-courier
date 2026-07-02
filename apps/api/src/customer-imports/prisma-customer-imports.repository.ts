@@ -116,36 +116,40 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
       documentNumber: string;
     }>;
   }): Promise<CustomerImportValidationConflictSnapshot> {
-    const [customers, profiles] = await this.prismaService.$transaction([
-      this.prismaService.customer.findMany({
-        where: {
-          organizationId: input.organizationId,
-          deletedAt: null,
-          customerCode: {
-            in: input.customerCodes.length > 0 ? input.customerCodes : [''],
+    const [customers, profiles] = await this.prismaService.$transaction(
+      async (tx) => {
+        const customerRows = await tx.customer.findMany({
+          where: {
+            organizationId: input.organizationId,
+            deletedAt: null,
+            customerCode: {
+              in: input.customerCodes.length > 0 ? input.customerCodes : [''],
+            },
           },
-        },
-        select: {
-          customerCode: true,
-        },
-      }),
-      this.prismaService.customerCustomsProfile.findMany({
-        where: {
-          organizationId: input.organizationId,
-          OR:
-            input.customsIdentities.length > 0
-              ? input.customsIdentities.map((identity) => ({
-                  documentType: identity.documentType as never,
-                  documentNumber: identity.documentNumber,
-                }))
-              : undefined,
-        },
-        select: {
-          documentType: true,
-          documentNumber: true,
-        },
-      }),
-    ]);
+          select: {
+            customerCode: true,
+          },
+        });
+        const profileRows = await tx.customerCustomsProfile.findMany({
+          where: {
+            organizationId: input.organizationId,
+            OR:
+              input.customsIdentities.length > 0
+                ? input.customsIdentities.map((identity) => ({
+                    documentType: identity.documentType as never,
+                    documentNumber: identity.documentNumber,
+                  }))
+                : undefined,
+          },
+          select: {
+            documentType: true,
+            documentNumber: true,
+          },
+        });
+
+        return [customerRows, profileRows] as const;
+      },
+    );
 
     return {
       customerCodes: customers.map((customer) => customer.customerCode),

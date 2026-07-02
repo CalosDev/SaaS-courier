@@ -142,15 +142,19 @@ export class PrismaCustomersRepository implements CustomersRepository {
         : {}),
     };
     const skip = (input.page - 1) * input.pageSize;
-    const [totalItems, customers] = await this.prismaService.$transaction([
-      this.prismaService.customer.count({ where }),
-      this.prismaService.customer.findMany({
-        where,
-        orderBy: [{ customerCode: 'asc' }, { id: 'asc' }],
-        skip,
-        take: input.pageSize,
-      }),
-    ]);
+    const [totalItems, customers] = await this.prismaService.$transaction(
+      async (tx) => {
+        const totalCount = await tx.customer.count({ where });
+        const customerRows = await tx.customer.findMany({
+          where,
+          orderBy: [{ customerCode: 'asc' }, { id: 'asc' }],
+          skip,
+          take: input.pageSize,
+        });
+
+        return [totalCount, customerRows] as const;
+      },
+    );
 
     return {
       items: customers.map((customer) => this.toCustomerRecord(customer)),

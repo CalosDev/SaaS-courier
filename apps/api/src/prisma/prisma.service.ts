@@ -16,7 +16,7 @@ export class PrismaService
       throw new Error('DATABASE_URL is required');
     }
 
-    const adapter = new PrismaPg({ connectionString });
+    const adapter = new PrismaPg(connectionString);
 
     super({ adapter });
   }
