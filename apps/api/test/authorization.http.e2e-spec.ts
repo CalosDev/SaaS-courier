@@ -486,6 +486,33 @@ describe('HTTP authorization with effective permissions', () => {
       });
       expect(currentSessionBody.session.permissions).toBeUndefined();
       expect(currentSessionBody.session.roles).toBeUndefined();
+
+      const authorizationResponse = await request(server)
+        .get('/auth/authorization')
+        .set('Cookie', orgOneCookie)
+        .expect(200);
+      const authorizationBody = authorizationResponse.body as {
+        permissionCodes: string[];
+        roles?: unknown;
+        employeeId?: unknown;
+        organizationId?: unknown;
+        sessionId?: unknown;
+      };
+
+      expect(authorizationBody.permissionCodes).toEqual(['roles.manage']);
+      expect(authorizationBody.roles).toBeUndefined();
+      expect(authorizationBody.employeeId).toBeUndefined();
+      expect(authorizationBody.organizationId).toBeUndefined();
+      expect(authorizationBody.sessionId).toBeUndefined();
+
+      const noRoleAuthorizationResponse = await request(server)
+        .get('/auth/authorization')
+        .set('Cookie', noRoleCookie)
+        .expect(200);
+
+      expect(noRoleAuthorizationResponse.body).toEqual({
+        permissionCodes: [],
+      });
     } finally {
       const prisma = prismaService;
       if (prisma) {

@@ -53,6 +53,13 @@ La aplicacion Next.js vive en `apps/web` y se ejecuta desde el workspace con pnp
 pnpm --filter @courier/web dev
 ```
 
+El backoffice usa mismo origen publico para autenticacion y CSRF. El navegador llama rutas relativas `/backend/*` y Next.js las reescribe internamente hacia NestJS usando `API_INTERNAL_URL`.
+
+```bash
+API_INTERNAL_URL=http://localhost:4000
+NEXT_PUBLIC_API_BASE_PATH=/backend
+```
+
 ## Backend API
 
 La aplicacion NestJS vive en `apps/api` y expone `GET /health` en el puerto 4000 por defecto.

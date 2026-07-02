@@ -1,11 +1,25 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
+import { LoadingState } from "@/components/ui/loading-state";
+import { useAuth } from "@/lib/auth/auth-provider";
+
 export default function Home() {
-  return (
-    <main className="page">
-      <section className="intro" aria-label="Estado del frontend">
-        <h1>Courier SaaS</h1>
-        <p>Frontend inicial configurado</p>
-        <p className="stack">Next.js + TypeScript</p>
-      </section>
-    </main>
-  );
+  const router = useRouter();
+  const { state } = useAuth();
+
+  useEffect(() => {
+    if (state.status === "authenticated") {
+      router.replace("/dashboard");
+      return;
+    }
+
+    if (state.status === "anonymous") {
+      router.replace("/login");
+    }
+  }, [router, state.status]);
+
+  return <LoadingState label="Preparando aplicación..." />;
 }

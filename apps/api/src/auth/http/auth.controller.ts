@@ -12,6 +12,7 @@ import { Throttle } from '@nestjs/throttler';
 
 import type { SessionContext } from '../../sessions/session.types';
 import { AuthenticatedOnly } from '../../rbac/http/authenticated-only.decorator';
+import { RbacService } from '../../rbac/rbac.service';
 import { AuthHttpService } from './auth-http.service';
 import type { AuthenticatedRequest } from './authenticated-request.type';
 import { CurrentSession } from './current-session.decorator';
@@ -21,7 +22,10 @@ import { Public } from './public.decorator';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authHttpService: AuthHttpService) {}
+  constructor(
+    private readonly authHttpService: AuthHttpService,
+    private readonly rbacService: RbacService,
+  ) {}
 
   @Get('csrf')
   @Public()
@@ -76,6 +80,23 @@ export class AuthController {
     @Res({ passthrough: true }) response: Response,
   ) {
     return this.authHttpService.getCurrentSession(response, session);
+  }
+
+  @Get('authorization')
+  @AuthenticatedOnly()
+  async getAuthorization(
+    @Req() request: AuthenticatedRequest,
+    @Res({ passthrough: true }) response: Response,
+  ): Promise<{ permissionCodes: string[] }> {
+    response.setHeader('Cache-Control', 'no-store');
+    const auth = request.auth!;
+
+    return {
+      permissionCodes: await this.rbacService.getEffectivePermissionCodes({
+        organizationId: auth.organizationId,
+        employeeId: auth.employeeId,
+      }),
+    };
   }
 
   @Post('session/rotate')
