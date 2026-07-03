@@ -15,6 +15,7 @@ import {
   InvalidOrganizationSettingsInputError,
   OrganizationSettingsNotFoundError,
 } from './organization-settings.errors';
+import type { CommandContext } from '../request-context/request-context.types';
 
 const LOCALE_PATTERN = /^[a-z]{2}-[A-Z]{2}$/;
 const CUSTOMER_CODE_PREFIX_PATTERN = /^[A-Z0-9][A-Z0-9_-]{0,7}$/;
@@ -44,10 +45,12 @@ export class OrganizationSettingsService {
   async updateCurrent(
     organizationId: string,
     input: UpdateOrganizationSettingsInput,
+    context?: CommandContext,
   ): Promise<OrganizationSettingsCurrentRecord> {
     const record = this.normalizeUpdateInput(organizationId, input);
-    const updated =
-      await this.organizationSettingsRepository.updateCurrent(record);
+    const updated = context
+      ? await this.organizationSettingsRepository.updateCurrent(record, context)
+      : await this.organizationSettingsRepository.updateCurrent(record);
 
     if (!updated) {
       throw new OrganizationSettingsNotFoundError(record.organizationId);

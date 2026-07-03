@@ -20,6 +20,8 @@ import { ListFacilitiesDto } from './dto/list-facilities.dto';
 import { UpdateFacilityDto } from './dto/update-facility.dto';
 import type { FacilityListResult, FacilityRecord } from './facility.types';
 import { FacilitiesService } from './facilities.service';
+import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
+import type { CommandContext } from '../request-context/request-context.types';
 
 @Controller('facilities')
 export class FacilitiesController {
@@ -47,6 +49,7 @@ export class FacilitiesController {
   @HttpCode(201)
   async createFacility(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Body() body: CreateFacilityDto,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -55,6 +58,7 @@ export class FacilitiesController {
     const facility = await this.facilitiesService.create(
       session.organizationId,
       body,
+      context,
     );
 
     return this.serializeFacility(facility);
@@ -82,6 +86,7 @@ export class FacilitiesController {
   @RequirePermissions('facilities.manage')
   async updateFacility(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('facilityId', new ParseUUIDPipe({ version: '4' }))
     facilityId: string,
     @Body() body: UpdateFacilityDto,
@@ -93,6 +98,7 @@ export class FacilitiesController {
       session.organizationId,
       facilityId,
       body,
+      context,
     );
 
     return this.serializeFacility(facility);

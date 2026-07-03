@@ -19,6 +19,7 @@ import {
   type UpdateFacilityInput,
   type UpdateFacilityRecord,
 } from './facility.types';
+import type { CommandContext } from '../request-context/request-context.types';
 
 const FACILITY_CODE_PATTERN = /^[A-Z0-9][A-Z0-9_-]{0,39}$/;
 const COUNTRY_CODE_PATTERN = /^[A-Z]{2}$/;
@@ -36,10 +37,13 @@ export class FacilitiesService {
   async create(
     organizationId: string,
     input: CreateFacilityInput,
+    context?: CommandContext,
   ): Promise<FacilityRecord> {
     const record = this.normalizeCreateInput(organizationId, input);
 
-    return this.facilitiesRepository.create(record);
+    return context
+      ? this.facilitiesRepository.create(record, context)
+      : this.facilitiesRepository.create(record);
   }
 
   async list(
@@ -71,9 +75,12 @@ export class FacilitiesService {
     organizationId: string,
     facilityId: string,
     input: UpdateFacilityInput,
+    context?: CommandContext,
   ): Promise<FacilityRecord> {
     const record = this.normalizeUpdateInput(organizationId, facilityId, input);
-    const facility = await this.facilitiesRepository.update(record);
+    const facility = context
+      ? await this.facilitiesRepository.update(record, context)
+      : await this.facilitiesRepository.update(record);
 
     if (!facility) {
       throw new FacilityNotFoundError(record.facilityId);

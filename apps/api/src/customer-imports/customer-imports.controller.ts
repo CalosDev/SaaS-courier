@@ -11,6 +11,8 @@ import {
 import type { Response } from 'express';
 import { CurrentSession } from '../auth/http/current-session.decorator';
 import { RequirePermissions } from '../rbac/http/require-permissions.decorator';
+import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
+import type { CommandContext } from '../request-context/request-context.types';
 import type { SessionContext } from '../sessions/session.types';
 import { CustomerImportsService } from './customer-imports.service';
 import { CreateCustomerImportDto } from './dto/create-customer-import.dto';
@@ -43,6 +45,7 @@ export class CustomerImportsController {
   @HttpCode(201)
   async create(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Body() body: CreateCustomerImportDto,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -52,6 +55,7 @@ export class CustomerImportsController {
       session.organizationId,
       session.employeeId,
       body,
+      this.asImportContext(context),
     );
 
     return this.serializeJobDetail(job);
@@ -80,6 +84,7 @@ export class CustomerImportsController {
   @HttpCode(200)
   async validate(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('importId', new ParseUUIDPipe({ version: '4' }))
     importId: string,
     @Res({ passthrough: true }) response: Response,
@@ -89,6 +94,7 @@ export class CustomerImportsController {
     const job = await this.customerImportsService.validate(
       session.organizationId,
       importId,
+      this.asImportContext(context),
     );
 
     return this.serializeJobDetail(job);
@@ -99,6 +105,7 @@ export class CustomerImportsController {
   @HttpCode(200)
   async commit(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('importId', new ParseUUIDPipe({ version: '4' }))
     importId: string,
     @Res({ passthrough: true }) response: Response,
@@ -108,6 +115,7 @@ export class CustomerImportsController {
     const job = await this.customerImportsService.commit(
       session.organizationId,
       importId,
+      this.asImportContext(context),
     );
 
     return this.serializeJobDetail(job);
@@ -118,6 +126,7 @@ export class CustomerImportsController {
   @HttpCode(200)
   async cancel(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('importId', new ParseUUIDPipe({ version: '4' }))
     importId: string,
     @Res({ passthrough: true }) response: Response,
@@ -127,6 +136,7 @@ export class CustomerImportsController {
     const job = await this.customerImportsService.cancel(
       session.organizationId,
       importId,
+      this.asImportContext(context),
     );
 
     return this.serializeJobDetail(job);
@@ -134,6 +144,10 @@ export class CustomerImportsController {
 
   private setNoStore(response: Response): void {
     response.setHeader('Cache-Control', 'no-store');
+  }
+
+  private asImportContext(context: CommandContext): CommandContext {
+    return { ...context, source: 'IMPORT' };
   }
 
   private serializeJobSummary(job: CustomerImportJobRecord) {

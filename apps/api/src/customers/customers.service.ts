@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   CustomerNotFoundError,
   InvalidCustomerInputError,
@@ -33,10 +34,13 @@ export class CustomersService {
   async create(
     organizationId: string,
     input: CreateCustomerInput,
+    context?: CommandContext,
   ): Promise<CustomerRecord> {
-    return this.customersRepository.createWithGeneratedCode(
-      this.normalizeCreateInput(organizationId, input),
-    );
+    const record = this.normalizeCreateInput(organizationId, input);
+
+    return context
+      ? this.customersRepository.createWithGeneratedCode(record, context)
+      : this.customersRepository.createWithGeneratedCode(record);
   }
 
   async getById(
@@ -68,10 +72,12 @@ export class CustomersService {
     organizationId: string,
     customerId: string,
     input: UpdateCustomerInput,
+    context?: CommandContext,
   ): Promise<CustomerRecord> {
-    const customer = await this.customersRepository.update(
-      this.normalizeUpdateInput(organizationId, customerId, input),
-    );
+    const record = this.normalizeUpdateInput(organizationId, customerId, input);
+    const customer = await (context
+      ? this.customersRepository.update(record, context)
+      : this.customersRepository.update(record));
 
     if (!customer) {
       throw new CustomerNotFoundError(customerId);

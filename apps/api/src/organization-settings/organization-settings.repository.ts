@@ -4,6 +4,7 @@ import type {
   OrganizationSettingsCurrentRecord,
   UpdateOrganizationSettingsRecord,
 } from './organization-settings.types';
+import type { CommandContext } from '../request-context/request-context.types';
 
 export abstract class OrganizationSettingsRepository {
   abstract findCurrent(
@@ -12,6 +13,7 @@ export abstract class OrganizationSettingsRepository {
 
   abstract updateCurrent(
     input: UpdateOrganizationSettingsRecord,
+    context?: CommandContext,
   ): Promise<OrganizationSettingsCurrentRecord | null>;
 
   abstract getCapabilitiesSnapshot(
@@ -24,5 +26,6 @@ export abstract class OrganizationSettingsRepository {
 
   abstract markOnboardingCompleted(
     organizationId: string,
+    context?: CommandContext,
   ): Promise<Date | null>;
 }

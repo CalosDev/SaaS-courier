@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { changedFields } from '../audit/audit-snapshot';
+import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import { Prisma, type Customer } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   CustomerCodeGenerationError,
   InvalidCustomerInputError,
@@ -29,6 +32,8 @@ const SEQUENTIAL_CODE_GENERATION_ATTEMPTS = 1000;
 
 @Injectable()
 export class PrismaCustomersRepository implements CustomersRepository {
+  private readonly auditWriter = new PrismaAuditOutboxWriter();
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly customerCodeService: CustomerCodeService,
@@ -36,6 +41,7 @@ export class PrismaCustomersRepository implements CustomersRepository {
 
   async createWithGeneratedCode(
     input: Omit<CreateCustomerRecord, 'customerCode'>,
+    context?: CommandContext,
   ): Promise<CustomerRecord> {
     return this.prismaService.$transaction(async (tx) => {
       const settings = await this.lockOrganizationSettings(
@@ -43,32 +49,57 @@ export class PrismaCustomersRepository implements CustomersRepository {
         input.organizationId,
       );
 
-      if (settings.customer_code_strategy === 'AUTO_SEQUENTIAL') {
-        return this.createWithSequentialCode(tx, input, settings);
+      const customer =
+        settings.customer_code_strategy === 'AUTO_SEQUENTIAL'
+          ? await this.createWithSequentialCode(tx, input, settings)
+          : await this.createWithRandomCode(tx, input, settings);
+
+      if (context) {
+        await this.writeCustomerAudit(
+          tx,
+          context,
+          'customer.created',
+          customer,
+        );
       }
 
-      return this.createWithRandomCode(tx, input, settings);
+      return customer;
     });
   }
 
-  async create(input: CreateCustomerRecord): Promise<CustomerRecord> {
-    const customer = await this.prismaService.customer.create({
-      data: {
-        organizationId: input.organizationId,
-        customerCode: input.customerCode,
-        type: input.type,
-        firstName: input.firstName,
-        lastName: input.lastName,
-        businessName: input.businessName,
-        email: input.email,
-        phone: input.phone,
-        mobilePhone: input.mobilePhone,
-        status: input.status,
-        notes: input.notes,
-      },
-    });
+  async create(
+    input: CreateCustomerRecord,
+    context?: CommandContext,
+  ): Promise<CustomerRecord> {
+    return this.prismaService.$transaction(async (tx) => {
+      const customer = await tx.customer.create({
+        data: {
+          organizationId: input.organizationId,
+          customerCode: input.customerCode,
+          type: input.type,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          businessName: input.businessName,
+          email: input.email,
+          phone: input.phone,
+          mobilePhone: input.mobilePhone,
+          status: input.status,
+          notes: input.notes,
+        },
+      });
+      const customerRecord = this.toCustomerRecord(customer);
 
-    return this.toCustomerRecord(customer);
+      if (context) {
+        await this.writeCustomerAudit(
+          tx,
+          context,
+          'customer.created',
+          customerRecord,
+        );
+      }
+
+      return customerRecord;
+    });
   }
 
   async findById(
@@ -168,40 +199,47 @@ export class PrismaCustomersRepository implements CustomersRepository {
     };
   }
 
-  async update(input: UpdateCustomerRecord): Promise<CustomerRecord | null> {
-    const currentCustomer = await this.prismaService.customer.findFirst({
-      where: {
-        organizationId: input.organizationId,
-        id: input.customerId,
-        deletedAt: null,
-      },
-    });
+  async update(
+    input: UpdateCustomerRecord,
+    context?: CommandContext,
+  ): Promise<CustomerRecord | null> {
+    return this.prismaService.$transaction(async (tx) => {
+      const currentCustomer = await tx.customer.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          id: input.customerId,
+          deletedAt: null,
+        },
+      });
 
-    if (!currentCustomer) {
-      return null;
-    }
+      if (!currentCustomer) {
+        return null;
+      }
 
-    const nextFirstName = input.firstName ?? currentCustomer.firstName;
-    const nextLastName = input.lastName ?? currentCustomer.lastName;
-    const nextBusinessName = input.businessName ?? currentCustomer.businessName;
+      const nextFirstName = input.firstName ?? currentCustomer.firstName;
+      const nextLastName = input.lastName ?? currentCustomer.lastName;
+      const nextBusinessName =
+        input.businessName ?? currentCustomer.businessName;
 
-    if (
-      currentCustomer.type === 'INDIVIDUAL' &&
-      (!nextFirstName || !nextLastName)
-    ) {
-      throw new InvalidCustomerInputError(
-        'Invalid customer input: firstName and lastName are required for individuals',
+      if (
+        currentCustomer.type === 'INDIVIDUAL' &&
+        (!nextFirstName || !nextLastName)
+      ) {
+        throw new InvalidCustomerInputError(
+          'Invalid customer input: firstName and lastName are required for individuals',
+        );
+      }
+
+      if (currentCustomer.type === 'BUSINESS' && !nextBusinessName) {
+        throw new InvalidCustomerInputError(
+          'Invalid customer input: businessName is required for businesses',
+        );
+      }
+
+      const beforeData = this.customerAuditSnapshot(
+        this.toCustomerRecord(currentCustomer),
       );
-    }
-
-    if (currentCustomer.type === 'BUSINESS' && !nextBusinessName) {
-      throw new InvalidCustomerInputError(
-        'Invalid customer input: businessName is required for businesses',
-      );
-    }
-
-    const updatedCustomers =
-      await this.prismaService.customer.updateManyAndReturn({
+      const updatedCustomers = await tx.customer.updateManyAndReturn({
         where: {
           organizationId: input.organizationId,
           id: input.customerId,
@@ -226,9 +264,30 @@ export class PrismaCustomersRepository implements CustomersRepository {
         limit: 1,
       });
 
-    const customer = updatedCustomers[0];
+      const customer = updatedCustomers[0];
 
-    return customer ? this.toCustomerRecord(customer) : null;
+      if (!customer) {
+        return null;
+      }
+
+      const customerRecord = this.toCustomerRecord(customer);
+      const afterData = this.customerAuditSnapshot(customerRecord);
+      const fields = changedFields(beforeData, afterData);
+
+      if (context && fields.length > 0) {
+        await this.writeCustomerAudit(
+          tx,
+          context,
+          'customer.updated',
+          customerRecord,
+          beforeData,
+          afterData,
+          fields,
+        );
+      }
+
+      return customerRecord;
+    });
   }
 
   private toCustomerRecord(customer: Customer): CustomerRecord {
@@ -246,6 +305,49 @@ export class PrismaCustomersRepository implements CustomersRepository {
       notes: customer.notes,
       createdAt: customer.createdAt,
       updatedAt: customer.updatedAt,
+    };
+  }
+
+  private async writeCustomerAudit(
+    tx: Prisma.TransactionClient,
+    context: CommandContext,
+    action: 'customer.created' | 'customer.updated',
+    customer: CustomerRecord,
+    beforeData?: Record<string, unknown>,
+    afterData = this.customerAuditSnapshot(customer),
+    fields = Object.keys(afterData),
+  ): Promise<void> {
+    await this.auditWriter.write(tx, {
+      context,
+      action,
+      entityType: 'CUSTOMER',
+      entityId: customer.id,
+      changedFields: fields,
+      beforeData,
+      afterData,
+      payload: {
+        customerId: customer.id,
+        customerCode: customer.customerCode,
+        type: customer.type,
+        status: customer.status,
+      },
+    });
+  }
+
+  private customerAuditSnapshot(
+    customer: CustomerRecord,
+  ): Record<string, unknown> {
+    return {
+      customerCode: customer.customerCode,
+      type: customer.type,
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      businessName: customer.businessName,
+      hasEmail: customer.email !== null,
+      hasPhone: customer.phone !== null,
+      hasMobilePhone: customer.mobilePhone !== null,
+      status: customer.status,
+      hasNotes: customer.notes !== null,
     };
   }
 

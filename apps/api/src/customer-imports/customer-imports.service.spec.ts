@@ -5,8 +5,20 @@ import {
   InvalidCustomerImportInputError,
 } from './customer-imports.errors';
 import { CustomerImportsService } from './customer-imports.service';
+import type { CommandContext } from '../request-context/request-context.types';
 
 describe('CustomerImportsService', () => {
+  const commandContext: CommandContext = {
+    organizationId: 'be24d4d5-507e-4787-bae5-857b9329bc2d',
+    actorType: 'EMPLOYEE',
+    actorUserId: '75478008-b40a-453a-940a-21717807cd5f',
+    actorEmployeeId: '5d2ac89e-f83e-4e08-9fab-f99c53743eb8',
+    source: 'IMPORT',
+    requestId: '898e459e-5ed3-4138-9988-c70690c0180e',
+    correlationId: '94d43d87-eafc-40b4-bca6-f1870e123c84',
+    ipAddress: '127.0.0.1',
+    userAgent: 'jest',
+  };
   const repository = {
     createDraft: jest.fn(),
     listJobs: jest.fn(),
@@ -168,5 +180,67 @@ describe('CustomerImportsService', () => {
         'c4b993c9-fab4-46b1-853f-8d26f2c06290',
       ),
     ).rejects.toBeInstanceOf(CustomerImportJobNotFoundError);
+  });
+
+  it('preserves the authenticated command context for every import transition', async () => {
+    const importJobId = '5fd2b6b2-d4e6-4e38-8a61-0a47ec84f7d1';
+    repository.createDraft.mockResolvedValueOnce({ id: importJobId });
+    repository.findJobById.mockResolvedValueOnce({
+      id: importJobId,
+      status: 'DRAFT',
+      preserveCustomerCodes: false,
+      rows: [],
+    });
+    repository.findValidationConflicts.mockResolvedValueOnce({
+      customerCodes: [],
+      customsIdentities: [],
+    });
+    repository.saveValidationResult.mockResolvedValueOnce({ id: importJobId });
+    repository.commitJob.mockResolvedValueOnce({ id: importJobId });
+    repository.cancelJob.mockResolvedValueOnce({ id: importJobId });
+
+    await service.create(
+      commandContext.organizationId,
+      commandContext.actorEmployeeId!,
+      {
+        preserveCustomerCodes: false,
+        rows: [{ type: 'BUSINESS', businessName: 'ACME' }],
+      },
+      commandContext,
+    );
+    await service.validate(
+      commandContext.organizationId,
+      importJobId,
+      commandContext,
+    );
+    await service.commit(
+      commandContext.organizationId,
+      importJobId,
+      commandContext,
+    );
+    await service.cancel(
+      commandContext.organizationId,
+      importJobId,
+      commandContext,
+    );
+
+    expect(repository.createDraft).toHaveBeenCalledWith(
+      expect.any(Object),
+      commandContext,
+    );
+    expect(repository.saveValidationResult).toHaveBeenCalledWith(
+      expect.any(Object),
+      commandContext,
+    );
+    expect(repository.commitJob).toHaveBeenCalledWith(
+      commandContext.organizationId,
+      importJobId,
+      commandContext,
+    );
+    expect(repository.cancelJob).toHaveBeenCalledWith(
+      commandContext.organizationId,
+      importJobId,
+      commandContext,
+    );
   });
 });

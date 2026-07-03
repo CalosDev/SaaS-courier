@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
+import { changedFields } from '../audit/audit-snapshot';
+import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import {
   Prisma,
   type CustomerCustomsProfile,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   CustomerIdentityConflictError,
   CustomerNotFoundError,
@@ -21,6 +24,8 @@ type LockedCustomerRow = {
 
 @Injectable()
 export class PrismaCustomerCustomsProfilesRepository implements CustomerCustomsProfilesRepository {
+  private readonly auditWriter = new PrismaAuditOutboxWriter();
+
   constructor(private readonly prismaService: PrismaService) {}
 
   async findByCustomerId(
@@ -39,6 +44,7 @@ export class PrismaCustomerCustomsProfilesRepository implements CustomerCustomsP
 
   async upsertIdentity(
     input: UpsertCustomerCustomsProfileIdentityRecord,
+    context?: CommandContext,
   ): Promise<CustomerCustomsProfileRecord> {
     try {
       return await this.prismaService.$transaction(async (tx) => {
@@ -95,6 +101,32 @@ export class PrismaCustomerCustomsProfilesRepository implements CustomerCustomsP
               },
             });
 
+        if (context) {
+          const beforeData = currentProfile
+            ? this.customsProfileAuditSnapshot(currentProfile)
+            : undefined;
+          const afterData = this.customsProfileAuditSnapshot(profile);
+          const fields = beforeData
+            ? changedFields(beforeData, afterData)
+            : Object.keys(afterData);
+          if (fields.length > 0) {
+            await this.auditWriter.write(tx, {
+              context,
+              action: 'customer.customs_profile.updated',
+              entityType: 'CUSTOMER_CUSTOMS_PROFILE',
+              entityId: profile.id,
+              changedFields: fields,
+              beforeData,
+              afterData,
+              payload: {
+                customerId: input.customerId,
+                customsProfileId: profile.id,
+                documentType: profile.documentType,
+              },
+            });
+          }
+        }
+
         return this.toRecord(profile);
       });
     } catch (error) {
@@ -115,12 +147,28 @@ export class PrismaCustomerCustomsProfilesRepository implements CustomerCustomsP
 
   async updateVerification(
     input: UpdateCustomerCustomsVerificationRecord,
+    context?: CommandContext,
   ): Promise<CustomerCustomsProfileRecord | null> {
-    const updatedProfiles =
-      await this.prismaService.customerCustomsProfile.updateManyAndReturn({
+    return this.prismaService.$transaction(async (tx) => {
+      const currentProfile = await tx.customerCustomsProfile.findUnique({
         where: {
-          organizationId: input.organizationId,
-          customerId: input.customerId,
+          organizationId_customerId: {
+            organizationId: input.organizationId,
+            customerId: input.customerId,
+          },
+        },
+      });
+
+      if (!currentProfile) {
+        return null;
+      }
+
+      const profile = await tx.customerCustomsProfile.update({
+        where: {
+          organizationId_customerId: {
+            organizationId: input.organizationId,
+            customerId: input.customerId,
+          },
         },
         data: {
           ruaStatus: input.ruaStatus,
@@ -130,12 +178,33 @@ export class PrismaCustomerCustomsProfilesRepository implements CustomerCustomsP
           externalReference: input.externalReference,
           ...(input.notes !== undefined ? { notes: input.notes } : {}),
         },
-        limit: 1,
       });
 
-    const profile = updatedProfiles[0];
+      if (context) {
+        const beforeData = this.customsProfileAuditSnapshot(currentProfile);
+        const afterData = this.customsProfileAuditSnapshot(profile);
+        const fields = changedFields(beforeData, afterData);
+        if (fields.length > 0) {
+          await this.auditWriter.write(tx, {
+            context,
+            action: 'customer.customs_verification.updated',
+            entityType: 'CUSTOMER_CUSTOMS_PROFILE',
+            entityId: profile.id,
+            changedFields: fields,
+            beforeData,
+            afterData,
+            payload: {
+              customerId: input.customerId,
+              customsProfileId: profile.id,
+              status: profile.ruaStatus,
+              verificationSource: profile.verificationSource,
+            },
+          });
+        }
+      }
 
-    return profile ? this.toRecord(profile) : null;
+      return this.toRecord(profile);
+    });
   }
 
   private async lockCustomer(
@@ -209,6 +278,22 @@ export class PrismaCustomerCustomsProfilesRepository implements CustomerCustomsP
       notes: profile.notes,
       createdAt: profile.createdAt,
       updatedAt: profile.updatedAt,
+    };
+  }
+
+  private customsProfileAuditSnapshot(
+    profile: CustomerCustomsProfile,
+  ): Record<string, unknown> {
+    return {
+      customerId: profile.customerId,
+      documentType: profile.documentType,
+      documentNumber: profile.documentNumber,
+      ruaStatus: profile.ruaStatus,
+      verificationSource: profile.verificationSource,
+      lastCheckedAt: profile.lastCheckedAt?.toISOString() ?? null,
+      verifiedAt: profile.verifiedAt?.toISOString() ?? null,
+      hasExternalReference: profile.externalReference !== null,
+      hasNotes: profile.notes !== null,
     };
   }
 }

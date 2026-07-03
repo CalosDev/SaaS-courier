@@ -15,6 +15,7 @@
     "db:migrate:dev": "pnpm --filter @courier/api prisma:migrate:dev",
     "db:migrate:status": "pnpm --filter @courier/api prisma:migrate:status",
     "rbac:sync-permissions": "pnpm --filter @courier/api rbac:sync-permissions",
+    "outbox:status": "pnpm --filter @courier/api outbox:status",
     "dev": "turbo run dev",
     "build": "turbo run build",
     "lint": "turbo run lint",

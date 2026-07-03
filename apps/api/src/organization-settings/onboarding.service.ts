@@ -10,6 +10,7 @@ import {
   OnboardingRequirementsIncompleteError,
   OrganizationSettingsNotFoundError,
 } from './organization-settings.errors';
+import type { CommandContext } from '../request-context/request-context.types';
 
 @Injectable()
 export class OnboardingService {
@@ -31,7 +32,10 @@ export class OnboardingService {
     return this.toOnboardingRecord(snapshot);
   }
 
-  async complete(organizationId: string): Promise<OnboardingRecord> {
+  async complete(
+    organizationId: string,
+    context?: CommandContext,
+  ): Promise<OnboardingRecord> {
     const snapshot =
       await this.organizationSettingsRepository.getOnboardingSnapshot(
         organizationId,
@@ -51,9 +55,16 @@ export class OnboardingService {
       throw new OnboardingRequirementsIncompleteError();
     }
 
-    await this.organizationSettingsRepository.markOnboardingCompleted(
-      organizationId,
-    );
+    if (context) {
+      await this.organizationSettingsRepository.markOnboardingCompleted(
+        organizationId,
+        context,
+      );
+    } else {
+      await this.organizationSettingsRepository.markOnboardingCompleted(
+        organizationId,
+      );
+    }
 
     const completedSnapshot =
       await this.organizationSettingsRepository.getOnboardingSnapshot(

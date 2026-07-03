@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import { changedFields } from '../audit/audit-snapshot';
+import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import { Prisma, type CustomerAddress } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   CustomerAddressNotFoundError,
   CustomerNotFoundError,
@@ -18,6 +21,8 @@ type LockedCustomerRow = {
 
 @Injectable()
 export class PrismaCustomerAddressesRepository implements CustomerAddressesRepository {
+  private readonly auditWriter = new PrismaAuditOutboxWriter();
+
   constructor(private readonly prismaService: PrismaService) {}
 
   async listByCustomerId(
@@ -51,6 +56,7 @@ export class PrismaCustomerAddressesRepository implements CustomerAddressesRepos
 
   async create(
     input: CreateCustomerAddressRecord,
+    context?: CommandContext,
   ): Promise<CustomerAddressRecord> {
     return this.prismaService.$transaction(async (tx) => {
       const customer = await this.lockCustomer(
@@ -96,12 +102,32 @@ export class PrismaCustomerAddressesRepository implements CustomerAddressesRepos
         },
       });
 
-      return this.toCustomerAddressRecord(address);
+      const addressRecord = this.toCustomerAddressRecord(address);
+
+      if (context) {
+        const afterData = this.addressAuditSnapshot(addressRecord);
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'customer.address.created',
+          entityType: 'CUSTOMER_ADDRESS',
+          entityId: addressRecord.id,
+          changedFields: Object.keys(afterData),
+          afterData,
+          payload: {
+            customerId: input.customerId,
+            addressId: addressRecord.id,
+            type: addressRecord.type,
+          },
+        });
+      }
+
+      return addressRecord;
     });
   }
 
   async update(
     input: UpdateCustomerAddressRecord,
+    context?: CommandContext,
   ): Promise<CustomerAddressRecord | null> {
     return this.prismaService.$transaction(async (tx) => {
       const customer = await this.lockCustomer(
@@ -185,7 +211,35 @@ export class PrismaCustomerAddressesRepository implements CustomerAddressesRepos
 
       const address = updatedAddresses[0];
 
-      return address ? this.toCustomerAddressRecord(address) : null;
+      if (!address) {
+        return null;
+      }
+
+      const beforeData = this.addressAuditSnapshot(
+        this.toCustomerAddressRecord(currentAddress),
+      );
+      const addressRecord = this.toCustomerAddressRecord(address);
+      const afterData = this.addressAuditSnapshot(addressRecord);
+      const fields = changedFields(beforeData, afterData);
+
+      if (context && fields.length > 0) {
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'customer.address.updated',
+          entityType: 'CUSTOMER_ADDRESS',
+          entityId: addressRecord.id,
+          changedFields: fields,
+          beforeData,
+          afterData,
+          payload: {
+            customerId: input.customerId,
+            addressId: addressRecord.id,
+            changedFields: fields,
+          },
+        });
+      }
+
+      return addressRecord;
     });
   }
 
@@ -226,6 +280,26 @@ export class PrismaCustomerAddressesRepository implements CustomerAddressesRepos
       isActive: address.isActive,
       createdAt: address.createdAt,
       updatedAt: address.updatedAt,
+    };
+  }
+
+  private addressAuditSnapshot(
+    address: CustomerAddressRecord,
+  ): Record<string, unknown> {
+    return {
+      customerId: address.customerId,
+      type: address.type,
+      label: address.label,
+      hasRecipientName: address.recipientName !== null,
+      hasPhone: address.phone !== null,
+      hasAddressLine1: address.addressLine1.length > 0,
+      hasAddressLine2: address.addressLine2 !== null,
+      city: address.city,
+      province: address.province,
+      countryCode: address.countryCode,
+      hasPostalCode: address.postalCode !== null,
+      isPrimary: address.isPrimary,
+      isActive: address.isActive,
     };
   }
 }

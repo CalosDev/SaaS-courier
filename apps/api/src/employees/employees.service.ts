@@ -25,6 +25,7 @@ import {
   InvalidEmployeeInputError,
 } from './employee.errors';
 import { EmployeesRepository } from './employees.repository';
+import type { CommandContext } from '../request-context/request-context.types';
 
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
@@ -58,6 +59,7 @@ export class EmployeesService {
   async inviteEmployee(
     organizationId: string,
     input: InviteEmployeeInput,
+    context?: CommandContext,
   ): Promise<EmployeeInvitationResult> {
     const activationSecret = this.activationTokenService.createSecret();
     const expiresAt = new Date(Date.now() + ACTIVATION_TOKEN_TTL_MS);
@@ -68,7 +70,9 @@ export class EmployeesService {
       invitedAt: new Date(),
     };
 
-    const result = await this.repository.inviteEmployee(record);
+    const result = context
+      ? await this.repository.inviteEmployee(record, context)
+      : await this.repository.inviteEmployee(record);
 
     return {
       status: result.status,
@@ -113,6 +117,7 @@ export class EmployeesService {
     actorEmployeeId: string,
     employeeId: string,
     input: UpdateEmployeeInput,
+    context?: CommandContext,
   ): Promise<EmployeeDetailRecord> {
     const normalizedOrganizationId = this.normalizeRequiredString(
       organizationId,
@@ -149,7 +154,9 @@ export class EmployeesService {
       currentEmployee.status,
       input,
     );
-    const updatedEmployee = await this.repository.updateEmployee(record);
+    const updatedEmployee = context
+      ? await this.repository.updateEmployee(record, context)
+      : await this.repository.updateEmployee(record);
 
     if (!updatedEmployee) {
       throw new EmployeeNotFoundError(normalizedEmployeeId);
@@ -160,11 +167,12 @@ export class EmployeesService {
       record.status !== currentEmployee.status &&
       (record.status === 'SUSPENDED' || record.status === 'TERMINATED')
     ) {
-      await this.sessionsService.revokeEmployeeSessions({
-        organizationId: normalizedOrganizationId,
-        employeeId: normalizedEmployeeId,
-        reason: 'ACCOUNT_CHANGED',
-      });
+      if (!context)
+        await this.sessionsService.revokeEmployeeSessions({
+          organizationId: normalizedOrganizationId,
+          employeeId: normalizedEmployeeId,
+          reason: 'ACCOUNT_CHANGED',
+        });
     }
 
     return updatedEmployee;
@@ -175,6 +183,7 @@ export class EmployeesService {
     actorEmployeeId: string,
     employeeId: string,
     input: ReplaceEmployeeFacilitiesInput,
+    context?: CommandContext,
   ): Promise<EmployeeDetailRecord> {
     const normalizedOrganizationId = this.normalizeRequiredString(
       organizationId,
@@ -213,8 +222,9 @@ export class EmployeesService {
       employeeId: normalizedEmployeeId,
       ...this.normalizeFacilitiesInput(input),
     };
-    const updatedEmployee =
-      await this.repository.replaceEmployeeFacilities(record);
+    const updatedEmployee = context
+      ? await this.repository.replaceEmployeeFacilities(record, context)
+      : await this.repository.replaceEmployeeFacilities(record);
 
     if (!updatedEmployee) {
       throw new EmployeeNotFoundError(normalizedEmployeeId);
@@ -228,6 +238,7 @@ export class EmployeesService {
     actorEmployeeId: string,
     employeeId: string,
     input: ReplaceEmployeeRolesInput,
+    context?: CommandContext,
   ): Promise<EmployeeDetailRecord> {
     const normalizedOrganizationId = this.normalizeRequiredString(
       organizationId,
@@ -266,7 +277,9 @@ export class EmployeesService {
       employeeId: normalizedEmployeeId,
       roleIds: this.normalizeIdentifierList(input.roleIds, 'roleIds'),
     };
-    const updatedEmployee = await this.repository.replaceEmployeeRoles(record);
+    const updatedEmployee = context
+      ? await this.repository.replaceEmployeeRoles(record, context)
+      : await this.repository.replaceEmployeeRoles(record);
 
     if (!updatedEmployee) {
       throw new EmployeeNotFoundError(normalizedEmployeeId);
@@ -278,6 +291,7 @@ export class EmployeesService {
   async revokeEmployeeSessions(
     organizationId: string,
     employeeId: string,
+    context?: CommandContext,
   ): Promise<void> {
     const normalizedOrganizationId = this.normalizeRequiredString(
       organizationId,
@@ -294,6 +308,20 @@ export class EmployeesService {
 
     if (!employee) {
       throw new EmployeeNotFoundError(normalizedEmployeeId);
+    }
+
+    if (context) {
+      if (!this.repository.revokeEmployeeSessions) {
+        throw new Error(
+          'Employee session revocation repository is unavailable',
+        );
+      }
+      await this.repository.revokeEmployeeSessions(
+        normalizedOrganizationId,
+        normalizedEmployeeId,
+        context,
+      );
+      return;
     }
 
     await this.sessionsService.revokeEmployeeSessions({

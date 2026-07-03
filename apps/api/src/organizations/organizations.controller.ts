@@ -7,6 +7,8 @@ import type { OrganizationRecord } from './organization.types';
 import { CurrentSession } from '../auth/http/current-session.decorator';
 import { UpdateCurrentOrganizationDto } from './dto/update-current-organization.dto';
 import { OrganizationsService } from './organizations.service';
+import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
+import type { CommandContext } from '../request-context/request-context.types';
 
 @Controller('organizations')
 export class OrganizationsController {
@@ -31,6 +33,7 @@ export class OrganizationsController {
   @RequirePermissions('organizations.manage')
   async updateCurrentOrganization(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Res({ passthrough: true }) response: Response,
     @Body() body: UpdateCurrentOrganizationDto,
   ) {
@@ -39,6 +42,7 @@ export class OrganizationsController {
     const organization = await this.organizationsService.updateProfile(
       session.organizationId,
       body,
+      context,
     );
 
     return this.serializeOrganization(organization);

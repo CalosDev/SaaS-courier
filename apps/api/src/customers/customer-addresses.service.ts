@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   CustomerAddressNotFoundError,
   InvalidCustomerInputError,
@@ -38,10 +39,13 @@ export class CustomerAddressesService {
     organizationId: string,
     customerId: string,
     input: CreateCustomerAddressInput,
+    context?: CommandContext,
   ): Promise<CustomerAddressRecord> {
-    return this.customerAddressesRepository.create(
-      this.normalizeCreateInput(organizationId, customerId, input),
-    );
+    const record = this.normalizeCreateInput(organizationId, customerId, input);
+
+    return context
+      ? this.customerAddressesRepository.create(record, context)
+      : this.customerAddressesRepository.create(record);
   }
 
   async update(
@@ -49,10 +53,17 @@ export class CustomerAddressesService {
     customerId: string,
     addressId: string,
     input: UpdateCustomerAddressInput,
+    context?: CommandContext,
   ): Promise<CustomerAddressRecord> {
-    const address = await this.customerAddressesRepository.update(
-      this.normalizeUpdateInput(organizationId, customerId, addressId, input),
+    const record = this.normalizeUpdateInput(
+      organizationId,
+      customerId,
+      addressId,
+      input,
     );
+    const address = await (context
+      ? this.customerAddressesRepository.update(record, context)
+      : this.customerAddressesRepository.update(record));
 
     if (!address) {
       throw new CustomerAddressNotFoundError(addressId);

@@ -10,6 +10,9 @@ import {
   type User,
 } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { changedFields } from '../audit/audit-snapshot';
+import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   EmployeeCodeConflictError,
   EmployeeFacilityNotFoundError,
@@ -54,10 +57,13 @@ type EmployeeWithRelations = Employee & {
 
 @Injectable()
 export class PrismaEmployeesRepository implements EmployeesRepository {
+  private readonly auditWriter = new PrismaAuditOutboxWriter();
+
   constructor(private readonly prismaService: PrismaService) {}
 
   async inviteEmployee(
     input: InviteEmployeeRecord,
+    context?: CommandContext,
   ): Promise<EmployeeInvitationRepositoryResult> {
     try {
       const invitedEmployee = await this.prismaService.$transaction(
@@ -207,6 +213,32 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
             });
           }
 
+          if (context) {
+            await this.auditWriter.write(tx, {
+              context,
+              action: 'employee.invited',
+              entityType: 'EMPLOYEE',
+              entityId: employee.id,
+              changedFields: [
+                'employeeCode',
+                'firstName',
+                'lastName',
+                'status',
+                'facilities',
+                'roles',
+              ],
+              afterData: {
+                employeeCode: employee.employeeCode,
+                firstName: employee.firstName,
+                lastName: employee.lastName,
+                status: employee.status,
+                facilityIds: [...input.facilityIds].sort(),
+                roleIds: [...input.roleIds].sort(),
+              },
+              payload: { employeeId: employee.id, status: employee.status },
+            });
+          }
+
           return {
             status: invitationStatus,
             employeeId: employee.id,
@@ -351,34 +383,73 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
 
   async updateEmployee(
     input: UpdateEmployeeRecord,
+    context?: CommandContext,
   ): Promise<EmployeeDetailRecord | null> {
     try {
-      const employees = await this.prismaService.employee.updateManyAndReturn({
-        where: {
-          organizationId: input.organizationId,
-          id: input.employeeId,
-          deletedAt: null,
-        },
-        data: {
-          ...(input.employeeCode !== undefined
-            ? { employeeCode: input.employeeCode }
-            : {}),
-          ...(input.firstName !== undefined
-            ? { firstName: input.firstName }
-            : {}),
-          ...(input.lastName !== undefined ? { lastName: input.lastName } : {}),
-          ...(input.phone !== undefined ? { phone: input.phone } : {}),
-          ...(input.status !== undefined ? { status: input.status } : {}),
-        },
-        limit: 1,
+      const employeeId = await this.prismaService.$transaction(async (tx) => {
+        const before = await tx.employee.findFirst({
+          where: {
+            organizationId: input.organizationId,
+            id: input.employeeId,
+            deletedAt: null,
+          },
+        });
+        if (!before) return null;
+
+        const employee = await tx.employee.update({
+          where: { id: before.id },
+          data: {
+            ...(input.employeeCode !== undefined
+              ? { employeeCode: input.employeeCode }
+              : {}),
+            ...(input.firstName !== undefined
+              ? { firstName: input.firstName }
+              : {}),
+            ...(input.lastName !== undefined
+              ? { lastName: input.lastName }
+              : {}),
+            ...(input.phone !== undefined ? { phone: input.phone } : {}),
+            ...(input.status !== undefined ? { status: input.status } : {}),
+          },
+        });
+        if (
+          input.status &&
+          input.status !== before.status &&
+          (input.status === 'SUSPENDED' || input.status === 'TERMINATED')
+        ) {
+          await tx.userSession.updateMany({
+            where: {
+              organizationId: input.organizationId,
+              employeeId: input.employeeId,
+              revokedAt: null,
+            },
+            data: {
+              revokedAt: new Date(),
+              revocationReason: 'ACCOUNT_CHANGED',
+            },
+          });
+        }
+        const beforeSnapshot = this.employeeAuditSnapshot(before);
+        const afterSnapshot = this.employeeAuditSnapshot(employee);
+        const fields = changedFields(beforeSnapshot, afterSnapshot);
+        if (context && fields.length > 0) {
+          await this.auditWriter.write(tx, {
+            context,
+            action: 'employee.updated',
+            entityType: 'EMPLOYEE',
+            entityId: employee.id,
+            changedFields: fields,
+            beforeData: beforeSnapshot,
+            afterData: afterSnapshot,
+            payload: { employeeId: employee.id, changedFields: fields },
+          });
+        }
+        return employee.id;
       });
-      const employee = employees[0];
 
-      if (!employee) {
-        return null;
-      }
-
-      return this.findEmployeeById(input.organizationId, employee.id);
+      return employeeId
+        ? this.findEmployeeById(input.organizationId, employeeId)
+        : null;
     } catch (error) {
       if (this.isEmployeeCodeConflictError(error, input.employeeCode)) {
         throw new EmployeeCodeConflictError(input.employeeCode ?? '');
@@ -390,6 +461,7 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
 
   async replaceEmployeeFacilities(
     input: ReplaceEmployeeFacilitiesRecord,
+    context?: CommandContext,
   ): Promise<EmployeeDetailRecord | null> {
     const employeeId = await this.prismaService.$transaction(async (tx) => {
       const employee = await tx.employee.findFirst({
@@ -413,6 +485,15 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
           'Invalid employee input: terminated employees cannot be modified',
         );
       }
+
+      const beforeAssignments = await tx.employeeFacility.findMany({
+        where: {
+          organizationId: input.organizationId,
+          employeeId: input.employeeId,
+        },
+        select: { facilityId: true, isPrimary: true },
+        orderBy: { facilityId: 'asc' },
+      });
 
       await this.assertFacilitiesBelongToOrganization(
         tx,
@@ -438,6 +519,31 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
         });
       }
 
+      const afterAssignments = input.facilityIds
+        .map((facilityId) => ({
+          facilityId,
+          isPrimary: facilityId === input.primaryFacilityId,
+        }))
+        .sort((a, b) => a.facilityId.localeCompare(b.facilityId));
+      if (
+        context &&
+        JSON.stringify(beforeAssignments) !== JSON.stringify(afterAssignments)
+      ) {
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'employee.facilities.replaced',
+          entityType: 'EMPLOYEE',
+          entityId: input.employeeId,
+          changedFields: ['facilities'],
+          beforeData: { facilities: beforeAssignments },
+          afterData: { facilities: afterAssignments },
+          payload: {
+            employeeId: input.employeeId,
+            facilityIds: [...input.facilityIds].sort(),
+          },
+        });
+      }
+
       return input.employeeId;
     });
 
@@ -448,6 +554,7 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
 
   async replaceEmployeeRoles(
     input: ReplaceEmployeeRolesRecord,
+    context?: CommandContext,
   ): Promise<EmployeeDetailRecord | null> {
     const employeeId = await this.prismaService.$transaction(async (tx) => {
       const employee = await tx.employee.findFirst({
@@ -472,6 +579,17 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
         );
       }
 
+      const beforeRoles = (
+        await tx.employeeRole.findMany({
+          where: {
+            organizationId: input.organizationId,
+            employeeId: input.employeeId,
+          },
+          select: { roleId: true },
+          orderBy: { roleId: 'asc' },
+        })
+      ).map((item) => item.roleId);
+
       await this.assertRolesBelongToOrganization(
         tx,
         input.organizationId,
@@ -495,12 +613,69 @@ export class PrismaEmployeesRepository implements EmployeesRepository {
         });
       }
 
+      const afterRoles = [...input.roleIds].sort();
+      if (
+        context &&
+        JSON.stringify(beforeRoles) !== JSON.stringify(afterRoles)
+      ) {
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'employee.roles.replaced',
+          entityType: 'EMPLOYEE',
+          entityId: input.employeeId,
+          changedFields: ['roles'],
+          beforeData: { roleIds: beforeRoles },
+          afterData: { roleIds: afterRoles },
+          payload: { employeeId: input.employeeId, roleIds: afterRoles },
+        });
+      }
+
       return input.employeeId;
     });
 
     return employeeId
       ? this.findEmployeeById(input.organizationId, employeeId)
       : null;
+  }
+
+  async revokeEmployeeSessions(
+    organizationId: string,
+    employeeId: string,
+    context: CommandContext,
+  ): Promise<number | null> {
+    return this.prismaService.$transaction(async (tx) => {
+      const employee = await tx.employee.findFirst({
+        where: { organizationId, id: employeeId, deletedAt: null },
+        select: { id: true },
+      });
+      if (!employee) return null;
+      const revokedAt = new Date();
+      const result = await tx.userSession.updateMany({
+        where: { organizationId, employeeId, revokedAt: null },
+        data: { revokedAt, revocationReason: 'ADMIN_REVOKED' },
+      });
+      if (result.count > 0) {
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'employee.sessions.revoked',
+          entityType: 'EMPLOYEE',
+          entityId: employeeId,
+          changedFields: ['sessions'],
+          afterData: { revokedSessionCount: result.count },
+          payload: { employeeId, revokedSessionCount: result.count },
+        });
+      }
+      return result.count;
+    });
+  }
+
+  private employeeAuditSnapshot(employee: Employee): Record<string, unknown> {
+    return {
+      employeeCode: employee.employeeCode,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
+      status: employee.status,
+    };
   }
 
   private get employeeInclude() {

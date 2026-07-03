@@ -8,5 +8,6 @@ apps/api/src/generated/prisma/
 .env.*
 !.env.example
 *.log
+*.docx
 .DS_Store
 .vscode/settings.json

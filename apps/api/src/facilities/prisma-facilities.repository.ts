@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 
 import { Prisma, type Facility } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { changedFields } from '../audit/audit-snapshot';
+import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   FacilityCodeConflictError,
   FacilityLimitReachedError,
@@ -24,9 +27,14 @@ type LockedOrganizationRow = {
 
 @Injectable()
 export class PrismaFacilitiesRepository implements FacilitiesRepository {
+  private readonly auditWriter = new PrismaAuditOutboxWriter();
+
   constructor(private readonly prismaService: PrismaService) {}
 
-  async create(input: CreateFacilityRecord): Promise<FacilityRecord> {
+  async create(
+    input: CreateFacilityRecord,
+    context?: CommandContext,
+  ): Promise<FacilityRecord> {
     try {
       return await this.prismaService.$transaction(async (tx) => {
         const organization = await this.lockOrganization(
@@ -69,6 +77,19 @@ export class PrismaFacilitiesRepository implements FacilitiesRepository {
             isActive: input.isActive,
           },
         });
+
+        if (context) {
+          const snapshot = this.auditSnapshot(facility);
+          await this.auditWriter.write(tx, {
+            context,
+            action: 'facility.created',
+            entityType: 'FACILITY',
+            entityId: facility.id,
+            changedFields: Object.keys(snapshot),
+            afterData: snapshot,
+            payload: { facilityId: facility.id, code: facility.code },
+          });
+        }
 
         return this.toFacilityRecord(facility);
       });
@@ -137,15 +158,23 @@ export class PrismaFacilitiesRepository implements FacilitiesRepository {
     return facility ? this.toFacilityRecord(facility) : null;
   }
 
-  async update(input: UpdateFacilityRecord): Promise<FacilityRecord | null> {
+  async update(
+    input: UpdateFacilityRecord,
+    context?: CommandContext,
+  ): Promise<FacilityRecord | null> {
     try {
-      const updatedFacilities =
-        await this.prismaService.facility.updateManyAndReturn({
+      return await this.prismaService.$transaction(async (tx) => {
+        const before = await tx.facility.findFirst({
           where: {
             organizationId: input.organizationId,
             id: input.facilityId,
             deletedAt: null,
           },
+        });
+        if (!before) throw new FacilityNotFoundError(input.facilityId);
+
+        const facility = await tx.facility.update({
+          where: { id: before.id },
           data: {
             ...(input.code !== undefined ? { code: input.code } : {}),
             ...(input.name !== undefined ? { name: input.name } : {}),
@@ -181,16 +210,24 @@ export class PrismaFacilitiesRepository implements FacilitiesRepository {
               ? { isActive: input.isActive }
               : {}),
           },
-          limit: 1,
         });
-
-      const facility = updatedFacilities[0];
-
-      if (!facility) {
-        throw new FacilityNotFoundError(input.facilityId);
-      }
-
-      return this.toFacilityRecord(facility);
+        const beforeSnapshot = this.auditSnapshot(before);
+        const afterSnapshot = this.auditSnapshot(facility);
+        const fields = changedFields(beforeSnapshot, afterSnapshot);
+        if (context && fields.length > 0) {
+          await this.auditWriter.write(tx, {
+            context,
+            action: 'facility.updated',
+            entityType: 'FACILITY',
+            entityId: facility.id,
+            changedFields: fields,
+            beforeData: beforeSnapshot,
+            afterData: afterSnapshot,
+            payload: { facilityId: facility.id, changedFields: fields },
+          });
+        }
+        return this.toFacilityRecord(facility);
+      });
     } catch (error) {
       if (error instanceof FacilityNotFoundError) {
         throw error;
@@ -202,6 +239,20 @@ export class PrismaFacilitiesRepository implements FacilitiesRepository {
 
       throw error;
     }
+  }
+
+  private auditSnapshot(facility: Facility): Record<string, unknown> {
+    return {
+      code: facility.code,
+      name: facility.name,
+      type: facility.type,
+      ownershipType: facility.ownershipType,
+      countryCode: facility.countryCode,
+      isCustomerFacing: facility.isCustomerFacing,
+      isPackageOrigin: facility.isPackageOrigin,
+      isDistributionCenter: facility.isDistributionCenter,
+      isActive: facility.isActive,
+    };
   }
 
   private async lockOrganization(

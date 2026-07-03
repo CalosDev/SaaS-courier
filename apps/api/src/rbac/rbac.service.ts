@@ -157,6 +157,7 @@ export class RbacService {
       description,
       permissionCodes,
       isSystem: false,
+      ...(input.context ? { context: input.context } : {}),
     };
   }
 
@@ -243,7 +244,7 @@ export class RbacService {
       );
     }
 
-    return record;
+    return input.context ? { ...record, context: input.context } : record;
   }
 
   private normalizeReplaceRolePermissionsInput(
@@ -262,6 +263,7 @@ export class RbacService {
       ),
       roleId: this.normalizeRequiredField(input.roleId, 'roleId'),
       permissionCodes: this.normalizePermissionCodes(input.permissionCodes),
+      ...(input.context ? { context: input.context } : {}),
     };
   }
 

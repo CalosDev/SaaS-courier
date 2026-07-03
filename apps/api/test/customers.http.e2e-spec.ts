@@ -10,6 +10,7 @@ import { configureHttpApp } from '../src/http/configure-http-app';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RbacService } from '../src/rbac/rbac.service';
 import { SessionsService } from '../src/sessions/sessions.service';
+import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
 
 const LOCAL_DATABASE_URL =
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
@@ -740,6 +741,10 @@ describe('Customers admin HTTP', () => {
           });
         }
         if (cleanup.organizationIds.length > 0) {
+          await deleteAuditArtifactsForOrganizations(
+            prismaService,
+            cleanup.organizationIds,
+          );
           await prismaService.organizationSettings.deleteMany({
             where: {
               organizationId: {

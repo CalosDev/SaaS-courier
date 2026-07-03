@@ -69,6 +69,11 @@ const permissionCatalog = [
     description:
       'Allows managing customer customs identity and RUA verification data within the current tenant.',
   },
+  {
+    code: 'audit.read',
+    name: 'Read audit logs',
+    description: 'Allows reading audit logs within the current tenant.',
+  },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionCode = (typeof permissionCatalog)[number]['code'];

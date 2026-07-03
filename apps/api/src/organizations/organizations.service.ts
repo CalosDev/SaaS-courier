@@ -12,6 +12,7 @@ import type {
   UpdateOrganizationProfileRecord,
 } from './organization.types';
 import { OrganizationsRepository } from './organizations.repository';
+import type { CommandContext } from '../request-context/request-context.types';
 
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -63,10 +64,12 @@ export class OrganizationsService {
   async updateProfile(
     organizationId: string,
     input: UpdateOrganizationProfileInput,
+    context?: CommandContext,
   ): Promise<OrganizationRecord> {
     const record = this.normalizeUpdateProfileInput(organizationId, input);
-    const organization =
-      await this.organizationsRepository.updateProfile(record);
+    const organization = context
+      ? await this.organizationsRepository.updateProfile(record, context)
+      : await this.organizationsRepository.updateProfile(record);
 
     if (!organization) {
       throw new OrganizationNotFoundError(record.organizationId);

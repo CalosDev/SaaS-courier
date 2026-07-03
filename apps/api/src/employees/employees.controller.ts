@@ -27,6 +27,8 @@ import type {
   EmployeeInvitationResult,
   EmployeeListResult,
 } from './employee.types';
+import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
+import type { CommandContext } from '../request-context/request-context.types';
 
 @Controller('employees')
 export class EmployeesController {
@@ -54,6 +56,7 @@ export class EmployeesController {
   @HttpCode(201)
   async inviteEmployee(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Body() body: InviteEmployeeDto,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -62,6 +65,7 @@ export class EmployeesController {
     const result = await this.employeesService.inviteEmployee(
       session.organizationId,
       body,
+      context,
     );
 
     return this.serializeInvitationResult(result);
@@ -89,6 +93,7 @@ export class EmployeesController {
   @RequirePermissions('employees.manage')
   async updateEmployee(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('employeeId', new ParseUUIDPipe({ version: '4' }))
     employeeId: string,
     @Body() body: UpdateEmployeeDto,
@@ -101,6 +106,7 @@ export class EmployeesController {
       session.employeeId,
       employeeId,
       body,
+      context,
     );
 
     return this.serializeEmployee(employee);
@@ -110,6 +116,7 @@ export class EmployeesController {
   @RequirePermissions('employees.manage')
   async replaceEmployeeFacilities(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('employeeId', new ParseUUIDPipe({ version: '4' }))
     employeeId: string,
     @Body() body: ReplaceEmployeeFacilitiesDto,
@@ -122,6 +129,7 @@ export class EmployeesController {
       session.employeeId,
       employeeId,
       body,
+      context,
     );
 
     return this.serializeEmployee(employee);
@@ -131,6 +139,7 @@ export class EmployeesController {
   @RequirePermissions('employees.manage', 'roles.manage')
   async replaceEmployeeRoles(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('employeeId', new ParseUUIDPipe({ version: '4' }))
     employeeId: string,
     @Body() body: ReplaceEmployeeRolesDto,
@@ -143,6 +152,7 @@ export class EmployeesController {
       session.employeeId,
       employeeId,
       body,
+      context,
     );
 
     return this.serializeEmployee(employee);
@@ -153,6 +163,7 @@ export class EmployeesController {
   @HttpCode(204)
   async revokeEmployeeSessions(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('employeeId', new ParseUUIDPipe({ version: '4' }))
     employeeId: string,
     @Res({ passthrough: true }) response: Response,
@@ -162,6 +173,7 @@ export class EmployeesController {
     await this.employeesService.revokeEmployeeSessions(
       session.organizationId,
       employeeId,
+      context,
     );
   }
 

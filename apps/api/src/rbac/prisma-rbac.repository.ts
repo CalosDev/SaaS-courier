@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 
+import { changedFields } from '../audit/audit-snapshot';
+import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import type { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import {
@@ -61,6 +63,8 @@ type RoleDetailWithCounts = Prisma.RoleGetPayload<{
 
 @Injectable()
 export class PrismaRbacRepository implements RbacRepository {
+  private readonly auditWriter = new PrismaAuditOutboxWriter();
+
   constructor(private readonly prismaService: PrismaService) {}
 
   async syncPermissionCatalog(
@@ -208,7 +212,26 @@ export class PrismaRbacRepository implements RbacRepository {
           },
         });
 
-        return this.toRoleRecord(persistedRole);
+        const roleRecord = this.toRoleRecord(persistedRole);
+
+        if (input.context) {
+          const afterData = this.roleAuditSnapshot(roleRecord);
+          await this.auditWriter.write(tx, {
+            context: input.context,
+            action: 'role.created',
+            entityType: 'ROLE',
+            entityId: roleRecord.id,
+            changedFields: Object.keys(afterData),
+            afterData,
+            payload: {
+              roleId: roleRecord.id,
+              code: roleRecord.code,
+              permissionCodes: roleRecord.permissionCodes,
+            },
+          });
+        }
+
+        return roleRecord;
       });
     } catch (error) {
       if (error instanceof PermissionCatalogNotSynchronizedError) {
@@ -378,41 +401,109 @@ export class PrismaRbacRepository implements RbacRepository {
 
   async updateRole(input: UpdateRoleRecord): Promise<RoleDetailRecord | null> {
     try {
-      const role = await this.prismaService.role.findFirst({
-        where: {
-          organizationId: input.organizationId,
-          id: input.roleId,
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-          isSystem: true,
-        },
+      return await this.prismaService.$transaction(async (tx) => {
+        const role = await tx.role.findFirst({
+          where: {
+            organizationId: input.organizationId,
+            id: input.roleId,
+            deletedAt: null,
+          },
+          include: {
+            rolePermissions: {
+              include: {
+                permission: {
+                  select: {
+                    code: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                employeeRoles: {
+                  where: {
+                    employee: {
+                      deletedAt: null,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+
+        if (!role) {
+          return null;
+        }
+
+        if (role.isSystem) {
+          throw new SystemRoleImmutableError();
+        }
+
+        const beforeData = this.roleAuditSnapshot(
+          this.toRoleDetailRecord(role),
+        );
+
+        const updatedRole = await tx.role.update({
+          where: {
+            id: input.roleId,
+          },
+          data: {
+            ...(input.code !== undefined ? { code: input.code } : {}),
+            ...(input.name !== undefined ? { name: input.name } : {}),
+            ...(input.description !== undefined
+              ? { description: input.description }
+              : {}),
+            ...(input.isActive !== undefined
+              ? { isActive: input.isActive }
+              : {}),
+          },
+          include: {
+            rolePermissions: {
+              include: {
+                permission: {
+                  select: {
+                    code: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                employeeRoles: {
+                  where: {
+                    employee: {
+                      deletedAt: null,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        });
+        const roleRecord = this.toRoleDetailRecord(updatedRole);
+        const afterData = this.roleAuditSnapshot(roleRecord);
+        const fields = changedFields(beforeData, afterData);
+
+        if (input.context && fields.length > 0) {
+          await this.auditWriter.write(tx, {
+            context: input.context,
+            action: 'role.updated',
+            entityType: 'ROLE',
+            entityId: roleRecord.id,
+            changedFields: fields,
+            beforeData,
+            afterData,
+            payload: {
+              roleId: roleRecord.id,
+              code: roleRecord.code,
+              changedFields: fields,
+            },
+          });
+        }
+
+        return roleRecord;
       });
-
-      if (!role) {
-        return null;
-      }
-
-      if (role.isSystem) {
-        throw new SystemRoleImmutableError();
-      }
-
-      await this.prismaService.role.update({
-        where: {
-          id: input.roleId,
-        },
-        data: {
-          ...(input.code !== undefined ? { code: input.code } : {}),
-          ...(input.name !== undefined ? { name: input.name } : {}),
-          ...(input.description !== undefined
-            ? { description: input.description }
-            : {}),
-          ...(input.isActive !== undefined ? { isActive: input.isActive } : {}),
-        },
-      });
-
-      return this.findRoleById(input.organizationId, input.roleId);
     } catch (error) {
       if (error instanceof SystemRoleImmutableError) {
         throw error;
@@ -436,9 +527,27 @@ export class PrismaRbacRepository implements RbacRepository {
           id: input.roleId,
           deletedAt: null,
         },
-        select: {
-          id: true,
-          isSystem: true,
+        include: {
+          rolePermissions: {
+            include: {
+              permission: {
+                select: {
+                  code: true,
+                },
+              },
+            },
+          },
+          _count: {
+            select: {
+              employeeRoles: {
+                where: {
+                  employee: {
+                    deletedAt: null,
+                  },
+                },
+              },
+            },
+          },
         },
       });
 
@@ -449,6 +558,7 @@ export class PrismaRbacRepository implements RbacRepository {
       if (role.isSystem) {
         throw new SystemRoleImmutableError();
       }
+      const beforeData = this.roleAuditSnapshot(this.toRoleDetailRecord(role));
 
       const permissions =
         input.permissionCodes.length === 0
@@ -517,7 +627,32 @@ export class PrismaRbacRepository implements RbacRepository {
         },
       });
 
-      return persistedRole ? this.toRoleDetailRecord(persistedRole) : null;
+      if (!persistedRole) {
+        return null;
+      }
+
+      const roleRecord = this.toRoleDetailRecord(persistedRole);
+      const afterData = this.roleAuditSnapshot(roleRecord);
+      const fields = changedFields(beforeData, afterData);
+
+      if (input.context && fields.length > 0) {
+        await this.auditWriter.write(tx, {
+          context: input.context,
+          action: 'role.permissions.replaced',
+          entityType: 'ROLE',
+          entityId: roleRecord.id,
+          changedFields: fields,
+          beforeData,
+          afterData,
+          payload: {
+            roleId: roleRecord.id,
+            code: roleRecord.code,
+            permissionCodes: roleRecord.permissionCodes,
+          },
+        });
+      }
+
+      return roleRecord;
     });
   }
 
@@ -678,6 +813,16 @@ export class PrismaRbacRepository implements RbacRepository {
     return {
       ...this.toRoleRecord(role),
       assignedEmployeeCount: role._count.employeeRoles,
+    };
+  }
+
+  private roleAuditSnapshot(role: RoleRecord): Record<string, unknown> {
+    return {
+      code: role.code,
+      name: role.name,
+      description: role.description,
+      isActive: role.isActive,
+      permissionCodes: role.permissionCodes,
     };
   }
 }

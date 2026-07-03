@@ -14,6 +14,8 @@ import {
 import type { Response } from 'express';
 
 import { CurrentSession } from '../auth/http/current-session.decorator';
+import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
+import type { CommandContext } from '../request-context/request-context.types';
 import { RequirePermissions } from '../rbac/http/require-permissions.decorator';
 import type { SessionContext } from '../sessions/session.types';
 import { CustomerAddressesService } from './customer-addresses.service';
@@ -63,6 +65,7 @@ export class CustomersController {
   @HttpCode(201)
   async createCustomer(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Body() body: CreateCustomerDto,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -71,6 +74,7 @@ export class CustomersController {
     const customer = await this.customersService.create(
       session.organizationId,
       body,
+      context,
     );
 
     return this.serializeCustomer(customer);
@@ -98,6 +102,7 @@ export class CustomersController {
   @RequirePermissions('customers.manage')
   async updateCustomer(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('customerId', new ParseUUIDPipe({ version: '4' }))
     customerId: string,
     @Body() body: UpdateCustomerDto,
@@ -109,6 +114,7 @@ export class CustomersController {
       session.organizationId,
       customerId,
       body,
+      context,
     );
 
     return this.serializeCustomer(customer);
@@ -137,6 +143,7 @@ export class CustomersController {
   @HttpCode(201)
   async createCustomerAddress(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('customerId', new ParseUUIDPipe({ version: '4' }))
     customerId: string,
     @Body() body: CreateCustomerAddressDto,
@@ -148,6 +155,7 @@ export class CustomersController {
       session.organizationId,
       customerId,
       body,
+      context,
     );
 
     return this.serializeAddress(address);
@@ -157,6 +165,7 @@ export class CustomersController {
   @RequirePermissions('customers.manage')
   async updateCustomerAddress(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('customerId', new ParseUUIDPipe({ version: '4' }))
     customerId: string,
     @Param('addressId', new ParseUUIDPipe({ version: '4' }))
@@ -171,6 +180,7 @@ export class CustomersController {
       customerId,
       addressId,
       body,
+      context,
     );
 
     return this.serializeAddress(address);
@@ -198,6 +208,7 @@ export class CustomersController {
   @RequirePermissions('customers.customs.manage')
   async upsertCustomerCustomsProfile(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('customerId', new ParseUUIDPipe({ version: '4' }))
     customerId: string,
     @Body() body: UpsertCustomerCustomsProfileDto,
@@ -209,6 +220,7 @@ export class CustomersController {
       session.organizationId,
       customerId,
       body,
+      context,
     );
 
     return this.serializeCustomsProfile(profile);
@@ -218,6 +230,7 @@ export class CustomersController {
   @RequirePermissions('customers.customs.manage')
   async updateCustomerCustomsVerification(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('customerId', new ParseUUIDPipe({ version: '4' }))
     customerId: string,
     @Body() body: UpdateCustomerCustomsVerificationDto,
@@ -230,6 +243,7 @@ export class CustomersController {
         session.organizationId,
         customerId,
         body,
+        context,
       );
 
     return this.serializeCustomsProfile(profile);

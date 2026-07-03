@@ -1,3 +1,5 @@
+import type { CommandContext } from '../request-context/request-context.types';
+
 export interface PermissionDefinition {
   code: string;
   name: string;
@@ -18,6 +20,7 @@ export interface CreateRoleInput {
   name: string;
   description?: string;
   permissionCodes?: string[];
+  context?: CommandContext;
 }
 
 export interface CreateRoleRecord {
@@ -27,6 +30,7 @@ export interface CreateRoleRecord {
   description: string | null;
   permissionCodes: string[];
   isSystem: false;
+  context?: CommandContext;
 }
 
 export interface AssignRoleToEmployeeInput {
@@ -106,6 +110,7 @@ export interface UpdateRoleInput {
   name?: string;
   description?: string;
   isActive?: boolean;
+  context?: CommandContext;
 }
 
 export interface UpdateRoleRecord {
@@ -115,18 +120,21 @@ export interface UpdateRoleRecord {
   name?: string;
   description?: string | null;
   isActive?: boolean;
+  context?: CommandContext;
 }
 
 export interface ReplaceRolePermissionsInput {
   organizationId: string;
   roleId: string;
   permissionCodes: string[];
+  context?: CommandContext;
 }
 
 export interface ReplaceRolePermissionsRecord {
   organizationId: string;
   roleId: string;
   permissionCodes: string[];
+  context?: CommandContext;
 }
 
 export interface PermissionListItem {

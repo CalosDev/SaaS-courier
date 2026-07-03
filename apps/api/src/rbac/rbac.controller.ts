@@ -14,6 +14,8 @@ import {
 import type { Response } from 'express';
 
 import { CurrentSession } from '../auth/http/current-session.decorator';
+import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
+import type { CommandContext } from '../request-context/request-context.types';
 import type { SessionContext } from '../sessions/session.types';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { ListRolesDto } from './dto/list-roles.dto';
@@ -54,6 +56,7 @@ export class RbacController {
   @HttpCode(201)
   async createRole(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Body() body: CreateRoleDto,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -61,6 +64,7 @@ export class RbacController {
 
     const role = await this.rbacService.createRole({
       organizationId: session.organizationId,
+      context,
       ...body,
     });
 
@@ -88,6 +92,7 @@ export class RbacController {
   @RequirePermissions('roles.manage')
   async updateRole(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('roleId', new ParseUUIDPipe({ version: '4' })) roleId: string,
     @Body() body: UpdateRoleDto,
     @Res({ passthrough: true }) response: Response,
@@ -97,6 +102,7 @@ export class RbacController {
     const role = await this.rbacService.updateRole({
       organizationId: session.organizationId,
       roleId,
+      context,
       ...body,
     });
 
@@ -107,6 +113,7 @@ export class RbacController {
   @RequirePermissions('roles.manage')
   async replaceRolePermissions(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Param('roleId', new ParseUUIDPipe({ version: '4' })) roleId: string,
     @Body() body: ReplaceRolePermissionsDto,
     @Res({ passthrough: true }) response: Response,
@@ -117,6 +124,7 @@ export class RbacController {
       organizationId: session.organizationId,
       roleId,
       permissionCodes: body.permissionCodes,
+      context,
     });
 
     return this.serializeRoleDetail(role);

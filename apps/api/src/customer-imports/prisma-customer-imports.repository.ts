@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import { changedFields } from '../audit/audit-snapshot';
+import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import {
   Prisma,
   type CustomerImportJob,
@@ -8,6 +10,7 @@ import {
 import { CustomerCodeService } from '../customers/customer-code.service';
 import { CustomerCodeGenerationError } from '../customers/customer.errors';
 import { PrismaService } from '../prisma/prisma.service';
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   CustomerImportJobNotFoundError,
   CustomerImportStateConflictError,
@@ -30,6 +33,8 @@ const RANDOM_CODE_GENERATION_ATTEMPTS = 10;
 
 @Injectable()
 export class PrismaCustomerImportsRepository implements CustomerImportsRepository {
+  private readonly auditWriter = new PrismaAuditOutboxWriter();
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly customerCodeService: CustomerCodeService,
@@ -37,45 +42,65 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
 
   async createDraft(
     input: CreateCustomerImportJobRecord,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord> {
-    const job = await this.prismaService.customerImportJob.create({
-      data: {
-        organization: {
-          connect: {
-            id: input.organizationId,
-          },
-        },
-        createdByEmployee: {
-          connect: {
-            organizationId_id: {
-              organizationId: input.organizationId,
-              id: input.createdByEmployeeId,
+    return this.prismaService.$transaction(async (tx) => {
+      const job = await tx.customerImportJob.create({
+        data: {
+          organization: {
+            connect: {
+              id: input.organizationId,
             },
           },
+          createdByEmployee: {
+            connect: {
+              organizationId_id: {
+                organizationId: input.organizationId,
+                id: input.createdByEmployeeId,
+              },
+            },
+          },
+          name: input.name,
+          status: 'DRAFT',
+          preserveCustomerCodes: input.preserveCustomerCodes,
+          totalRows: input.rows.length,
+          validRows: 0,
+          invalidRows: 0,
+          importedRows: 0,
+          rows: {
+            create: input.rows.map((row) => ({
+              rowNumber: row.rowNumber,
+              rawData: row.rawData as Prisma.InputJsonValue,
+              status: 'PENDING',
+            })),
+          },
         },
-        name: input.name,
-        status: 'DRAFT',
-        preserveCustomerCodes: input.preserveCustomerCodes,
-        totalRows: input.rows.length,
-        validRows: 0,
-        invalidRows: 0,
-        importedRows: 0,
-        rows: {
-          create: input.rows.map((row) => ({
-            rowNumber: row.rowNumber,
-            rawData: row.rawData as Prisma.InputJsonValue,
-            status: 'PENDING',
-          })),
+        include: {
+          rows: {
+            orderBy: [{ rowNumber: 'asc' }],
+          },
         },
-      },
-      include: {
-        rows: {
-          orderBy: [{ rowNumber: 'asc' }],
-        },
-      },
-    });
+      });
 
-    return this.toJobRecord(job);
+      if (context) {
+        const afterData = this.importAuditSnapshot(job);
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'customer_import.created',
+          entityType: 'CUSTOMER_IMPORT',
+          entityId: job.id,
+          changedFields: Object.keys(afterData),
+          afterData,
+          payload: {
+            importJobId: job.id,
+            totalRows: job.totalRows,
+            preserveCustomerCodes: job.preserveCustomerCodes,
+          },
+        });
+      }
+
+      return this.toJobRecord(job);
+    });
   }
 
   async listJobs(organizationId: string): Promise<CustomerImportJobRecord[]> {
@@ -161,6 +186,7 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
 
   async saveValidationResult(
     input: SaveCustomerImportValidationRecord,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord> {
     return this.prismaService.$transaction(async (tx) => {
       for (const row of input.rows) {
@@ -188,6 +214,13 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
         invalidRows: input.invalidRows,
       };
 
+      const currentJob = await tx.customerImportJob.findFirstOrThrow({
+        where: {
+          organizationId: input.organizationId,
+          id: input.importJobId,
+        },
+      });
+
       await tx.customerImportJob.update({
         where: {
           id: input.importJobId,
@@ -214,6 +247,29 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
         },
       });
 
+      if (context) {
+        const beforeData = this.importAuditSnapshot(currentJob);
+        const afterData = this.importAuditSnapshot(job);
+        const fields = changedFields(beforeData, afterData);
+        if (fields.length > 0) {
+          await this.auditWriter.write(tx, {
+            context,
+            action: 'customer_import.validated',
+            entityType: 'CUSTOMER_IMPORT',
+            entityId: job.id,
+            changedFields: fields,
+            beforeData,
+            afterData,
+            payload: {
+              importJobId: job.id,
+              totalRows: job.totalRows,
+              validRows: job.validRows,
+              invalidRows: job.invalidRows,
+            },
+          });
+        }
+      }
+
       return this.toJobRecord(job);
     });
   }
@@ -221,6 +277,7 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
   async commitJob(
     organizationId: string,
     importJobId: string,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord> {
     try {
       return await this.prismaService.$transaction(async (tx) => {
@@ -320,6 +377,24 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
           importJobId,
         );
 
+        if (context) {
+          const beforeData = this.importAuditSnapshot(job);
+          const afterData = this.importAuditSnapshot(completedJob);
+          await this.auditWriter.write(tx, {
+            context,
+            action: 'customer_import.committed',
+            entityType: 'CUSTOMER_IMPORT',
+            entityId: completedJob.id,
+            changedFields: changedFields(beforeData, afterData),
+            beforeData,
+            afterData,
+            payload: {
+              importJobId: completedJob.id,
+              importedRows: completedJob.importedRows,
+            },
+          });
+        }
+
         return this.toJobRecord(completedJob);
       });
     } catch (error) {
@@ -352,6 +427,7 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
   async cancelJob(
     organizationId: string,
     importJobId: string,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord | null> {
     return this.prismaService.$transaction(async (tx) => {
       const job = await this.lockJob(tx, organizationId, importJobId, false);
@@ -381,6 +457,24 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
       });
 
       const cancelledJob = await this.lockJob(tx, organizationId, importJobId);
+
+      if (context) {
+        const beforeData = this.importAuditSnapshot(job);
+        const afterData = this.importAuditSnapshot(cancelledJob);
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'customer_import.cancelled',
+          entityType: 'CUSTOMER_IMPORT',
+          entityId: cancelledJob.id,
+          changedFields: changedFields(beforeData, afterData),
+          beforeData,
+          afterData,
+          payload: {
+            importJobId: cancelledJob.id,
+            status: cancelledJob.status,
+          },
+        });
+      }
 
       return this.toJobRecord(cancelledJob);
     });
@@ -652,6 +746,18 @@ export class PrismaCustomerImportsRepository implements CustomerImportsRepositor
               importedCustomerId: row.importedCustomerId ?? null,
             }))
           : undefined,
+    };
+  }
+
+  private importAuditSnapshot(job: CustomerImportJob): Record<string, unknown> {
+    return {
+      name: job.name,
+      status: job.status,
+      preserveCustomerCodes: job.preserveCustomerCodes,
+      totalRows: job.totalRows,
+      validRows: job.validRows,
+      invalidRows: job.invalidRows,
+      importedRows: job.importedRows,
     };
   }
 }

@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   CustomerCustomsProfileNotFoundError,
   InvalidCustomerCustomsProfileError,
@@ -49,6 +50,7 @@ export class CustomerCustomsProfilesService {
     organizationId: string,
     customerId: string,
     input: UpsertCustomerCustomsProfileIdentityInput,
+    context?: CommandContext,
   ): Promise<CustomerCustomsProfileRecord> {
     const record: UpsertCustomerCustomsProfileIdentityRecord = {
       organizationId: this.normalizeRequiredField(
@@ -72,21 +74,28 @@ export class CustomerCustomsProfilesService {
           : this.normalizeOptionalField(input.notes),
     };
 
-    return this.customerCustomsProfilesRepository.upsertIdentity(record);
+    return context
+      ? this.customerCustomsProfilesRepository.upsertIdentity(record, context)
+      : this.customerCustomsProfilesRepository.upsertIdentity(record);
   }
 
   async updateVerification(
     organizationId: string,
     customerId: string,
     input: UpdateCustomerCustomsVerificationInput,
+    context?: CommandContext,
   ): Promise<CustomerCustomsProfileRecord> {
     const record = this.normalizeVerificationUpdate(
       organizationId,
       customerId,
       input,
     );
-    const profile =
-      await this.customerCustomsProfilesRepository.updateVerification(record);
+    const profile = await (context
+      ? this.customerCustomsProfilesRepository.updateVerification(
+          record,
+          context,
+        )
+      : this.customerCustomsProfilesRepository.updateVerification(record));
 
     if (!profile) {
       throw new CustomerCustomsProfileNotFoundError(record.customerId);

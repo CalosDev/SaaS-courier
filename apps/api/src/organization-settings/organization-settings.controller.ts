@@ -12,6 +12,8 @@ import type {
   OrganizationCapabilitiesRecord,
   OrganizationSettingsCurrentRecord,
 } from './organization-settings.types';
+import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
+import type { CommandContext } from '../request-context/request-context.types';
 
 @Controller('organizations/current')
 export class OrganizationSettingsController {
@@ -37,6 +39,7 @@ export class OrganizationSettingsController {
   @RequirePermissions('organizations.manage')
   async updateCurrentSettings(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Body() body: UpdateCurrentOrganizationSettingsDto,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -46,6 +49,7 @@ export class OrganizationSettingsController {
       await this.organizationSettingsService.updateCurrent(
         session.organizationId,
         body,
+        context,
       ),
     );
   }
@@ -83,12 +87,13 @@ export class OrganizationSettingsController {
   @HttpCode(200)
   async completeOnboarding(
     @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
     @Res({ passthrough: true }) response: Response,
   ) {
     this.setNoStore(response);
 
     return this.serializeOnboarding(
-      await this.onboardingService.complete(session.organizationId),
+      await this.onboardingService.complete(session.organizationId, context),
     );
   }
 

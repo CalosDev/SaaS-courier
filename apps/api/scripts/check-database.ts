@@ -8,7 +8,7 @@ type SelectOneRow = {
   result: number | bigint | string | null;
 };
 
-config({ path: path.resolve(__dirname, '../../..', '.env') });
+config({ path: path.resolve(__dirname, '../../..', '.env'), quiet: true });
 
 async function main(): Promise<void> {
   let prisma: PrismaClient | undefined;

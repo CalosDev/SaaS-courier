@@ -1,6 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { changedFields } from '../audit/audit-snapshot';
+import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
+import type { CommandContext } from '../request-context/request-context.types';
 import { OrganizationSettingsRepository } from './organization-settings.repository';
 import type {
   OnboardingSnapshot,
@@ -12,6 +15,8 @@ import type {
 
 @Injectable()
 export class PrismaOrganizationSettingsRepository implements OrganizationSettingsRepository {
+  private readonly auditWriter = new PrismaAuditOutboxWriter();
+
   constructor(private readonly prismaService: PrismaService) {}
 
   async findCurrent(
@@ -22,19 +27,12 @@ export class PrismaOrganizationSettingsRepository implements OrganizationSetting
 
   async updateCurrent(
     input: UpdateOrganizationSettingsRecord,
+    context?: CommandContext,
   ): Promise<OrganizationSettingsCurrentRecord | null> {
     return this.prismaService.$transaction(async (tx) => {
-      const existing = await tx.organization.findFirst({
-        where: {
-          id: input.organizationId,
-          deletedAt: null,
-        },
-        select: {
-          id: true,
-        },
-      });
+      const before = await this.findCurrentWithClient(tx, input.organizationId);
 
-      if (!existing) {
+      if (!before) {
         return null;
       }
 
@@ -83,7 +81,31 @@ export class PrismaOrganizationSettingsRepository implements OrganizationSetting
         },
       });
 
-      return this.findCurrentWithClient(tx, input.organizationId);
+      const updated = await this.findCurrentWithClient(
+        tx,
+        input.organizationId,
+      );
+      if (!updated) return null;
+
+      const beforeSnapshot = this.auditSnapshot(before);
+      const afterSnapshot = this.auditSnapshot(updated);
+      const fields = changedFields(beforeSnapshot, afterSnapshot);
+      if (context && fields.length > 0) {
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'organization.settings.updated',
+          entityType: 'ORGANIZATION_SETTINGS',
+          entityId: input.organizationId,
+          changedFields: fields,
+          beforeData: beforeSnapshot,
+          afterData: afterSnapshot,
+          payload: {
+            organizationId: input.organizationId,
+            changedFields: fields,
+          },
+        });
+      }
+      return updated;
     });
   }
 
@@ -201,20 +223,54 @@ export class PrismaOrganizationSettingsRepository implements OrganizationSetting
     };
   }
 
-  async markOnboardingCompleted(organizationId: string): Promise<Date | null> {
-    const completedAt = new Date();
-    const records =
-      await this.prismaService.organizationSettings.updateManyAndReturn({
-        where: {
-          organizationId,
-        },
-        data: {
-          onboardingCompletedAt: completedAt,
-        },
-        limit: 1,
+  async markOnboardingCompleted(
+    organizationId: string,
+    context?: CommandContext,
+  ): Promise<Date | null> {
+    return this.prismaService.$transaction(async (tx) => {
+      const before = await tx.organizationSettings.findUnique({
+        where: { organizationId },
       });
+      if (!before) return null;
+      if (before.onboardingCompletedAt) return before.onboardingCompletedAt;
 
-    return records[0]?.onboardingCompletedAt ?? null;
+      const completedAt = new Date();
+      const updated = await tx.organizationSettings.update({
+        where: { organizationId },
+        data: { onboardingCompletedAt: completedAt },
+      });
+      if (context) {
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'organization.onboarding.completed',
+          entityType: 'ORGANIZATION_SETTINGS',
+          entityId: organizationId,
+          changedFields: ['onboardingCompletedAt'],
+          beforeData: { onboardingCompleted: false },
+          afterData: { onboardingCompleted: true },
+          payload: { organizationId, onboardingCompleted: true },
+        });
+      }
+      return updated.onboardingCompletedAt;
+    });
+  }
+
+  private auditSnapshot(
+    record: OrganizationSettingsCurrentRecord,
+  ): Record<string, unknown> {
+    return {
+      countryCode: record.organization.countryCode,
+      currencyCode: record.organization.currencyCode,
+      timezone: record.organization.timezone,
+      locale: record.settings.locale,
+      dateFormat: record.settings.dateFormat,
+      weightUnit: record.settings.weightUnit,
+      dimensionUnit: record.settings.dimensionUnit,
+      customerCodeStrategy: record.settings.customerCodeStrategy,
+      customerCodePrefix: record.settings.customerCodePrefix,
+      customerCodeRandomLength: record.settings.customerCodeRandomLength,
+      customerCodeSequencePadding: record.settings.customerCodeSequencePadding,
+    };
   }
 
   private async findCurrentWithClient(

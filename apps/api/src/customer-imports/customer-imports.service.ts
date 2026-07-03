@@ -1,4 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common';
+import type { CommandContext } from '../request-context/request-context.types';
 import {
   CustomerImportJobNotFoundError,
   InvalidCustomerImportInputError,
@@ -33,6 +34,7 @@ export class CustomerImportsService {
     organizationId: string,
     createdByEmployeeId: string,
     input: CreateCustomerImportJobInput,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord> {
     const record = this.normalizeCreateInput(
       organizationId,
@@ -40,7 +42,9 @@ export class CustomerImportsService {
       input,
     );
 
-    return this.customerImportsRepository.createDraft(record);
+    return context
+      ? this.customerImportsRepository.createDraft(record, context)
+      : this.customerImportsRepository.createDraft(record);
   }
 
   async list(organizationId: string): Promise<CustomerImportJobRecord[]> {
@@ -68,6 +72,7 @@ export class CustomerImportsService {
   async validate(
     organizationId: string,
     importJobId: string,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord> {
     const job = await this.getById(organizationId, importJobId);
     const rows = job.rows ?? [];
@@ -174,7 +179,7 @@ export class CustomerImportsService {
     ).length;
     const invalidRows = updatedRows.length - validRows;
 
-    return this.customerImportsRepository.saveValidationResult({
+    const validationRecord: SaveCustomerImportValidationRecord = {
       organizationId: this.normalizeRequiredField(
         organizationId,
         'organizationId',
@@ -183,27 +188,65 @@ export class CustomerImportsService {
       validRows,
       invalidRows,
       rows: updatedRows,
-    });
+    };
+
+    return context
+      ? this.customerImportsRepository.saveValidationResult(
+          validationRecord,
+          context,
+        )
+      : this.customerImportsRepository.saveValidationResult(validationRecord);
   }
 
   async commit(
     organizationId: string,
     importJobId: string,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord> {
-    return this.customerImportsRepository.commitJob(
-      this.normalizeRequiredField(organizationId, 'organizationId'),
-      this.normalizeRequiredField(importJobId, 'importJobId'),
+    const normalizedOrganizationId = this.normalizeRequiredField(
+      organizationId,
+      'organizationId',
     );
+    const normalizedImportJobId = this.normalizeRequiredField(
+      importJobId,
+      'importJobId',
+    );
+
+    return context
+      ? this.customerImportsRepository.commitJob(
+          normalizedOrganizationId,
+          normalizedImportJobId,
+          context,
+        )
+      : this.customerImportsRepository.commitJob(
+          normalizedOrganizationId,
+          normalizedImportJobId,
+        );
   }
 
   async cancel(
     organizationId: string,
     importJobId: string,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord> {
-    const job = await this.customerImportsRepository.cancelJob(
-      this.normalizeRequiredField(organizationId, 'organizationId'),
-      this.normalizeRequiredField(importJobId, 'importJobId'),
+    const normalizedOrganizationId = this.normalizeRequiredField(
+      organizationId,
+      'organizationId',
     );
+    const normalizedImportJobId = this.normalizeRequiredField(
+      importJobId,
+      'importJobId',
+    );
+    const job = await (context
+      ? this.customerImportsRepository.cancelJob(
+          normalizedOrganizationId,
+          normalizedImportJobId,
+          context,
+        )
+      : this.customerImportsRepository.cancelJob(
+          normalizedOrganizationId,
+          normalizedImportJobId,
+        ));
 
     if (!job) {
       throw new CustomerImportJobNotFoundError(importJobId);

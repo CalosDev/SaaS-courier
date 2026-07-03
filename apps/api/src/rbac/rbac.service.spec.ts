@@ -17,6 +17,7 @@ import type {
   UpdateRoleRecord,
 } from './rbac.types';
 import { RbacService } from './rbac.service';
+import type { CommandContext } from '../request-context/request-context.types';
 
 function buildRoleRecord(overrides: Partial<RoleRecord> = {}): RoleRecord {
   const now = new Date('2026-06-28T00:00:00.000Z');
@@ -38,6 +39,17 @@ function buildRoleRecord(overrides: Partial<RoleRecord> = {}): RoleRecord {
 }
 
 describe('RbacService', () => {
+  const commandContext: CommandContext = {
+    organizationId: 'c0f62987-ebef-4e56-94a6-cb4b38d45c4b',
+    actorType: 'EMPLOYEE',
+    actorUserId: '12c254df-1cc8-4413-b33d-cc791c49cb34',
+    actorEmployeeId: '3f2e9bb8-68f8-48ed-a06f-265a51a66008',
+    source: 'HTTP',
+    requestId: '36ef98cc-ef79-42ce-894a-cfe04f866678',
+    correlationId: '967b142d-fe90-473f-ae43-e4f2b13675dc',
+    ipAddress: '127.0.0.1',
+    userAgent: 'jest',
+  };
   const repository = {
     syncPermissionCatalog: jest.fn<
       Promise<PermissionCatalogSyncResult>,
@@ -360,6 +372,47 @@ describe('RbacService', () => {
       expect.objectContaining({
         permissionCodes: ['employees.read', 'roles.read'],
       }),
+    );
+  });
+
+  it('preserves the authenticated command context for audited role mutations', async () => {
+    repository.createRoleWithPermissions.mockResolvedValueOnce(
+      buildRoleRecord(),
+    );
+    repository.updateRole.mockResolvedValueOnce(
+      buildRoleRecord() as RoleDetailRecord,
+    );
+    repository.replaceRolePermissions.mockResolvedValueOnce(
+      buildRoleRecord() as RoleDetailRecord,
+    );
+
+    await service.createRole({
+      organizationId: commandContext.organizationId,
+      code: 'OPS_MANAGER',
+      name: 'Operations Manager',
+      context: commandContext,
+    });
+    await service.updateRole({
+      organizationId: commandContext.organizationId,
+      roleId: randomUUID(),
+      name: 'Operations Lead',
+      context: commandContext,
+    });
+    await service.replaceRolePermissions({
+      organizationId: commandContext.organizationId,
+      roleId: randomUUID(),
+      permissionCodes: ['roles.read'],
+      context: commandContext,
+    });
+
+    expect(repository.createRoleWithPermissions).toHaveBeenCalledWith(
+      expect.objectContaining({ context: commandContext }),
+    );
+    expect(repository.updateRole).toHaveBeenCalledWith(
+      expect.objectContaining({ context: commandContext }),
+    );
+    expect(repository.replaceRolePermissions).toHaveBeenCalledWith(
+      expect.objectContaining({ context: commandContext }),
     );
   });
 

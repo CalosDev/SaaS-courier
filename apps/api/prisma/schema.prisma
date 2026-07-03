@@ -169,6 +169,33 @@ enum CustomerImportRowStatus {
   @@map("customer_import_row_status")
 }
 
+enum AuditActorType {
+  EMPLOYEE
+  SYSTEM
+  INTEGRATION
+
+  @@map("audit_actor_type")
+}
+
+enum AuditSource {
+  HTTP
+  JOB
+  IMPORT
+  SYSTEM
+
+  @@map("audit_source")
+}
+
+enum OutboxEventStatus {
+  PENDING
+  PROCESSING
+  PUBLISHED
+  FAILED
+  DEAD_LETTER
+
+  @@map("outbox_event_status")
+}
+
 model Organization {
   id                      String                   @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
   legalName               String                   @map("legal_name") @db.VarChar(200)
@@ -201,10 +228,75 @@ model Organization {
   settings                OrganizationSettings?
   customerImportJobs      CustomerImportJob[]
   customerImportRows      CustomerImportRow[]
+  auditLogs               AuditLog[]
+  outboxEvents            OutboxEvent[]
 
   @@index([status], map: "organizations_status_idx")
   @@index([deletedAt], map: "organizations_deleted_at_idx")
   @@map("organizations")
+}
+
+model AuditLog {
+  id              String         @id(map: "audit_logs_pkey") @default(uuid()) @db.Uuid
+  organizationId  String         @map("organization_id") @db.Uuid
+  actorType       AuditActorType @map("actor_type")
+  actorUserId     String?        @map("actor_user_id") @db.Uuid
+  actorEmployeeId String?        @map("actor_employee_id") @db.Uuid
+  action          String         @db.VarChar(120)
+  entityType      String         @map("entity_type") @db.VarChar(80)
+  entityId        String         @map("entity_id") @db.VarChar(128)
+  source          AuditSource
+  requestId       String         @map("request_id") @db.Uuid
+  correlationId   String         @map("correlation_id") @db.VarChar(100)
+  changedFields   Json           @map("changed_fields")
+  beforeData      Json?          @map("before_data")
+  afterData       Json?          @map("after_data")
+  reason          String?        @db.VarChar(500)
+  metadata        Json?
+  ipAddress       String?        @map("ip_address") @db.VarChar(64)
+  userAgent       String?        @map("user_agent") @db.VarChar(512)
+  occurredAt      DateTime       @map("occurred_at") @db.Timestamptz(3)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "audit_logs_organization_id_fkey")
+
+  @@index([organizationId, occurredAt], map: "audit_logs_organization_id_occurred_at_idx")
+  @@index([organizationId, entityType, entityId, occurredAt], map: "audit_logs_org_entity_occurred_at_idx")
+  @@index([organizationId, actorEmployeeId, occurredAt], map: "audit_logs_org_actor_occurred_at_idx")
+  @@index([organizationId, action, occurredAt], map: "audit_logs_org_action_occurred_at_idx")
+  @@index([organizationId, correlationId], map: "audit_logs_org_correlation_id_idx")
+  @@map("audit_logs")
+}
+
+model OutboxEvent {
+  id                  String            @id(map: "outbox_events_pkey") @default(uuid()) @db.Uuid
+  organizationId      String            @map("organization_id") @db.Uuid
+  eventType           String            @map("event_type") @db.VarChar(120)
+  aggregateType       String            @map("aggregate_type") @db.VarChar(80)
+  aggregateId         String            @map("aggregate_id") @db.VarChar(128)
+  schemaVersion       Int               @map("schema_version")
+  payload             Json
+  metadata            Json?
+  idempotencyKey      String            @map("idempotency_key") @db.VarChar(200)
+  status              OutboxEventStatus @default(PENDING)
+  occurredAt          DateTime          @map("occurred_at") @db.Timestamptz(3)
+  availableAt         DateTime          @map("available_at") @db.Timestamptz(3)
+  lockedBy            String?           @map("locked_by") @db.VarChar(120)
+  lockedUntil         DateTime?         @map("locked_until") @db.Timestamptz(3)
+  attempts            Int               @default(0)
+  processingStartedAt DateTime?         @map("processing_started_at") @db.Timestamptz(3)
+  publishedAt         DateTime?         @map("published_at") @db.Timestamptz(3)
+  deadLetteredAt      DateTime?         @map("dead_lettered_at") @db.Timestamptz(3)
+  lastErrorCode       String?           @map("last_error_code") @db.VarChar(120)
+  lastErrorAt         DateTime?         @map("last_error_at") @db.Timestamptz(3)
+  createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization        Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "outbox_events_organization_id_fkey")
+
+  @@unique([organizationId, idempotencyKey], map: "outbox_events_organization_id_idempotency_key_key")
+  @@index([status, availableAt, createdAt], map: "outbox_events_status_available_at_created_at_idx")
+  @@index([organizationId, aggregateType, aggregateId], map: "outbox_events_org_aggregate_idx")
+  @@index([organizationId, occurredAt], map: "outbox_events_organization_id_occurred_at_idx")
+  @@map("outbox_events")
 }
 
 model Facility {

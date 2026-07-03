@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 
 import type { Organization, Prisma } from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { changedFields } from '../audit/audit-snapshot';
+import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
+import type { CommandContext } from '../request-context/request-context.types';
 import { OrganizationSlugConflictError } from './organization.errors';
 import type {
   CreateOrganizationRecord,
@@ -12,6 +15,8 @@ import { OrganizationsRepository } from './organizations.repository';
 
 @Injectable()
 export class PrismaOrganizationsRepository implements OrganizationsRepository {
+  private readonly auditWriter = new PrismaAuditOutboxWriter();
+
   constructor(private readonly prismaService: PrismaService) {}
 
   async create(input: CreateOrganizationRecord): Promise<OrganizationRecord> {
@@ -66,13 +71,16 @@ export class PrismaOrganizationsRepository implements OrganizationsRepository {
 
   async updateProfile(
     input: UpdateOrganizationProfileRecord,
+    context?: CommandContext,
   ): Promise<OrganizationRecord | null> {
-    const organizations =
-      await this.prismaService.organization.updateManyAndReturn({
-        where: {
-          id: input.organizationId,
-          deletedAt: null,
-        },
+    return this.prismaService.$transaction(async (tx) => {
+      const before = await tx.organization.findFirst({
+        where: { id: input.organizationId, deletedAt: null },
+      });
+      if (!before) return null;
+
+      const organization = await tx.organization.update({
+        where: { id: before.id },
         data: {
           ...(input.legalName !== undefined
             ? { legalName: input.legalName }
@@ -84,12 +92,37 @@ export class PrismaOrganizationsRepository implements OrganizationsRepository {
           ...(input.email !== undefined ? { email: input.email } : {}),
           ...(input.phone !== undefined ? { phone: input.phone } : {}),
         },
-        limit: 1,
       });
+      const beforeSnapshot = this.profileSnapshot(before);
+      const afterSnapshot = this.profileSnapshot(organization);
+      const fields = changedFields(beforeSnapshot, afterSnapshot);
 
-    const organization = organizations[0];
+      if (context && fields.length > 0) {
+        await this.auditWriter.write(tx, {
+          context,
+          action: 'organization.updated',
+          entityType: 'ORGANIZATION',
+          entityId: organization.id,
+          changedFields: fields,
+          beforeData: beforeSnapshot,
+          afterData: afterSnapshot,
+          payload: { organizationId: organization.id, changedFields: fields },
+        });
+      }
 
-    return organization ? this.toOrganizationRecord(organization) : null;
+      return this.toOrganizationRecord(organization);
+    });
+  }
+
+  private profileSnapshot(organization: Organization): Record<string, unknown> {
+    return {
+      legalName: organization.legalName,
+      commercialName: organization.commercialName,
+      countryCode: organization.countryCode,
+      currencyCode: organization.currencyCode,
+      timezone: organization.timezone,
+      status: organization.status,
+    };
   }
 
   private isSlugConflictError(error: unknown): boolean {

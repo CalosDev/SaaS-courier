@@ -8,6 +8,7 @@ import type {
 export abstract class CustomerImportsRepository {
   abstract createDraft(
     input: CreateCustomerImportJobRecord,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord>;
 
   abstract listJobs(organizationId: string): Promise<CustomerImportJobRecord[]>;
@@ -28,15 +29,19 @@ export abstract class CustomerImportsRepository {
 
   abstract saveValidationResult(
     input: SaveCustomerImportValidationRecord,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord>;
 
   abstract commitJob(
     organizationId: string,
     importJobId: string,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord>;
 
   abstract cancelJob(
     organizationId: string,
     importJobId: string,
+    context?: CommandContext,
   ): Promise<CustomerImportJobRecord | null>;
 }
+import type { CommandContext } from '../request-context/request-context.types';

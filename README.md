@@ -143,7 +143,10 @@ pnpm db:validate
 pnpm db:generate
 pnpm db:check
 pnpm rbac:sync-permissions
+pnpm outbox:status
 ```
+
+`pnpm outbox:status` muestra un resumen agregado de entrega sin exponer payloads, metadata ni claves de idempotencia.
 
 Para crear y revisar migraciones versionadas:
 

@@ -3,6 +3,7 @@ import type {
   OrganizationRecord,
   UpdateOrganizationProfileRecord,
 } from './organization.types';
+import type { CommandContext } from '../request-context/request-context.types';
 
 export abstract class OrganizationsRepository {
   abstract create(input: CreateOrganizationRecord): Promise<OrganizationRecord>;
@@ -13,5 +14,6 @@ export abstract class OrganizationsRepository {
 
   abstract updateProfile(
     input: UpdateOrganizationProfileRecord,
+    context?: CommandContext,
   ): Promise<OrganizationRecord | null>;
 }
