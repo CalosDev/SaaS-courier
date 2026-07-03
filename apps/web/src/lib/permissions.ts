@@ -12,6 +12,9 @@ export const PERMISSION_CODES = [
   "customers.manage",
   "customers.customs.read",
   "customers.customs.manage",
+  "audit.read",
+  "prealerts.read",
+  "prealerts.manage",
 ] as const;
 
 export type PermissionCode = (typeof PERMISSION_CODES)[number];

@@ -74,6 +74,17 @@ const permissionCatalog = [
     name: 'Read audit logs',
     description: 'Allows reading audit logs within the current tenant.',
   },
+  {
+    code: 'prealerts.read',
+    name: 'Read prealerts',
+    description: 'Allows reading prealerts within the current tenant.',
+  },
+  {
+    code: 'prealerts.manage',
+    name: 'Manage prealerts',
+    description:
+      'Allows creating, updating and cancelling prealerts within the current tenant.',
+  },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionCode = (typeof permissionCatalog)[number]['code'];

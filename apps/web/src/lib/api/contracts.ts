@@ -250,6 +250,58 @@ export type CustomerListResponse = {
   pagination: Pagination;
 };
 
+export type PrealertStatus = "PENDING_ARRIVAL" | "CANCELLED";
+
+export type PrealertInvoiceStatus =
+  | "NOT_REQUIRED"
+  | "PENDING"
+  | "PROVIDED"
+  | "REJECTED"
+  | "VERIFIED";
+
+export type PrealertCustomerSummary = {
+  id: string;
+  customerCode: string;
+  type: "INDIVIDUAL" | "BUSINESS";
+  displayName: string;
+};
+
+export type PrealertEmployeeSummary = {
+  id: string;
+  displayName: string;
+};
+
+export type PrealertSummary = {
+  id: string;
+  prealertCode: string;
+  externalTrackingNumber: string;
+  carrierName: string | null;
+  storeName: string;
+  purchaseDate: string | null;
+  description: string;
+  quantity: number;
+  declaredValue: string;
+  currencyCode: string;
+  invoiceStatus: PrealertInvoiceStatus;
+  status: PrealertStatus;
+  customer: PrealertCustomerSummary;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PrealertDetail = PrealertSummary & {
+  notes: string | null;
+  cancellationReason: string | null;
+  cancelledAt: string | null;
+  createdBy: PrealertEmployeeSummary;
+  cancelledBy: PrealertEmployeeSummary | null;
+};
+
+export type PrealertListResponse = {
+  items: PrealertSummary[];
+  pagination: Pagination;
+};
+
 export type CustomerAddress = {
   id: string;
   type: "HOME" | "WORK" | "BILLING" | "DELIVERY" | "OTHER";

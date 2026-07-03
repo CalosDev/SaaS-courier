@@ -44,8 +44,8 @@ describe('Rbac integration', () => {
       const firstSync = await rbacService.syncPermissionCatalog();
       const secondSync = await rbacService.syncPermissionCatalog();
 
-      expect(firstSync.totalActiveCatalogPermissions).toBe(14);
-      expect(secondSync.totalActiveCatalogPermissions).toBe(14);
+      expect(firstSync.totalActiveCatalogPermissions).toBe(16);
+      expect(secondSync.totalActiveCatalogPermissions).toBe(16);
 
       const organizationOne = await prismaService.organization.create({
         data: {

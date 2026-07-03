@@ -18,6 +18,8 @@ import type {
   OrganizationCapabilities,
   OrganizationSettings,
   PermissionItem,
+  PrealertDetail,
+  PrealertListResponse,
   Role,
   RoleDetail,
   RoleListResponse,
@@ -217,5 +219,24 @@ export const backofficeApi = {
       `/customer-imports/${importId}/cancel`,
       {},
     );
+  },
+  listPrealerts(params: Record<string, string | number | boolean | undefined>) {
+    return apiClient.get<PrealertListResponse>(
+      `/prealerts${buildQuery(params)}`,
+    );
+  },
+  createPrealert(body: Record<string, unknown>) {
+    return apiClient.post<PrealertDetail>("/prealerts", body);
+  },
+  getPrealert(prealertId: string) {
+    return apiClient.get<PrealertDetail>(`/prealerts/${prealertId}`);
+  },
+  updatePrealert(prealertId: string, body: Record<string, unknown>) {
+    return apiClient.patch<PrealertDetail>(`/prealerts/${prealertId}`, body);
+  },
+  cancelPrealert(prealertId: string, reason: string) {
+    return apiClient.post<PrealertDetail>(`/prealerts/${prealertId}/cancel`, {
+      reason,
+    });
   },
 };

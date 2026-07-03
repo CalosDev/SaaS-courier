@@ -101,10 +101,27 @@ Los primeros endpoints administrativos protegidos disponibles actualmente son:
 - `POST /customer-imports/:importId/validate`
 - `POST /customer-imports/:importId/commit`
 - `POST /customer-imports/:importId/cancel`
+- `GET /prealerts`
+- `POST /prealerts`
+- `GET /prealerts/:prealertId`
+- `PATCH /prealerts/:prealertId`
+- `POST /prealerts/:prealertId/cancel`
 
 La identificacion aduanera de clientes se guarda en `CustomerCustomsProfile`. El listado general `GET /customers` no expone cedulas, pasaportes, RNC ni estado RUA.
 
 La importacion inicial de clientes usa staging JSON en base de datos y requiere el flujo `create -> validate -> commit`. En este punto no hay CSV, Excel, archivos ni S3.
+
+## Prealertas
+
+El backoffice inicial de prealertas vive en:
+
+```bash
+/prealerts
+/prealerts/new
+/prealerts/:prealertId
+```
+
+La prealerta registra una compra esperada y no confirma recepcion fisica del paquete.
 
 ## Autenticacion HTTP
 

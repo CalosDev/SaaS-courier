@@ -196,6 +196,23 @@ enum OutboxEventStatus {
   @@map("outbox_event_status")
 }
 
+enum PrealertStatus {
+  PENDING_ARRIVAL
+  CANCELLED
+
+  @@map("prealert_status")
+}
+
+enum PrealertInvoiceStatus {
+  NOT_REQUIRED
+  PENDING
+  PROVIDED
+  REJECTED
+  VERIFIED
+
+  @@map("prealert_invoice_status")
+}
+
 model Organization {
   id                      String                   @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
   legalName               String                   @map("legal_name") @db.VarChar(200)
@@ -230,6 +247,7 @@ model Organization {
   customerImportRows      CustomerImportRow[]
   auditLogs               AuditLog[]
   outboxEvents            OutboxEvent[]
+  prealerts               Prealert[]
 
   @@index([status], map: "organizations_status_idx")
   @@index([deletedAt], map: "organizations_deleted_at_idx")
@@ -351,6 +369,7 @@ model Customer {
   addresses      CustomerAddress[]
   customsProfile CustomerCustomsProfile?
   importRows     CustomerImportRow[]
+  prealerts      Prealert[]
 
   @@unique([organizationId, customerCode], map: "customers_organization_id_customer_code_key")
   @@unique([organizationId, id], map: "customers_organization_id_id_key")
@@ -557,6 +576,8 @@ model Employee {
   employeeRoles      EmployeeRole[]
   userSessions       UserSession[]
   customerImportJobs CustomerImportJob[]
+  createdPrealerts   Prealert[]          @relation("PrealertCreatedByEmployee")
+  cancelledPrealerts Prealert[]          @relation("PrealertCancelledByEmployee")
 
   @@unique([organizationId, userId], map: "employees_organization_id_user_id_key")
   @@unique([organizationId, employeeCode], map: "employees_organization_id_employee_code_key")
@@ -582,6 +603,47 @@ model EmployeeFacility {
   @@index([organizationId, employeeId], map: "employee_facilities_organization_id_employee_id_idx")
   @@index([organizationId, facilityId], map: "employee_facilities_organization_id_facility_id_idx")
   @@map("employee_facilities")
+}
+
+model Prealert {
+  id                               String                @id(map: "prealerts_pkey") @default(uuid()) @db.Uuid
+  organizationId                   String                @map("organization_id") @db.Uuid
+  customerId                       String                @map("customer_id") @db.Uuid
+  createdByEmployeeId              String                @map("created_by_employee_id") @db.Uuid
+  prealertCode                     String                @map("prealert_code") @db.VarChar(20)
+  externalTrackingNumber           String                @map("external_tracking_number") @db.VarChar(100)
+  externalTrackingNumberNormalized String                @map("external_tracking_number_normalized") @db.VarChar(100)
+  carrierName                      String?               @map("carrier_name") @db.VarChar(100)
+  storeName                        String                @map("store_name") @db.VarChar(160)
+  purchaseDate                     DateTime?             @map("purchase_date") @db.Date
+  description                      String                @db.VarChar(500)
+  quantity                         Int
+  declaredValue                    Decimal               @map("declared_value") @db.Decimal(14, 2)
+  currencyCode                     String                @map("currency_code") @db.Char(3)
+  invoiceStatus                    PrealertInvoiceStatus @default(PENDING) @map("invoice_status")
+  status                           PrealertStatus        @default(PENDING_ARRIVAL)
+  notes                            String?               @db.VarChar(1000)
+  cancellationReason               String?               @map("cancellation_reason") @db.VarChar(500)
+  cancelledAt                      DateTime?             @map("cancelled_at") @db.Timestamptz(3)
+  cancelledByEmployeeId            String?               @map("cancelled_by_employee_id") @db.Uuid
+  createdAt                        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                        DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt                        DateTime?             @map("deleted_at") @db.Timestamptz(3)
+  organization                     Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "prealerts_organization_id_fkey")
+  customer                         Customer              @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "prealerts_organization_id_customer_id_fkey")
+  createdByEmployee                Employee              @relation("PrealertCreatedByEmployee", fields: [organizationId, createdByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "prealerts_organization_id_created_by_employee_id_fkey")
+  cancelledByEmployee              Employee?             @relation("PrealertCancelledByEmployee", fields: [organizationId, cancelledByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "prealerts_organization_id_cancelled_by_employee_id_fkey")
+
+  @@unique([organizationId, prealertCode], map: "prealerts_organization_id_prealert_code_key")
+  @@unique([organizationId, id], map: "prealerts_organization_id_id_key")
+  @@index([organizationId, customerId], map: "prealerts_organization_id_customer_id_idx")
+  @@index([organizationId, status, createdAt], map: "prealerts_organization_id_status_created_at_idx")
+  @@index([organizationId, invoiceStatus, createdAt], map: "prealerts_organization_id_invoice_status_created_at_idx")
+  @@index([organizationId, createdByEmployeeId], map: "prealerts_organization_id_created_by_employee_id_idx")
+  @@index([organizationId, cancelledByEmployeeId], map: "prealerts_organization_id_cancelled_by_employee_id_idx")
+  @@index([organizationId, externalTrackingNumberNormalized], map: "prealerts_organization_id_tracking_normalized_idx")
+  @@index([organizationId, deletedAt], map: "prealerts_organization_id_deleted_at_idx")
+  @@map("prealerts")
 }
 
 model UserSession {

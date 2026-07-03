@@ -59,6 +59,15 @@ import {
   InvalidCustomerImportInputError,
 } from '../../customer-imports/customer-imports.errors';
 import {
+  InvalidPrealertInputError,
+  InvalidPrealertStateTransitionError,
+  PrealertCodeGenerationError,
+  PrealertCustomerUnavailableError,
+  PrealertImmutableError,
+  PrealertNotFoundError,
+  PrealertTrackingConflictError,
+} from '../../prealerts/prealert.errors';
+import {
   InvalidOrganizationInputError,
   OrganizationNotFoundError,
   OrganizationSlugConflictError,
@@ -118,6 +127,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof InvalidOrganizationInputError ||
       exception instanceof InvalidFacilityInputError ||
       exception instanceof InvalidCustomerInputError ||
+      exception instanceof InvalidPrealertInputError ||
       exception instanceof InvalidCustomerImportInputError ||
       exception instanceof InvalidCustomerCustomsProfileError ||
       exception instanceof InvalidEmployeeInputError ||
@@ -187,6 +197,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof FacilityNotFoundError ||
       exception instanceof FacilityOrganizationUnavailableError ||
       exception instanceof CustomerNotFoundError ||
+      exception instanceof PrealertNotFoundError ||
       exception instanceof CustomerImportJobNotFoundError ||
       exception instanceof CustomerAddressNotFoundError ||
       exception instanceof CustomerCustomsProfileNotFoundError ||
@@ -208,6 +219,10 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof FacilityCodeConflictError ||
       exception instanceof FacilityLimitReachedError ||
       exception instanceof CustomerIdentityConflictError ||
+      exception instanceof PrealertTrackingConflictError ||
+      exception instanceof PrealertCustomerUnavailableError ||
+      exception instanceof PrealertImmutableError ||
+      exception instanceof InvalidPrealertStateTransitionError ||
       exception instanceof EmployeeCodeConflictError ||
       exception instanceof EmployeeMembershipConflictError ||
       exception instanceof EmployeeMaxUsersExceededError ||
@@ -229,7 +244,10 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       };
     }
 
-    if (exception instanceof CustomerCodeGenerationError) {
+    if (
+      exception instanceof CustomerCodeGenerationError ||
+      exception instanceof PrealertCodeGenerationError
+    ) {
       return {
         status: 500,
         code: exception.code,
@@ -296,7 +314,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
         path.startsWith('/organizations') ||
         path.startsWith('/facilities') ||
         path.startsWith('/customers') ||
-        path.startsWith('/customer-imports'))
+        path.startsWith('/customer-imports') ||
+        path.startsWith('/prealerts'))
     );
   }
 }

@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   LogOut,
   MapPinned,
+  Package,
   PackageSearch,
   ShieldCheck,
   Users,
@@ -74,6 +75,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Importaciones",
     icon: PackageSearch,
     requiredPermissions: ["customers.read"],
+  },
+  {
+    href: "/prealerts",
+    label: "Prealertas",
+    icon: Package,
+    requiredPermissions: ["prealerts.read"],
   },
 ];
 

@@ -22,6 +22,9 @@ export const AUDIT_ACTIONS = [
   'customer_import.validated',
   'customer_import.committed',
   'customer_import.cancelled',
+  'prealert.created',
+  'prealert.updated',
+  'prealert.cancelled',
 ] as const;
 
 export type AuditActionCode = (typeof AUDIT_ACTIONS)[number];
@@ -36,6 +39,7 @@ export const AUDIT_ENTITY_TYPES = [
   'CUSTOMER_ADDRESS',
   'CUSTOMER_CUSTOMS_PROFILE',
   'CUSTOMER_IMPORT',
+  'PREALERT',
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];
