@@ -250,7 +250,7 @@ export type CustomerListResponse = {
   pagination: Pagination;
 };
 
-export type PrealertStatus = "PENDING_ARRIVAL" | "CANCELLED";
+export type PrealertStatus = "PENDING_ARRIVAL" | "MATCHED" | "CANCELLED";
 
 export type PrealertInvoiceStatus =
   | "NOT_REQUIRED"
@@ -271,6 +271,12 @@ export type PrealertEmployeeSummary = {
   displayName: string;
 };
 
+export type PrealertMatchedPackageSummary = {
+  id: string;
+  internalTrackingNumber: string;
+  status: "RECEPTION_PENDING" | "CANCELLED";
+};
+
 export type PrealertSummary = {
   id: string;
   prealertCode: string;
@@ -285,6 +291,7 @@ export type PrealertSummary = {
   invoiceStatus: PrealertInvoiceStatus;
   status: PrealertStatus;
   customer: PrealertCustomerSummary;
+  matchedPackage: PrealertMatchedPackageSummary | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -299,6 +306,54 @@ export type PrealertDetail = PrealertSummary & {
 
 export type PrealertListResponse = {
   items: PrealertSummary[];
+  pagination: Pagination;
+};
+
+export type PackageStatus = "RECEPTION_PENDING" | "CANCELLED";
+
+export type PackageSource = "MANUAL" | "PREALERT";
+
+export type PackageCustomerSummary = {
+  id: string;
+  customerCode: string;
+  type: "INDIVIDUAL" | "BUSINESS";
+  displayName: string;
+};
+
+export type PackagePrealertSummary = {
+  id: string;
+  prealertCode: string;
+  storeName: string;
+};
+
+export type PackageEmployeeSummary = {
+  id: string;
+  displayName: string;
+};
+
+export type PackageSummary = {
+  id: string;
+  internalTrackingNumber: string;
+  externalTrackingNumber: string;
+  status: PackageStatus;
+  source: PackageSource;
+  customer: PackageCustomerSummary;
+  prealert: PackagePrealertSummary | null;
+  registeredAt: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PackageDetail = PackageSummary & {
+  notes: string | null;
+  cancellationReason: string | null;
+  cancelledAt: string | null;
+  registeredBy: PackageEmployeeSummary;
+  cancelledBy: PackageEmployeeSummary | null;
+};
+
+export type PackageListResponse = {
+  items: PackageSummary[];
   pagination: Pagination;
 };
 

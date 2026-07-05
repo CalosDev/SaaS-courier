@@ -79,4 +79,51 @@ describe("AppShell", () => {
 
     expect(screen.getByText("Prealertas")).toBeInTheDocument();
   });
+
+  it("shows the packages entry only when the session has packages.read", () => {
+    usePathnameMock.mockReturnValue("/dashboard");
+    useAuthMock.mockReturnValue({
+      state: {
+        status: "authenticated",
+        session: {
+          organizationName: "Courier Uno",
+          firstName: "Ada",
+          lastName: "Lovelace",
+          email: "ada@courier.test",
+        },
+        permissionCodes: ["organizations.read"],
+      },
+      logout: vi.fn(),
+    });
+
+    const { rerender } = render(
+      <AppShell>
+        <div>Contenido</div>
+      </AppShell>,
+    );
+
+    expect(screen.queryByText("Paquetes")).not.toBeInTheDocument();
+
+    useAuthMock.mockReturnValue({
+      state: {
+        status: "authenticated",
+        session: {
+          organizationName: "Courier Uno",
+          firstName: "Ada",
+          lastName: "Lovelace",
+          email: "ada@courier.test",
+        },
+        permissionCodes: ["organizations.read", "packages.read"],
+      },
+      logout: vi.fn(),
+    });
+
+    rerender(
+      <AppShell>
+        <div>Contenido</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByText("Paquetes")).toBeInTheDocument();
+  });
 });

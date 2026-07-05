@@ -4,6 +4,7 @@ dist/
 coverage/
 .turbo/
 apps/api/src/generated/prisma/
+apps/web/test-results/
 .env
 .env.*
 !.env.example

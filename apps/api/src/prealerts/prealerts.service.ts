@@ -1,5 +1,9 @@
 import { Inject, Injectable } from '@nestjs/common';
 
+import {
+  ExternalTrackingNormalizationError,
+  ExternalTrackingNormalizer,
+} from '../common/tracking/external-tracking-normalizer';
 import { CustomerNotFoundError } from '../customers/customer.errors';
 import { CustomersRepository } from '../customers/customers.repository';
 import type { CustomerRecord } from '../customers/customer.types';
@@ -11,7 +15,6 @@ import {
   PrealertImmutableError,
   PrealertNotFoundError,
 } from './prealert.errors';
-import { PrealertTrackingNormalizer } from './prealert-tracking-normalizer';
 import { PrealertsRepository } from './prealerts.repository';
 import type {
   CancelPrealertInput,
@@ -37,7 +40,7 @@ export class PrealertsService {
     @Inject(CustomersRepository)
     private readonly customersRepository: CustomersRepository,
     private readonly organizationsService: OrganizationsService,
-    private readonly trackingNormalizer: PrealertTrackingNormalizer = new PrealertTrackingNormalizer(),
+    private readonly trackingNormalizer: ExternalTrackingNormalizer = new ExternalTrackingNormalizer(),
   ) {}
 
   async create(
@@ -50,9 +53,7 @@ export class PrealertsService {
       this.normalizeRequiredField(input.customerId, 'customerId'),
     );
     this.ensureCustomerCanCreatePrealert(customer);
-    const tracking = this.trackingNormalizer.normalize(
-      input.externalTrackingNumber,
-    );
+    const tracking = this.normalizeTracking(input.externalTrackingNumber);
     const organization =
       await this.organizationsService.getById(organizationId);
 
@@ -185,9 +186,7 @@ export class PrealertsService {
     }
 
     if (input.externalTrackingNumber !== undefined) {
-      const tracking = this.trackingNormalizer.normalize(
-        input.externalTrackingNumber,
-      );
+      const tracking = this.normalizeTracking(input.externalTrackingNumber);
       record.externalTrackingNumber = tracking.original;
       record.externalTrackingNumberNormalized = tracking.normalized;
     }
@@ -484,5 +483,31 @@ export class PrealertsService {
     }
 
     return normalizedValue;
+  }
+
+  private normalizeTracking(value: unknown): {
+    original: string;
+    normalized: string;
+  } {
+    try {
+      return this.trackingNormalizer.normalize(value);
+    } catch (error) {
+      if (
+        error instanceof ExternalTrackingNormalizationError &&
+        error.reason === 'required'
+      ) {
+        throw new InvalidPrealertInputError(
+          'Invalid prealert input: externalTrackingNumber is required',
+        );
+      }
+
+      if (error instanceof ExternalTrackingNormalizationError) {
+        throw new InvalidPrealertInputError(
+          'Invalid prealert input: externalTrackingNumber is invalid',
+        );
+      }
+
+      throw error;
+    }
   }
 }

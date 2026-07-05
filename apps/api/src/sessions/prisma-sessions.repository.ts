@@ -49,23 +49,6 @@ type EmployeePrincipalRecord = {
   }>;
 };
 
-type EmployeePrincipalRow = {
-  id: string;
-  employee_code: string | null;
-  first_name: string;
-  last_name: string;
-  user_id: string;
-  user_email: string;
-  organization_id: string;
-  organization_slug: string;
-  organization_commercial_name: string;
-};
-
-type EmployeeFacilityRow = {
-  facility_id: string;
-  is_primary: boolean;
-};
-
 @Injectable()
 export class PrismaSessionsRepository implements SessionsRepository {
   constructor(private readonly prismaService: PrismaService) {}
@@ -396,80 +379,103 @@ export class PrismaSessionsRepository implements SessionsRepository {
           userId?: never;
         },
   ): Promise<EmployeePrincipalRecord | null> {
-    const employeeRows = await prisma.$queryRaw<EmployeePrincipalRow[]>(
-      Prisma.sql`
-        SELECT
-          e.id,
-          e.employee_code,
-          e.first_name,
-          e.last_name,
-          u.id AS user_id,
-          u.email AS user_email,
-          o.id AS organization_id,
-          o.slug AS organization_slug,
-          o.commercial_name AS organization_commercial_name
-        FROM employees e
-        INNER JOIN users u
-          ON u.id = e.user_id
-        INNER JOIN organizations o
-          ON o.id = e.organization_id
-        WHERE e.organization_id = ${input.organizationId}::uuid
-          AND e.status = 'ACTIVE'::employee_status
-          AND e.deleted_at IS NULL
-          AND u.status = 'ACTIVE'::user_status
-          AND u.deleted_at IS NULL
-          AND u.email_verified_at IS NOT NULL
-          AND u.password_hash IS NOT NULL
-          AND o.status IN ('ACTIVE'::organization_status, 'TRIAL'::organization_status)
-          AND o.deleted_at IS NULL
-          AND ${
-            'employeeId' in input
-              ? Prisma.sql`e.id = ${input.employeeId}::uuid`
-              : Prisma.sql`e.user_id = ${input.userId}::uuid`
-          }
-        LIMIT 1
-      `,
-    );
-    const employee = employeeRows[0];
+    const employee = await prisma.employee.findFirst({
+      where: {
+        organizationId: input.organizationId,
+        status: 'ACTIVE',
+        deletedAt: null,
+        ...('employeeId' in input
+          ? { id: input.employeeId }
+          : { userId: input.userId }),
+      },
+      select: {
+        id: true,
+        employeeCode: true,
+        firstName: true,
+        lastName: true,
+        userId: true,
+        organizationId: true,
+      },
+    });
 
     if (!employee) {
       return null;
     }
 
-    const facilityRows = await prisma.$queryRaw<EmployeeFacilityRow[]>(
-      Prisma.sql`
-        SELECT
-          ef.facility_id,
-          ef.is_primary
-        FROM employee_facilities ef
-        INNER JOIN facilities f
-          ON f.organization_id = ef.organization_id
-         AND f.id = ef.facility_id
-        WHERE ef.organization_id = ${input.organizationId}::uuid
-          AND ef.employee_id = ${employee.id}::uuid
-          AND f.is_active = TRUE
-          AND f.deleted_at IS NULL
-        ORDER BY ef.is_primary DESC, ef.facility_id ASC
-      `,
-    );
+    const user = await prisma.user.findFirst({
+      where: {
+        id: employee.userId,
+        status: 'ACTIVE',
+        deletedAt: null,
+        emailVerifiedAt: {
+          not: null,
+        },
+        passwordHash: {
+          not: null,
+        },
+      },
+      select: {
+        id: true,
+        email: true,
+      },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    const organization = await prisma.organization.findFirst({
+      where: {
+        id: employee.organizationId,
+        status: {
+          in: ['ACTIVE', 'TRIAL'],
+        },
+        deletedAt: null,
+      },
+      select: {
+        id: true,
+        slug: true,
+        commercialName: true,
+      },
+    });
+
+    if (!organization) {
+      return null;
+    }
+
+    const employeeFacilities = await prisma.employeeFacility.findMany({
+      where: {
+        organizationId: input.organizationId,
+        employeeId: employee.id,
+        facility: {
+          isActive: true,
+          deletedAt: null,
+        },
+      },
+      orderBy: [{ isPrimary: 'desc' }, { facilityId: 'asc' }],
+      select: {
+        facilityId: true,
+        isPrimary: true,
+      },
+    });
 
     return {
       id: employee.id,
-      employeeCode: employee.employee_code,
-      firstName: employee.first_name,
-      lastName: employee.last_name,
+      employeeCode: employee.employeeCode,
+      firstName: employee.firstName,
+      lastName: employee.lastName,
       user: {
-        id: employee.user_id,
-        email: employee.user_email,
+        id: user.id,
+        email: user.email,
       },
       organization: {
-        id: employee.organization_id,
-        slug: employee.organization_slug,
-        commercialName: employee.organization_commercial_name,
+        id: organization.id,
+        slug: organization.slug,
+        commercialName: organization.commercialName,
       },
-      employeeFacilities: facilityRows.map((facility) => ({
-        facilityId: facility.facility_id,
-        isPrimary: facility.is_primary,
+      employeeFacilities: employeeFacilities.map((facility) => ({
+        facilityId: facility.facilityId,
+        isPrimary: facility.isPrimary,
       })),
     };
   }

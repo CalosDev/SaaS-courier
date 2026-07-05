@@ -144,7 +144,9 @@ describe("NewPrealertPage", () => {
 
     render(<NewPrealertPage />);
 
-    await screen.findByLabelText("Cliente");
+    await waitFor(() => {
+      expect(screen.getByText("C-001 · Cliente Activo")).toBeInTheDocument();
+    });
 
     fireEvent.change(screen.getByLabelText("Cliente"), {
       target: { value: "customer-active" },
@@ -167,8 +169,11 @@ describe("NewPrealertPage", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Registrar prealerta" }));
 
+    await waitFor(() => {
+      expect(backofficeApiMock.createPrealert).toHaveBeenCalledTimes(1);
+    });
     expect(
-      await screen.findByText("Ya existe una prealerta activa con ese tracking."),
+      await screen.findByText(/Ya existe una prealerta activa con ese tracking\./i),
     ).toBeInTheDocument();
   });
 });

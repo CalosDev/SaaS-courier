@@ -35,6 +35,11 @@ type PrealertWithRelations = Prealert & {
     lastName: string | null;
     businessName: string | null;
   };
+  packages: Array<{
+    id: string;
+    internalTrackingNumber: string;
+    status: 'RECEPTION_PENDING' | 'CANCELLED';
+  }>;
   createdByEmployee: Pick<Employee, 'id' | 'firstName' | 'lastName'>;
   cancelledByEmployee: Pick<Employee, 'id' | 'firstName' | 'lastName'> | null;
 };
@@ -470,6 +475,18 @@ export class PrismaPrealertsRepository implements PrealertsRepository {
           businessName: true,
         },
       },
+      packages: {
+        where: {
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          internalTrackingNumber: true,
+          status: true,
+        },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        take: 1,
+      },
       createdByEmployee: {
         select: {
           id: true,
@@ -511,6 +528,15 @@ export class PrismaPrealertsRepository implements PrealertsRepository {
         type: prealert.customer.type,
         displayName: this.customerDisplayName(prealert.customer),
       },
+      matchedPackage:
+        prealert.status === 'MATCHED' && prealert.packages[0]
+          ? {
+              id: prealert.packages[0].id,
+              internalTrackingNumber:
+                prealert.packages[0].internalTrackingNumber,
+              status: prealert.packages[0].status,
+            }
+          : null,
       createdBy: this.employeeSummary(prealert.createdByEmployee),
       cancelledBy: prealert.cancelledByEmployee
         ? this.employeeSummary(prealert.cancelledByEmployee)

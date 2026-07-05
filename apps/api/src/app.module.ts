@@ -11,6 +11,7 @@ import { FacilitiesModule } from './facilities/facilities.module';
 import { HealthModule } from './health/health.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationSettingsModule } from './organization-settings/organization-settings.module';
+import { PackagesModule } from './packages/packages.module';
 import { PrealertsModule } from './prealerts/prealerts.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { RbacModule } from './rbac/rbac.module';
@@ -35,6 +36,7 @@ import { SessionsModule } from './sessions/sessions.module';
     FacilitiesModule,
     HealthModule,
     OrganizationSettingsModule,
+    PackagesModule,
     PrealertsModule,
     PrismaModule,
     OrganizationsModule,

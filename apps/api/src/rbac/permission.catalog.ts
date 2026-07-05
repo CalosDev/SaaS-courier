@@ -85,6 +85,18 @@ const permissionCatalog = [
     description:
       'Allows creating, updating and cancelling prealerts within the current tenant.',
   },
+  {
+    code: 'packages.read',
+    name: 'Read packages',
+    description:
+      'Allows reading package registration data within the current tenant.',
+  },
+  {
+    code: 'packages.manage',
+    name: 'Manage packages',
+    description:
+      'Allows creating, updating and cancelling package registrations within the current tenant.',
+  },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionCode = (typeof permissionCatalog)[number]['code'];

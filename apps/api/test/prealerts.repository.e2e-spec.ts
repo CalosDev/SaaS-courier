@@ -69,20 +69,18 @@ describe('Prealerts repository integration', () => {
         data: { organizationId: otherOrganization.id },
       });
 
-      const [userOne, userTwo] = await prisma.$transaction([
-        prisma.user.create({
-          data: {
-            email: `prealerts.one.${suffix}@courier.test`,
-            status: 'ACTIVE',
-          },
-        }),
-        prisma.user.create({
-          data: {
-            email: `prealerts.two.${suffix}@courier.test`,
-            status: 'ACTIVE',
-          },
-        }),
-      ]);
+      const userOne = await prisma.user.create({
+        data: {
+          email: `prealerts.one.${suffix}@courier.test`,
+          status: 'ACTIVE',
+        },
+      });
+      const userTwo = await prisma.user.create({
+        data: {
+          email: `prealerts.two.${suffix}@courier.test`,
+          status: 'ACTIVE',
+        },
+      });
       cleanup.userIds.push(userOne.id, userTwo.id);
 
       const employeeOne = await prisma.employee.create({

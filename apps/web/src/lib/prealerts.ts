@@ -5,6 +5,7 @@ import type {
 
 export const PREALERT_STATUS_LABELS: Record<PrealertStatus, string> = {
   PENDING_ARRIVAL: "Pendiente de llegada",
+  MATCHED: "Vinculada",
   CANCELLED: "Cancelada",
 };
 
@@ -21,8 +22,15 @@ export const PREALERT_INVOICE_STATUS_LABELS: Record<
 
 export function getPrealertStatusTone(
   status: PrealertStatus,
-): "warning" | "danger" {
-  return status === "PENDING_ARRIVAL" ? "warning" : "danger";
+): "warning" | "success" | "danger" {
+  switch (status) {
+    case "PENDING_ARRIVAL":
+      return "warning";
+    case "MATCHED":
+      return "success";
+    default:
+      return "danger";
+  }
 }
 
 export function getPrealertInvoiceTone(

@@ -1,6 +1,10 @@
 import type { CommandContext } from '../request-context/request-context.types';
 
-export const PREALERT_STATUS_VALUES = ['PENDING_ARRIVAL', 'CANCELLED'] as const;
+export const PREALERT_STATUS_VALUES = [
+  'PENDING_ARRIVAL',
+  'MATCHED',
+  'CANCELLED',
+] as const;
 export const PREALERT_INVOICE_STATUS_VALUES = [
   'NOT_REQUIRED',
   'PENDING',
@@ -25,6 +29,12 @@ export interface PrealertEmployeeSummary {
   displayName: string;
 }
 
+export interface PrealertMatchedPackageSummary {
+  id: string;
+  internalTrackingNumber: string;
+  status: 'RECEPTION_PENDING' | 'CANCELLED';
+}
+
 export interface PrealertRecord {
   id: string;
   prealertCode: string;
@@ -43,6 +53,7 @@ export interface PrealertRecord {
   cancellationReason: string | null;
   cancelledAt: Date | null;
   customer: PrealertCustomerSummary;
+  matchedPackage: PrealertMatchedPackageSummary | null;
   createdBy: PrealertEmployeeSummary;
   cancelledBy: PrealertEmployeeSummary | null;
   createdAt: Date;

@@ -24,31 +24,35 @@ export class PrismaAuditRepository implements AuditRepository {
           : undefined,
     };
     const skip = (input.page - 1) * input.pageSize;
-    const [totalItems, items] = await this.prismaService.$transaction([
-      this.prismaService.auditLog.count({ where }),
-      this.prismaService.auditLog.findMany({
-        where,
-        orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
-        skip,
-        take: input.pageSize,
-        select: {
-          id: true,
-          actorType: true,
-          actorEmployeeId: true,
-          action: true,
-          entityType: true,
-          entityId: true,
-          source: true,
-          requestId: true,
-          correlationId: true,
-          changedFields: true,
-          beforeData: true,
-          afterData: true,
-          reason: true,
-          occurredAt: true,
-        },
-      }),
-    ]);
+    const [totalItems, items] = await this.prismaService.$transaction(
+      async (tx) => {
+        const totalCount = await tx.auditLog.count({ where });
+        const rows = await tx.auditLog.findMany({
+          where,
+          orderBy: [{ occurredAt: 'desc' }, { id: 'desc' }],
+          skip,
+          take: input.pageSize,
+          select: {
+            id: true,
+            actorType: true,
+            actorEmployeeId: true,
+            action: true,
+            entityType: true,
+            entityId: true,
+            source: true,
+            requestId: true,
+            correlationId: true,
+            changedFields: true,
+            beforeData: true,
+            afterData: true,
+            reason: true,
+            occurredAt: true,
+          },
+        });
+
+        return [totalCount, rows] as const;
+      },
+    );
 
     return {
       items,

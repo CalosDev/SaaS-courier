@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 
+import { ExternalTrackingNormalizer } from '../common/tracking/external-tracking-normalizer';
 import { CustomersModule } from '../customers/customers.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { PrealertCodeService } from './prealert-code.service';
-import { PrealertTrackingNormalizer } from './prealert-tracking-normalizer';
 import { PrismaPrealertsRepository } from './prisma-prealerts.repository';
 import { PrealertsController } from './prealerts.controller';
 import { PrealertsRepository } from './prealerts.repository';
@@ -15,7 +15,7 @@ import { PrealertsService } from './prealerts.service';
   controllers: [PrealertsController],
   providers: [
     PrealertCodeService,
-    PrealertTrackingNormalizer,
+    ExternalTrackingNormalizer,
     PrealertsService,
     PrismaPrealertsRepository,
     {

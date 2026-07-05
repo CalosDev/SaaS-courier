@@ -17,6 +17,9 @@ import type {
   Organization,
   OrganizationCapabilities,
   OrganizationSettings,
+  PackageDetail,
+  PackageListResponse,
+  PackageSummary,
   PermissionItem,
   PrealertDetail,
   PrealertListResponse,
@@ -236,6 +239,25 @@ export const backofficeApi = {
   },
   cancelPrealert(prealertId: string, reason: string) {
     return apiClient.post<PrealertDetail>(`/prealerts/${prealertId}/cancel`, {
+      reason,
+    });
+  },
+  listPackages(params: Record<string, string | number | boolean | undefined>) {
+    return apiClient.get<PackageListResponse>(
+      `/packages${buildQuery(params)}`,
+    );
+  },
+  createPackage(body: Record<string, unknown>) {
+    return apiClient.post<PackageSummary>("/packages", body);
+  },
+  getPackage(packageId: string) {
+    return apiClient.get<PackageDetail>(`/packages/${packageId}`);
+  },
+  updatePackage(packageId: string, body: Record<string, unknown>) {
+    return apiClient.patch<PackageDetail>(`/packages/${packageId}`, body);
+  },
+  cancelPackage(packageId: string, reason: string) {
+    return apiClient.post<PackageDetail>(`/packages/${packageId}/cancel`, {
       reason,
     });
   },

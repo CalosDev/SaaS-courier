@@ -25,6 +25,7 @@ import { PrealertsService } from './prealerts.service';
 import type {
   PrealertEmployeeSummary,
   PrealertListResult,
+  PrealertMatchedPackageSummary,
   PrealertRecord,
 } from './prealert.types';
 
@@ -158,6 +159,9 @@ export class PrealertsController {
       invoiceStatus: prealert.invoiceStatus,
       status: prealert.status,
       customer: prealert.customer,
+      matchedPackage: prealert.matchedPackage
+        ? this.serializeMatchedPackage(prealert.matchedPackage)
+        : null,
       createdAt: prealert.createdAt.toISOString(),
       updatedAt: prealert.updatedAt.toISOString(),
     };
@@ -180,6 +184,16 @@ export class PrealertsController {
     return {
       id: employee.id,
       displayName: employee.displayName,
+    };
+  }
+
+  private serializeMatchedPackage(
+    packageSummary: PrealertMatchedPackageSummary,
+  ) {
+    return {
+      id: packageSummary.id,
+      internalTrackingNumber: packageSummary.internalTrackingNumber,
+      status: packageSummary.status,
     };
   }
 

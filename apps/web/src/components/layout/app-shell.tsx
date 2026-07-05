@@ -79,8 +79,14 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: "/prealerts",
     label: "Prealertas",
-    icon: Package,
+    icon: PackageSearch,
     requiredPermissions: ["prealerts.read"],
+  },
+  {
+    href: "/packages",
+    label: "Paquetes",
+    icon: Package,
+    requiredPermissions: ["packages.read"],
   },
 ];
 

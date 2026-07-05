@@ -51,7 +51,9 @@ export default function PrealertDetailPage({
 
   const readOnly =
     resource.status === "success" &&
-    (resource.data.status === "CANCELLED" || !canManage);
+    (resource.data.status === "CANCELLED" ||
+      resource.data.status === "MATCHED" ||
+      !canManage);
 
   const initialValues =
     resource.status === "success"
@@ -179,6 +181,12 @@ export default function PrealertDetailPage({
         </section>
 
         {message ? <Alert tone="success">{message}</Alert> : null}
+        {resource.data.status === "MATCHED" ? (
+          <Alert tone="info">
+            Esta prealerta ya fue vinculada a un paquete y permanece en solo
+            lectura.
+          </Alert>
+        ) : null}
         {resource.data.status === "CANCELLED" ? (
           <Alert tone="warning">
             Esta prealerta esta cancelada y permanece en solo lectura.
@@ -212,6 +220,13 @@ export default function PrealertDetailPage({
               <li>
                 <span>Tracking</span>
                 <strong>{resource.data.externalTrackingNumber}</strong>
+              </li>
+              <li>
+                <span>Paquete vinculado</span>
+                <strong>
+                  {resource.data.matchedPackage?.internalTrackingNumber ||
+                    "No aplica"}
+                </strong>
               </li>
               <li>
                 <span>Valor</span>

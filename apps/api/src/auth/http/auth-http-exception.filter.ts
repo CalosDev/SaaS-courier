@@ -68,6 +68,17 @@ import {
   PrealertTrackingConflictError,
 } from '../../prealerts/prealert.errors';
 import {
+  InvalidPackageInputError,
+  InvalidPackageStatusTransitionError,
+  PackageCodeGenerationError,
+  PackageCustomerUnavailableError,
+  PackageImmutableError,
+  PackageNotFoundError,
+  PackagePrealertMatchRequiredError,
+  PackagePrealertUnavailableError,
+  PackageTrackingConflictError,
+} from '../../packages/package.errors';
+import {
   InvalidOrganizationInputError,
   OrganizationNotFoundError,
   OrganizationSlugConflictError,
@@ -128,6 +139,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof InvalidFacilityInputError ||
       exception instanceof InvalidCustomerInputError ||
       exception instanceof InvalidPrealertInputError ||
+      exception instanceof InvalidPackageInputError ||
       exception instanceof InvalidCustomerImportInputError ||
       exception instanceof InvalidCustomerCustomsProfileError ||
       exception instanceof InvalidEmployeeInputError ||
@@ -198,6 +210,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof FacilityOrganizationUnavailableError ||
       exception instanceof CustomerNotFoundError ||
       exception instanceof PrealertNotFoundError ||
+      exception instanceof PackageNotFoundError ||
       exception instanceof CustomerImportJobNotFoundError ||
       exception instanceof CustomerAddressNotFoundError ||
       exception instanceof CustomerCustomsProfileNotFoundError ||
@@ -223,6 +236,12 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof PrealertCustomerUnavailableError ||
       exception instanceof PrealertImmutableError ||
       exception instanceof InvalidPrealertStateTransitionError ||
+      exception instanceof PackageTrackingConflictError ||
+      exception instanceof PackageCustomerUnavailableError ||
+      exception instanceof PackagePrealertMatchRequiredError ||
+      exception instanceof PackagePrealertUnavailableError ||
+      exception instanceof PackageImmutableError ||
+      exception instanceof InvalidPackageStatusTransitionError ||
       exception instanceof EmployeeCodeConflictError ||
       exception instanceof EmployeeMembershipConflictError ||
       exception instanceof EmployeeMaxUsersExceededError ||
@@ -246,7 +265,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
 
     if (
       exception instanceof CustomerCodeGenerationError ||
-      exception instanceof PrealertCodeGenerationError
+      exception instanceof PrealertCodeGenerationError ||
+      exception instanceof PackageCodeGenerationError
     ) {
       return {
         status: 500,
@@ -315,6 +335,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
         path.startsWith('/facilities') ||
         path.startsWith('/customers') ||
         path.startsWith('/customer-imports') ||
+        path.startsWith('/packages') ||
         path.startsWith('/prealerts'))
     );
   }

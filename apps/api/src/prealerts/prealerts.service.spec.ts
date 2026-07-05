@@ -67,6 +67,7 @@ function buildPrealertRecord(
       type: 'INDIVIDUAL',
       displayName: 'Ada Lovelace',
     },
+    matchedPackage: null,
     createdBy: {
       id: '96f31d98-7f6f-4b24-a312-7af803006674',
       displayName: 'Ada Lovelace',

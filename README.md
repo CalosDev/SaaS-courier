@@ -60,6 +60,13 @@ API_INTERNAL_URL=http://localhost:4000
 NEXT_PUBLIC_API_BASE_PATH=/backend
 ```
 
+Pruebas del frontend:
+
+```bash
+pnpm --filter @courier/web test
+pnpm --filter @courier/web test:e2e
+```
+
 ## Backend API
 
 La aplicacion NestJS vive en `apps/api` y expone `GET /health` en el puerto 4000 por defecto.
@@ -106,6 +113,11 @@ Los primeros endpoints administrativos protegidos disponibles actualmente son:
 - `GET /prealerts/:prealertId`
 - `PATCH /prealerts/:prealertId`
 - `POST /prealerts/:prealertId/cancel`
+- `GET /packages`
+- `POST /packages`
+- `GET /packages/:packageId`
+- `PATCH /packages/:packageId`
+- `POST /packages/:packageId/cancel`
 
 La identificacion aduanera de clientes se guarda en `CustomerCustomsProfile`. El listado general `GET /customers` no expone cedulas, pasaportes, RNC ni estado RUA.
 
@@ -122,6 +134,18 @@ El backoffice inicial de prealertas vive en:
 ```
 
 La prealerta registra una compra esperada y no confirma recepcion fisica del paquete.
+
+## Paquetes
+
+El backoffice inicial de paquetes vive en:
+
+```bash
+/packages
+/packages/new
+/packages/:packageId
+```
+
+El paquete representa el registro operativo inicial del courier. En este punto el sistema todavia no completa recepcion fisica, peso, dimensiones, fotografias ni ubicacion.
 
 ## Autenticacion HTTP
 
