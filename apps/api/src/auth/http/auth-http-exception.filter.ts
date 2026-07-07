@@ -84,6 +84,12 @@ import {
   PackageReceptionNotFoundError,
 } from '../../packages/package-reception.errors';
 import {
+  InvalidPackageDocumentInputError,
+  PackageDocumentNotFoundError,
+  PackageDocumentStateConflictError,
+  PackageDocumentStorageUnavailableError,
+} from '../../packages/package-document.errors';
+import {
   InvalidOrganizationInputError,
   OrganizationNotFoundError,
   OrganizationSlugConflictError,
@@ -145,6 +151,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof InvalidCustomerInputError ||
       exception instanceof InvalidPrealertInputError ||
       exception instanceof InvalidPackageInputError ||
+      exception instanceof InvalidPackageDocumentInputError ||
       exception instanceof InvalidCustomerImportInputError ||
       exception instanceof InvalidCustomerCustomsProfileError ||
       exception instanceof InvalidEmployeeInputError ||
@@ -216,6 +223,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof CustomerNotFoundError ||
       exception instanceof PrealertNotFoundError ||
       exception instanceof PackageNotFoundError ||
+      exception instanceof PackageDocumentNotFoundError ||
       exception instanceof PackageReceptionNotFoundError ||
       exception instanceof CustomerImportJobNotFoundError ||
       exception instanceof CustomerAddressNotFoundError ||
@@ -247,6 +255,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof PackagePrealertMatchRequiredError ||
       exception instanceof PackagePrealertUnavailableError ||
       exception instanceof PackageImmutableError ||
+      exception instanceof PackageDocumentStateConflictError ||
       exception instanceof InvalidPackageStatusTransitionError ||
       exception instanceof PackageReceptionConflictError ||
       exception instanceof PackageReceptionFacilityUnavailableError ||
@@ -268,6 +277,14 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
           exception instanceof FacilityLimitReachedError
             ? 'Facility limit reached.'
             : 'Conflict.',
+      };
+    }
+
+    if (exception instanceof PackageDocumentStorageUnavailableError) {
+      return {
+        status: 503,
+        code: exception.code,
+        message: 'Service unavailable.',
       };
     }
 

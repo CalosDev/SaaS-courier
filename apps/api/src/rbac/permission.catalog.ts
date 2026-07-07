@@ -103,6 +103,17 @@ const permissionCatalog = [
     description:
       'Allows recording physical package reception within assigned facilities.',
   },
+  {
+    code: 'package_documents.read',
+    name: 'Read package documents',
+    description: 'Allows reading package documents within the current tenant.',
+  },
+  {
+    code: 'package_documents.manage',
+    name: 'Manage package documents',
+    description:
+      'Allows creating, completing and deleting package documents within the current tenant.',
+  },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionCode = (typeof permissionCatalog)[number]['code'];

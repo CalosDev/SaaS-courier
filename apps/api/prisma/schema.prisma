@@ -233,6 +233,26 @@ enum PackageCondition {
   @@map("package_condition")
 }
 
+enum PackageDocumentType {
+  INVOICE
+  PURCHASE_RECEIPT
+  PACKAGE_PHOTO
+  DAMAGE_PHOTO
+  IDENTITY_SUPPORT
+  OTHER
+
+  @@map("package_document_type")
+}
+
+enum StoredObjectStatus {
+  PENDING_UPLOAD
+  AVAILABLE
+  QUARANTINED
+  DELETED
+
+  @@map("stored_object_status")
+}
+
 model Organization {
   id                      String                   @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
   legalName               String                   @map("legal_name") @db.VarChar(200)
@@ -270,6 +290,8 @@ model Organization {
   prealerts               Prealert[]
   packages                Package[]
   packageReceptions       PackageReception[]
+  storedObjects           StoredObject[]
+  packageDocuments        PackageDocument[]
 
   @@index([status], map: "organizations_status_idx")
   @@index([deletedAt], map: "organizations_deleted_at_idx")
@@ -583,28 +605,31 @@ model LoginChallenge {
 }
 
 model Employee {
-  id                 String              @id(map: "employees_pkey") @default(uuid()) @db.Uuid
-  organizationId     String              @map("organization_id") @db.Uuid
-  userId             String              @map("user_id") @db.Uuid
-  employeeCode       String?             @map("employee_code") @db.VarChar(40)
-  firstName          String              @map("first_name") @db.VarChar(120)
-  lastName           String              @map("last_name") @db.VarChar(120)
-  phone              String?             @db.VarChar(32)
-  status             EmployeeStatus      @default(PENDING)
-  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt          DateTime?           @map("deleted_at") @db.Timestamptz(3)
-  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "employees_organization_id_fkey")
-  user               User                @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "employees_user_id_fkey")
-  employeeFacilities EmployeeFacility[]
-  employeeRoles      EmployeeRole[]
-  userSessions       UserSession[]
-  customerImportJobs CustomerImportJob[]
-  createdPrealerts   Prealert[]          @relation("PrealertCreatedByEmployee")
-  cancelledPrealerts Prealert[]          @relation("PrealertCancelledByEmployee")
-  registeredPackages Package[]           @relation("PackageRegisteredByEmployee")
-  cancelledPackages  Package[]           @relation("PackageCancelledByEmployee")
-  receivedPackages   PackageReception[]  @relation("PackageReceptionReceivedByEmployee")
+  id                      String              @id(map: "employees_pkey") @default(uuid()) @db.Uuid
+  organizationId          String              @map("organization_id") @db.Uuid
+  userId                  String              @map("user_id") @db.Uuid
+  employeeCode            String?             @map("employee_code") @db.VarChar(40)
+  firstName               String              @map("first_name") @db.VarChar(120)
+  lastName                String              @map("last_name") @db.VarChar(120)
+  phone                   String?             @db.VarChar(32)
+  status                  EmployeeStatus      @default(PENDING)
+  createdAt               DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt               DateTime?           @map("deleted_at") @db.Timestamptz(3)
+  organization            Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "employees_organization_id_fkey")
+  user                    User                @relation(fields: [userId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "employees_user_id_fkey")
+  employeeFacilities      EmployeeFacility[]
+  employeeRoles           EmployeeRole[]
+  userSessions            UserSession[]
+  customerImportJobs      CustomerImportJob[]
+  createdPrealerts        Prealert[]          @relation("PrealertCreatedByEmployee")
+  cancelledPrealerts      Prealert[]          @relation("PrealertCancelledByEmployee")
+  registeredPackages      Package[]           @relation("PackageRegisteredByEmployee")
+  cancelledPackages       Package[]           @relation("PackageCancelledByEmployee")
+  receivedPackages        PackageReception[]  @relation("PackageReceptionReceivedByEmployee")
+  createdStoredObjects    StoredObject[]      @relation("StoredObjectCreatedByEmployee")
+  createdPackageDocuments PackageDocument[]   @relation("PackageDocumentCreatedByEmployee")
+  deletedPackageDocuments PackageDocument[]   @relation("PackageDocumentDeletedByEmployee")
 
   @@unique([organizationId, userId], map: "employees_organization_id_user_id_key")
   @@unique([organizationId, employeeCode], map: "employees_organization_id_employee_code_key")
@@ -698,6 +723,7 @@ model Package {
   registeredByEmployee             Employee          @relation("PackageRegisteredByEmployee", fields: [organizationId, registeredByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_registered_by_employee_id_fkey")
   cancelledByEmployee              Employee?         @relation("PackageCancelledByEmployee", fields: [organizationId, cancelledByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_cancelled_by_employee_id_fkey")
   reception                        PackageReception?
+  documents                        PackageDocument[]
 
   @@unique([organizationId, internalTrackingNumber], map: "packages_organization_id_internal_tracking_number_key")
   @@unique([organizationId, id], map: "packages_organization_id_id_key")
@@ -736,6 +762,58 @@ model PackageReception {
   @@index([organizationId, facilityId, receivedAt], map: "package_receptions_org_facility_received_at_idx")
   @@index([organizationId, receivedByEmployeeId], map: "package_receptions_org_received_by_employee_id_idx")
   @@map("package_receptions")
+}
+
+model StoredObject {
+  id                  String             @id(map: "stored_objects_pkey") @default(uuid()) @db.Uuid
+  organizationId      String             @map("organization_id") @db.Uuid
+  createdByEmployeeId String             @map("created_by_employee_id") @db.Uuid
+  bucketName          String             @map("bucket_name") @db.VarChar(120)
+  objectKey           String             @map("object_key") @db.VarChar(400)
+  originalFilename    String             @map("original_filename") @db.VarChar(255)
+  contentType         String             @map("content_type") @db.VarChar(120)
+  contentLength       Int                @map("content_length")
+  status              StoredObjectStatus @default(PENDING_UPLOAD)
+  etag                String?            @db.VarChar(120)
+  uploadedAt          DateTime?          @map("uploaded_at") @db.Timestamptz(3)
+  deletedAt           DateTime?          @map("deleted_at") @db.Timestamptz(3)
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization        Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "stored_objects_organization_id_fkey")
+  createdByEmployee   Employee           @relation("StoredObjectCreatedByEmployee", fields: [organizationId, createdByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "stored_objects_organization_id_created_by_employee_id_fkey")
+  packageDocument     PackageDocument?
+
+  @@unique([organizationId, id], map: "stored_objects_organization_id_id_key")
+  @@unique([organizationId, objectKey], map: "stored_objects_org_object_key_key")
+  @@index([organizationId, status, createdAt], map: "stored_objects_org_status_created_at_idx")
+  @@index([organizationId, deletedAt], map: "stored_objects_org_deleted_at_idx")
+  @@map("stored_objects")
+}
+
+model PackageDocument {
+  id                  String              @id(map: "package_documents_pkey") @default(uuid()) @db.Uuid
+  organizationId      String              @map("organization_id") @db.Uuid
+  packageId           String              @map("package_id") @db.Uuid
+  storedObjectId      String              @map("stored_object_id") @db.Uuid
+  createdByEmployeeId String              @map("created_by_employee_id") @db.Uuid
+  deletedByEmployeeId String?             @map("deleted_by_employee_id") @db.Uuid
+  documentType        PackageDocumentType @map("document_type")
+  availableAt         DateTime?           @map("available_at") @db.Timestamptz(3)
+  deletedAt           DateTime?           @map("deleted_at") @db.Timestamptz(3)
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "package_documents_organization_id_fkey")
+  package             Package             @relation(fields: [organizationId, packageId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "package_documents_organization_id_package_id_fkey")
+  storedObject        StoredObject        @relation(fields: [organizationId, storedObjectId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "package_documents_organization_id_stored_object_id_fkey")
+  createdByEmployee   Employee            @relation("PackageDocumentCreatedByEmployee", fields: [organizationId, createdByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "package_documents_organization_id_created_by_employee_id_fkey")
+  deletedByEmployee   Employee?           @relation("PackageDocumentDeletedByEmployee", fields: [organizationId, deletedByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "package_documents_organization_id_deleted_by_employee_id_fkey")
+
+  @@unique([organizationId, id], map: "package_documents_organization_id_id_key")
+  @@unique([organizationId, storedObjectId], map: "package_documents_org_stored_object_id_key")
+  @@index([organizationId, packageId, deletedAt, createdAt], map: "package_documents_org_package_deleted_created_idx")
+  @@index([organizationId, documentType, deletedAt], map: "package_documents_org_type_deleted_idx")
+  @@index([organizationId, createdByEmployeeId], map: "package_documents_org_created_by_employee_id_idx")
+  @@map("package_documents")
 }
 
 model UserSession {

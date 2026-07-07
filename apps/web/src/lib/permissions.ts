@@ -18,6 +18,8 @@ export const PERMISSION_CODES = [
   "packages.read",
   "packages.manage",
   "packages.receive",
+  "package_documents.read",
+  "package_documents.manage",
 ] as const;
 
 export type PermissionCode = (typeof PERMISSION_CODES)[number];

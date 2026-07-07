@@ -31,6 +31,9 @@ export const AUDIT_ACTIONS = [
   'package.updated',
   'package.cancelled',
   'package.received',
+  'package.document.created',
+  'package.document.available',
+  'package.document.deleted',
 ] as const;
 
 export type AuditActionCode = (typeof AUDIT_ACTIONS)[number];
@@ -47,6 +50,7 @@ export const AUDIT_ENTITY_TYPES = [
   'CUSTOMER_IMPORT',
   'PREALERT',
   'PACKAGE',
+  'PACKAGE_DOCUMENT',
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

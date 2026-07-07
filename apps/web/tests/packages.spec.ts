@@ -21,6 +21,8 @@ const PACKAGE_PERMISSIONS = [
   "packages.read",
   "packages.manage",
   "packages.receive",
+  "package_documents.read",
+  "package_documents.manage",
   "facilities.read",
   "customers.read",
   "prealerts.read",
@@ -231,6 +233,80 @@ test("records package reception with assigned facility and configured units", as
   await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}`);
 });
 
+test("uploads package documents from the detail view", async ({ page }) => {
+  let uploadIntentPayload: Record<string, unknown> | null = null;
+  let completeCalls = 0;
+
+  await page.route(`**/backend/packages/${PACKAGE_SUMMARY.id}/documents/upload-intent`, async (route) => {
+    uploadIntentPayload = (await route.request().postDataJSON()) as Record<
+      string,
+      unknown
+    >;
+    await fulfillJson(route, 201, {
+      document: {
+        id: "document-1",
+      },
+      upload: {
+        method: "PUT",
+        url: "https://storage.example/upload/document-1",
+        headers: {
+          "Content-Type": "application/pdf",
+        },
+        expiresAt: "2026-07-07T12:00:00.000Z",
+      },
+    });
+  });
+
+  await page.route("https://storage.example/**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      body: "",
+    });
+  });
+
+  await page.route(
+    `**/backend/packages/${PACKAGE_SUMMARY.id}/documents/document-1/complete`,
+    async (route) => {
+      completeCalls += 1;
+      await fulfillJson(route, 200, {
+        id: "document-1",
+        packageId: PACKAGE_SUMMARY.id,
+        documentType: "INVOICE",
+        status: "AVAILABLE",
+        originalFilename: "invoice.pdf",
+        contentType: "application/pdf",
+        contentLength: 7,
+        createdBy: {
+          id: "employee-1",
+          displayName: "Ada Lovelace",
+        },
+        createdAt: "2026-07-07T10:00:00.000Z",
+        availableAt: "2026-07-07T10:01:00.000Z",
+        deletedAt: null,
+      });
+    },
+  );
+
+  await page.goto(`/packages/${PACKAGE_SUMMARY.id}`);
+
+  await page.setInputFiles('input[type="file"]', {
+    name: "invoice.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("invoice"),
+  });
+  await page.getByRole("button", { name: "Cargar documento" }).click();
+
+  expect(uploadIntentPayload).toEqual({
+    documentType: "INVOICE",
+    fileName: "invoice.pdf",
+    contentType: "application/pdf",
+    contentLength: 7,
+  });
+  expect(uploadIntentPayload).not.toHaveProperty("organizationId");
+  expect(uploadIntentPayload).not.toHaveProperty("bucketName");
+  expect(completeCalls).toBe(1);
+});
+
 async function mockBackoffice(page: Page): Promise<void> {
   await page.route("**/backend/**", async (route) => {
     await fulfillBackofficeRoute(route);
@@ -277,6 +353,13 @@ async function fulfillBackofficeRoute(route: Route): Promise<void> {
 
   if (method === "GET" && path === `/backend/packages/${PACKAGE_SUMMARY.id}`) {
     await fulfillJson(route, 200, PACKAGE_DETAIL);
+    return;
+  }
+
+  if (method === "GET" && path === `/backend/packages/${PACKAGE_SUMMARY.id}/documents`) {
+    await fulfillJson(route, 200, {
+      items: [],
+    });
     return;
   }
 

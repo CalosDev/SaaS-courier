@@ -10,6 +10,10 @@ const { useAuthMock, backofficeApiMock } = vi.hoisted(() => ({
   backofficeApiMock: {
     getPackage: vi.fn(),
     listCustomers: vi.fn(),
+    listPackageDocuments: vi.fn(),
+    createPackageDocumentUploadIntent: vi.fn(),
+    completePackageDocument: vi.fn(),
+    deletePackageDocument: vi.fn(),
     updatePackage: vi.fn(),
     cancelPackage: vi.fn(),
   },
@@ -26,6 +30,12 @@ vi.mock("@/lib/api/backoffice", () => ({
 describe("PackageDetailPage", () => {
   beforeEach(() => {
     Object.values(backofficeApiMock).forEach((mock) => mock.mockReset());
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+      }),
+    );
     useAuthMock.mockReturnValue({
       state: {
         status: "authenticated",
@@ -33,6 +43,8 @@ describe("PackageDetailPage", () => {
           "packages.read",
           "packages.manage",
           "packages.receive",
+          "package_documents.read",
+          "package_documents.manage",
           "facilities.read",
           "organizations.read",
         ],
@@ -59,6 +71,9 @@ describe("PackageDetailPage", () => {
         totalItems: 2,
         totalPages: 1,
       },
+    });
+    backofficeApiMock.listPackageDocuments.mockResolvedValue({
+      items: [],
     });
   });
 
@@ -156,6 +171,125 @@ describe("PackageDetailPage", () => {
     );
     expect(backofficeApiMock.updatePackage.mock.calls[0][1]).not.toHaveProperty(
       "internalTrackingNumber",
+    );
+  });
+
+  it("uploads package documents without sending tenant or storage internals", async () => {
+    backofficeApiMock.getPackage.mockResolvedValue({
+      id: "package-1",
+      internalTrackingNumber: "PK7KMP4TX9RW3Q",
+      externalTrackingNumber: "1Z-999-AA1-01-2345-6784",
+      status: "RECEPTION_PENDING",
+      source: "MANUAL",
+      customer: {
+        id: "customer-1",
+        customerCode: "C-001",
+        type: "INDIVIDUAL",
+        displayName: "Cliente Uno",
+      },
+      prealert: null,
+      notes: null,
+      cancellationReason: null,
+      cancelledAt: null,
+      registeredBy: {
+        id: "employee-1",
+        displayName: "Ada Lovelace",
+      },
+      cancelledBy: null,
+      registeredAt: "2026-07-03T10:00:00.000Z",
+      createdAt: "2026-07-03T10:00:00.000Z",
+      updatedAt: "2026-07-03T10:00:00.000Z",
+    });
+    backofficeApiMock.listPackageDocuments
+      .mockResolvedValueOnce({ items: [] })
+      .mockResolvedValueOnce({
+        items: [
+          {
+            id: "document-1",
+            packageId: "package-1",
+            documentType: "INVOICE",
+            status: "AVAILABLE",
+            originalFilename: "invoice.pdf",
+            contentType: "application/pdf",
+            contentLength: 2048,
+            createdBy: {
+              id: "employee-1",
+              displayName: "Ada Lovelace",
+            },
+            createdAt: "2026-07-07T10:00:00.000Z",
+            availableAt: "2026-07-07T10:01:00.000Z",
+            deletedAt: null,
+          },
+        ],
+      });
+    backofficeApiMock.createPackageDocumentUploadIntent.mockResolvedValue({
+      document: {
+        id: "document-1",
+      },
+      upload: {
+        method: "PUT",
+        url: "https://storage.example/upload/document-1",
+        headers: {
+          "Content-Type": "application/pdf",
+        },
+        expiresAt: "2026-07-07T10:15:00.000Z",
+      },
+    });
+    backofficeApiMock.completePackageDocument.mockResolvedValue({});
+
+    await act(async () => {
+      render(
+        <Suspense fallback={null}>
+          <PackageDetailPage
+            params={Promise.resolve({ packageId: "package-1" })}
+          />
+        </Suspense>,
+      );
+    });
+
+    const fileInput = await screen.findByLabelText("Archivo");
+    const file = new File(["invoice"], "invoice.pdf", {
+      type: "application/pdf",
+    });
+
+    fireEvent.change(screen.getByLabelText("Tipo de documento"), {
+      target: { value: "INVOICE" },
+    });
+    fireEvent.change(fileInput, {
+      target: { files: [file] },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Cargar documento" }));
+
+    await waitFor(() => {
+      expect(
+        backofficeApiMock.createPackageDocumentUploadIntent,
+      ).toHaveBeenCalledWith("package-1", {
+        documentType: "INVOICE",
+        fileName: "invoice.pdf",
+        contentType: "application/pdf",
+        contentLength: 7,
+      });
+    });
+
+    expect(
+      backofficeApiMock.createPackageDocumentUploadIntent.mock.calls[0][1],
+    ).not.toHaveProperty("organizationId");
+    expect(
+      backofficeApiMock.createPackageDocumentUploadIntent.mock.calls[0][1],
+    ).not.toHaveProperty("bucketName");
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://storage.example/upload/document-1",
+      expect.objectContaining({
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/pdf",
+        },
+        body: file,
+      }),
+    );
+    expect(backofficeApiMock.completePackageDocument).toHaveBeenCalledWith(
+      "package-1",
+      "document-1",
     );
   });
 

@@ -368,6 +368,20 @@ export type PackageCondition =
   | "CRUSHED"
   | "OTHER";
 
+export type PackageDocumentType =
+  | "INVOICE"
+  | "PURCHASE_RECEIPT"
+  | "PACKAGE_PHOTO"
+  | "DAMAGE_PHOTO"
+  | "IDENTITY_SUPPORT"
+  | "OTHER";
+
+export type StoredObjectStatus =
+  | "PENDING_UPLOAD"
+  | "AVAILABLE"
+  | "QUARANTINED"
+  | "DELETED";
+
 export type PackageReception = {
   id: string;
   packageId: string;
@@ -387,6 +401,34 @@ export type PackageReception = {
   condition: PackageCondition;
   receivedAt: string;
   createdAt: string;
+};
+
+export type PackageDocument = {
+  id: string;
+  packageId: string;
+  documentType: PackageDocumentType;
+  status: StoredObjectStatus;
+  originalFilename: string;
+  contentType: string;
+  contentLength: number;
+  createdBy: PackageEmployeeSummary;
+  createdAt: string;
+  availableAt: string | null;
+  deletedAt: string | null;
+};
+
+export type PackageDocumentListResponse = {
+  items: PackageDocument[];
+};
+
+export type PackageDocumentUploadIntentResponse = {
+  document: PackageDocument;
+  upload: {
+    method: "PUT";
+    url: string;
+    headers: Record<string, string>;
+    expiresAt: string;
+  };
 };
 
 export type CustomerAddress = {

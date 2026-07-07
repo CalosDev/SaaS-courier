@@ -18,6 +18,9 @@ import type {
   OrganizationCapabilities,
   OrganizationSettings,
   PackageDetail,
+  PackageDocument,
+  PackageDocumentListResponse,
+  PackageDocumentUploadIntentResponse,
   PackageReception,
   PackageListResponse,
   PackageSummary,
@@ -268,6 +271,31 @@ export const backofficeApi = {
   getPackageReception(packageId: string) {
     return apiClient.get<PackageReception>(
       `/packages/${packageId}/reception`,
+    );
+  },
+  listPackageDocuments(packageId: string) {
+    return apiClient.get<PackageDocumentListResponse>(
+      `/packages/${packageId}/documents`,
+    );
+  },
+  createPackageDocumentUploadIntent(
+    packageId: string,
+    body: Record<string, unknown>,
+  ) {
+    return apiClient.post<PackageDocumentUploadIntentResponse>(
+      `/packages/${packageId}/documents/upload-intent`,
+      body,
+    );
+  },
+  completePackageDocument(packageId: string, documentId: string) {
+    return apiClient.post<PackageDocument>(
+      `/packages/${packageId}/documents/${documentId}/complete`,
+      {},
+    );
+  },
+  deletePackageDocument(packageId: string, documentId: string) {
+    return apiClient.delete<PackageDocument>(
+      `/packages/${packageId}/documents/${documentId}`,
     );
   },
 };

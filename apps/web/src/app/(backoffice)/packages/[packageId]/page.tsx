@@ -4,6 +4,7 @@ import { use, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { PermissionBoundary } from "@/components/auth/permission-boundary";
+import { PackageDocumentsSection } from "@/components/packages/package-documents-section";
 import { PackageCustomerSelector } from "@/components/packages/package-customer-selector";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -47,6 +48,12 @@ export default function PackageDetailPage({
   const canManage =
     state.status === "authenticated" &&
     hasPermission(state.permissionCodes, "packages.manage");
+  const canReadDocuments =
+    state.status === "authenticated" &&
+    hasPermission(state.permissionCodes, "package_documents.read");
+  const canManageDocuments =
+    state.status === "authenticated" &&
+    hasPermission(state.permissionCodes, "package_documents.manage");
   const canOpenReception =
     state.status === "authenticated" &&
     hasEveryPermission(state.permissionCodes, [
@@ -237,6 +244,16 @@ export default function PackageDetailPage({
             </ul>
           </Card>
         </section>
+
+        {canReadDocuments ? (
+          <Card>
+            <h2>Documentos del paquete</h2>
+            <PackageDocumentsSection
+              packageId={packageId}
+              canManage={canManageDocuments}
+            />
+          </Card>
+        ) : null}
 
         {canManage && resource.data.status === "RECEPTION_PENDING" ? (
           <Card>

@@ -162,6 +162,8 @@ describe('HTTP authorization with effective permissions', () => {
         'facilities.read',
         'organizations.manage',
         'organizations.read',
+        'package_documents.manage',
+        'package_documents.read',
         'packages.manage',
         'packages.read',
         'packages.receive',
