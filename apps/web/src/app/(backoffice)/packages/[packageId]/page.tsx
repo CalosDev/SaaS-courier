@@ -1,6 +1,7 @@
 "use client";
 
 import { use, useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { PermissionBoundary } from "@/components/auth/permission-boundary";
 import { PackageCustomerSelector } from "@/components/packages/package-customer-selector";
@@ -19,7 +20,7 @@ import { ApiError } from "@/lib/api/api-error";
 import { backofficeApi } from "@/lib/api/backoffice";
 import type { PackageDetail } from "@/lib/api/contracts";
 import { useAuth } from "@/lib/auth/auth-provider";
-import { hasPermission } from "@/lib/permissions";
+import { hasEveryPermission, hasPermission } from "@/lib/permissions";
 import {
   PACKAGE_SOURCE_LABELS,
   PACKAGE_STATUS_LABELS,
@@ -46,10 +47,18 @@ export default function PackageDetailPage({
   const canManage =
     state.status === "authenticated" &&
     hasPermission(state.permissionCodes, "packages.manage");
+  const canOpenReception =
+    state.status === "authenticated" &&
+    hasEveryPermission(state.permissionCodes, [
+      "packages.read",
+      "packages.receive",
+      "facilities.read",
+      "organizations.read",
+    ]);
 
   const readOnly =
     resource.status === "success" &&
-    (resource.data.status === "CANCELLED" || !canManage);
+    (resource.data.status !== "RECEPTION_PENDING" || !canManage);
   const linkedToPrealert =
     resource.status === "success" && resource.data.prealert !== null;
 
@@ -151,6 +160,14 @@ export default function PackageDetailPage({
             <p>{resource.data.customer.displayName}</p>
           </div>
           <div className="actions-row">
+            {canOpenReception && resource.data.status === "RECEPTION_PENDING" ? (
+              <Link
+                href={`/packages/${packageId}/receive`}
+                className="ui-button ui-button--primary"
+              >
+                Recibir paquete
+              </Link>
+            ) : null}
             <Badge tone={getPackageStatusTone(resource.data.status)}>
               {PACKAGE_STATUS_LABELS[resource.data.status]}
             </Badge>
@@ -164,6 +181,12 @@ export default function PackageDetailPage({
         {resource.data.status === "CANCELLED" ? (
           <Alert tone="warning">
             Este paquete esta cancelado y permanece en solo lectura.
+          </Alert>
+        ) : null}
+        {resource.data.status === "RECEIVED_AT_ORIGIN" ? (
+          <Alert tone="success">
+            La recepcion fisica fue confirmada y el registro permanece en solo
+            lectura.
           </Alert>
         ) : null}
         {linkedToPrealert ? (

@@ -18,6 +18,7 @@ import type {
   OrganizationCapabilities,
   OrganizationSettings,
   PackageDetail,
+  PackageReception,
   PackageListResponse,
   PackageSummary,
   PermissionItem,
@@ -260,5 +261,13 @@ export const backofficeApi = {
     return apiClient.post<PackageDetail>(`/packages/${packageId}/cancel`, {
       reason,
     });
+  },
+  receivePackage(packageId: string, body: Record<string, unknown>) {
+    return apiClient.post<PackageReception>(`/packages/${packageId}/receive`, body);
+  },
+  getPackageReception(packageId: string) {
+    return apiClient.get<PackageReception>(
+      `/packages/${packageId}/reception`,
+    );
   },
 };

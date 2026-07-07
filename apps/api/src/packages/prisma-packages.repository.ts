@@ -69,7 +69,7 @@ type LockedPackageRow = {
   internal_tracking_number: string;
   external_tracking_number: string;
   external_tracking_number_normalized: string;
-  status: 'RECEPTION_PENDING' | 'CANCELLED';
+  status: 'RECEPTION_PENDING' | 'RECEIVED_AT_ORIGIN' | 'CANCELLED';
   notes: string | null;
   cancellation_reason: string | null;
   cancelled_at: Date | null;

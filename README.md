@@ -118,6 +118,8 @@ Los primeros endpoints administrativos protegidos disponibles actualmente son:
 - `GET /packages/:packageId`
 - `PATCH /packages/:packageId`
 - `POST /packages/:packageId/cancel`
+- `POST /packages/:packageId/receive`
+- `GET /packages/:packageId/reception`
 
 La identificacion aduanera de clientes se guarda en `CustomerCustomsProfile`. El listado general `GET /customers` no expone cedulas, pasaportes, RNC ni estado RUA.
 
@@ -143,9 +145,10 @@ El backoffice inicial de paquetes vive en:
 /packages
 /packages/new
 /packages/:packageId
+/packages/:packageId/receive
 ```
 
-El paquete representa el registro operativo inicial del courier. En este punto el sistema todavia no completa recepcion fisica, peso, dimensiones, fotografias ni ubicacion.
+El paquete representa el registro operativo inicial del courier. La recepcion fisica registra facility, peso, dimensiones, piezas, condicion y empleado receptor, y cambia el estado a `RECEIVED_AT_ORIGIN` de forma atomica con audit y outbox. Las fotografias y ubicaciones de inventario permanecen fuera de este alcance.
 
 ## Autenticacion HTTP
 

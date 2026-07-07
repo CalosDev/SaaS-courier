@@ -79,6 +79,11 @@ import {
   PackageTrackingConflictError,
 } from '../../packages/package.errors';
 import {
+  PackageReceptionConflictError,
+  PackageReceptionFacilityUnavailableError,
+  PackageReceptionNotFoundError,
+} from '../../packages/package-reception.errors';
+import {
   InvalidOrganizationInputError,
   OrganizationNotFoundError,
   OrganizationSlugConflictError,
@@ -211,6 +216,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof CustomerNotFoundError ||
       exception instanceof PrealertNotFoundError ||
       exception instanceof PackageNotFoundError ||
+      exception instanceof PackageReceptionNotFoundError ||
       exception instanceof CustomerImportJobNotFoundError ||
       exception instanceof CustomerAddressNotFoundError ||
       exception instanceof CustomerCustomsProfileNotFoundError ||
@@ -242,6 +248,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof PackagePrealertUnavailableError ||
       exception instanceof PackageImmutableError ||
       exception instanceof InvalidPackageStatusTransitionError ||
+      exception instanceof PackageReceptionConflictError ||
+      exception instanceof PackageReceptionFacilityUnavailableError ||
       exception instanceof EmployeeCodeConflictError ||
       exception instanceof EmployeeMembershipConflictError ||
       exception instanceof EmployeeMaxUsersExceededError ||

@@ -38,7 +38,7 @@ type PrealertWithRelations = Prealert & {
   packages: Array<{
     id: string;
     internalTrackingNumber: string;
-    status: 'RECEPTION_PENDING' | 'CANCELLED';
+    status: 'RECEPTION_PENDING' | 'RECEIVED_AT_ORIGIN' | 'CANCELLED';
   }>;
   createdByEmployee: Pick<Employee, 'id' | 'firstName' | 'lastName'>;
   cancelledByEmployee: Pick<Employee, 'id' | 'firstName' | 'lastName'> | null;

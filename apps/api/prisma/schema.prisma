@@ -216,9 +216,21 @@ enum PrealertInvoiceStatus {
 
 enum PackageStatus {
   RECEPTION_PENDING
+  RECEIVED_AT_ORIGIN
   CANCELLED
 
   @@map("package_status")
+}
+
+enum PackageCondition {
+  SEALED
+  OPEN
+  DAMAGED
+  WET
+  CRUSHED
+  OTHER
+
+  @@map("package_condition")
 }
 
 model Organization {
@@ -257,6 +269,7 @@ model Organization {
   outboxEvents            OutboxEvent[]
   prealerts               Prealert[]
   packages                Package[]
+  packageReceptions       PackageReception[]
 
   @@index([status], map: "organizations_status_idx")
   @@index([deletedAt], map: "organizations_deleted_at_idx")
@@ -349,6 +362,7 @@ model Facility {
   deletedAt            DateTime?             @map("deleted_at") @db.Timestamptz(3)
   organization         Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "facilities_organization_id_fkey")
   employeeFacilities   EmployeeFacility[]
+  packageReceptions    PackageReception[]
 
   @@unique([organizationId, code], map: "facilities_organization_id_code_key")
   @@unique([organizationId, id], map: "facilities_organization_id_id_key")
@@ -590,6 +604,7 @@ model Employee {
   cancelledPrealerts Prealert[]          @relation("PrealertCancelledByEmployee")
   registeredPackages Package[]           @relation("PackageRegisteredByEmployee")
   cancelledPackages  Package[]           @relation("PackageCancelledByEmployee")
+  receivedPackages   PackageReception[]  @relation("PackageReceptionReceivedByEmployee")
 
   @@unique([organizationId, userId], map: "employees_organization_id_user_id_key")
   @@unique([organizationId, employeeCode], map: "employees_organization_id_employee_code_key")
@@ -660,28 +675,29 @@ model Prealert {
 }
 
 model Package {
-  id                               String        @id(map: "packages_pkey") @default(uuid()) @db.Uuid
-  organizationId                   String        @map("organization_id") @db.Uuid
-  customerId                       String        @map("customer_id") @db.Uuid
-  prealertId                       String?       @map("prealert_id") @db.Uuid
-  registeredByEmployeeId           String        @map("registered_by_employee_id") @db.Uuid
-  internalTrackingNumber           String        @map("internal_tracking_number") @db.VarChar(24)
-  externalTrackingNumber           String        @map("external_tracking_number") @db.VarChar(100)
-  externalTrackingNumberNormalized String        @map("external_tracking_number_normalized") @db.VarChar(100)
-  status                           PackageStatus @default(RECEPTION_PENDING)
-  notes                            String?       @db.VarChar(1000)
-  cancellationReason               String?       @map("cancellation_reason") @db.VarChar(500)
-  cancelledAt                      DateTime?     @map("cancelled_at") @db.Timestamptz(3)
-  cancelledByEmployeeId            String?       @map("cancelled_by_employee_id") @db.Uuid
-  registeredAt                     DateTime      @default(now()) @map("registered_at") @db.Timestamptz(3)
-  createdAt                        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                        DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt                        DateTime?     @map("deleted_at") @db.Timestamptz(3)
-  organization                     Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_fkey")
-  customer                         Customer      @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_customer_id_fkey")
-  prealert                         Prealert?     @relation("PackagePrealert", fields: [organizationId, prealertId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_prealert_id_fkey")
-  registeredByEmployee             Employee      @relation("PackageRegisteredByEmployee", fields: [organizationId, registeredByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_registered_by_employee_id_fkey")
-  cancelledByEmployee              Employee?     @relation("PackageCancelledByEmployee", fields: [organizationId, cancelledByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_cancelled_by_employee_id_fkey")
+  id                               String            @id(map: "packages_pkey") @default(uuid()) @db.Uuid
+  organizationId                   String            @map("organization_id") @db.Uuid
+  customerId                       String            @map("customer_id") @db.Uuid
+  prealertId                       String?           @map("prealert_id") @db.Uuid
+  registeredByEmployeeId           String            @map("registered_by_employee_id") @db.Uuid
+  internalTrackingNumber           String            @map("internal_tracking_number") @db.VarChar(24)
+  externalTrackingNumber           String            @map("external_tracking_number") @db.VarChar(100)
+  externalTrackingNumberNormalized String            @map("external_tracking_number_normalized") @db.VarChar(100)
+  status                           PackageStatus     @default(RECEPTION_PENDING)
+  notes                            String?           @db.VarChar(1000)
+  cancellationReason               String?           @map("cancellation_reason") @db.VarChar(500)
+  cancelledAt                      DateTime?         @map("cancelled_at") @db.Timestamptz(3)
+  cancelledByEmployeeId            String?           @map("cancelled_by_employee_id") @db.Uuid
+  registeredAt                     DateTime          @default(now()) @map("registered_at") @db.Timestamptz(3)
+  createdAt                        DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt                        DateTime?         @map("deleted_at") @db.Timestamptz(3)
+  organization                     Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_fkey")
+  customer                         Customer          @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_customer_id_fkey")
+  prealert                         Prealert?         @relation("PackagePrealert", fields: [organizationId, prealertId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_prealert_id_fkey")
+  registeredByEmployee             Employee          @relation("PackageRegisteredByEmployee", fields: [organizationId, registeredByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_registered_by_employee_id_fkey")
+  cancelledByEmployee              Employee?         @relation("PackageCancelledByEmployee", fields: [organizationId, cancelledByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_cancelled_by_employee_id_fkey")
+  reception                        PackageReception?
 
   @@unique([organizationId, internalTrackingNumber], map: "packages_organization_id_internal_tracking_number_key")
   @@unique([organizationId, id], map: "packages_organization_id_id_key")
@@ -693,6 +709,33 @@ model Package {
   @@index([organizationId, externalTrackingNumberNormalized], map: "packages_organization_id_tracking_normalized_idx")
   @@index([organizationId, deletedAt], map: "packages_organization_id_deleted_at_idx")
   @@map("packages")
+}
+
+model PackageReception {
+  id                   String           @id(map: "package_receptions_pkey") @default(uuid()) @db.Uuid
+  organizationId       String           @map("organization_id") @db.Uuid
+  packageId            String           @map("package_id") @db.Uuid
+  facilityId           String           @map("facility_id") @db.Uuid
+  receivedByEmployeeId String           @map("received_by_employee_id") @db.Uuid
+  weight               Decimal          @db.Decimal(12, 3)
+  weightUnit           WeightUnit       @map("weight_unit")
+  length               Decimal          @db.Decimal(12, 2)
+  width                Decimal          @db.Decimal(12, 2)
+  height               Decimal          @db.Decimal(12, 2)
+  dimensionUnit        DimensionUnit    @map("dimension_unit")
+  pieceCount           Int              @map("piece_count")
+  condition            PackageCondition
+  receivedAt           DateTime         @default(now()) @map("received_at") @db.Timestamptz(3)
+  createdAt            DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  organization         Organization     @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "package_receptions_organization_id_fkey")
+  package              Package          @relation(fields: [organizationId, packageId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "package_receptions_organization_id_package_id_fkey")
+  facility             Facility         @relation(fields: [organizationId, facilityId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "package_receptions_organization_id_facility_id_fkey")
+  receivedByEmployee   Employee         @relation("PackageReceptionReceivedByEmployee", fields: [organizationId, receivedByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "package_receptions_organization_id_received_by_employee_id_fkey")
+
+  @@unique([organizationId, packageId], map: "package_receptions_organization_id_package_id_key")
+  @@index([organizationId, facilityId, receivedAt], map: "package_receptions_org_facility_received_at_idx")
+  @@index([organizationId, receivedByEmployeeId], map: "package_receptions_org_received_by_employee_id_idx")
+  @@map("package_receptions")
 }
 
 model UserSession {

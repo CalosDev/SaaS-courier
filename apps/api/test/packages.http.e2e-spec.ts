@@ -87,6 +87,7 @@ describe('Packages admin HTTP', () => {
     organizationIds: [] as string[],
     userIds: [] as string[],
     employeeIds: [] as string[],
+    facilityIds: [] as string[],
     roleIds: [] as string[],
     customerIds: [] as string[],
     prealertIds: [] as string[],
@@ -193,6 +194,26 @@ describe('Packages admin HTTP', () => {
         },
       });
       cleanup.employeeIds.push(otherEmployee.id);
+
+      const receptionFacility = await prisma.facility.create({
+        data: {
+          organizationId: organization.id,
+          code: `MIA-${shortCode}`,
+          name: 'Miami Origin',
+          type: 'INTERNATIONAL_WAREHOUSE',
+          isPackageOrigin: true,
+          isActive: true,
+        },
+      });
+      cleanup.facilityIds.push(receptionFacility.id);
+      await prisma.employeeFacility.create({
+        data: {
+          organizationId: organization.id,
+          employeeId: employee.id,
+          facilityId: receptionFacility.id,
+          isPrimary: true,
+        },
+      });
 
       const role = await rbacService.createRole({
         organizationId: organization.id,
@@ -425,6 +446,89 @@ describe('Packages admin HTTP', () => {
         },
       });
 
+      const receptionBody = {
+        facilityId: receptionFacility.id,
+        weight: 12.5,
+        length: 10,
+        width: 8,
+        height: 6,
+        pieceCount: 1,
+        condition: 'SEALED',
+      };
+
+      await request(server)
+        .post(`/packages/${createdManualPackage.id}/receive`)
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send(receptionBody)
+        .expect(403);
+
+      const receivePermission = await prisma.permission.findUniqueOrThrow({
+        where: { code: 'packages.receive' },
+        select: { id: true },
+      });
+      await prisma.rolePermission.create({
+        data: {
+          organizationId: organization.id,
+          roleId: role.id,
+          permissionId: receivePermission.id,
+        },
+      });
+
+      await request(server)
+        .get(`/packages/${createdManualPackage.id}/reception`)
+        .set('Cookie', sessionCookie)
+        .expect(404);
+
+      const receiveResponse = await request(server)
+        .post(`/packages/${createdManualPackage.id}/receive`)
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send(receptionBody)
+        .expect(200);
+      expect(receiveResponse.headers['cache-control']).toBe('no-store');
+      expect(receiveResponse.body).toMatchObject({
+        packageId: createdManualPackage.id,
+        facility: { id: receptionFacility.id, code: `MIA-${shortCode}` },
+        receivedBy: { id: employee.id, displayName: 'Ada Lovelace' },
+        weight: '12.500',
+        weightUnit: 'LB',
+        length: '10.00',
+        width: '8.00',
+        height: '6.00',
+        dimensionUnit: 'IN',
+        pieceCount: 1,
+        condition: 'SEALED',
+      });
+      expect(receiveResponse.body).not.toHaveProperty('organizationId');
+      expect(receiveResponse.body).not.toHaveProperty('receivedByEmployeeId');
+
+      await request(server)
+        .post(`/packages/${createdManualPackage.id}/receive`)
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send(receptionBody)
+        .expect(200);
+
+      await request(server)
+        .post(`/packages/${createdManualPackage.id}/receive`)
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send({ ...receptionBody, weight: 13 })
+        .expect(409);
+
+      const receptionResponse = await request(server)
+        .get(`/packages/${createdManualPackage.id}/reception`)
+        .set('Cookie', sessionCookie)
+        .expect(200);
+      const receiveResponseBody = receiveResponse.body as { id: string };
+      const receptionResponseBody = receptionResponse.body as { id: string };
+      expect(receptionResponseBody.id).toBe(receiveResponseBody.id);
+
       const pendingPrealert = await prisma.prealert.create({
         data: {
           organizationId: organization.id,
@@ -640,8 +744,21 @@ describe('Packages admin HTTP', () => {
         .get(`/packages/${foreignPackage.id}`)
         .set('Cookie', sessionCookie)
         .expect(404);
+
+      await request(server)
+        .post(`/packages/${foreignPackage.id}/receive`)
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send(receptionBody)
+        .expect(404);
     } finally {
       if (prismaService) {
+        if (cleanup.packageIds.length > 0) {
+          await prismaService.packageReception.deleteMany({
+            where: { packageId: { in: cleanup.packageIds } },
+          });
+        }
         if (cleanup.packageIds.length > 0) {
           await prismaService.package.deleteMany({
             where: {
@@ -697,12 +814,20 @@ describe('Packages admin HTTP', () => {
           });
         }
         if (cleanup.employeeIds.length > 0) {
+          await prismaService.employeeFacility.deleteMany({
+            where: { employeeId: { in: cleanup.employeeIds } },
+          });
           await prismaService.employee.deleteMany({
             where: {
               id: {
                 in: cleanup.employeeIds,
               },
             },
+          });
+        }
+        if (cleanup.facilityIds.length > 0) {
+          await prismaService.facility.deleteMany({
+            where: { id: { in: cleanup.facilityIds } },
           });
         }
         if (cleanup.customerIds.length > 0) {

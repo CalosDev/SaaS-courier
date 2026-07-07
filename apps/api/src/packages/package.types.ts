@@ -2,6 +2,7 @@ import type { CommandContext } from '../request-context/request-context.types';
 
 export const PACKAGE_STATUS_VALUES = [
   'RECEPTION_PENDING',
+  'RECEIVED_AT_ORIGIN',
   'CANCELLED',
 ] as const;
 export const PACKAGE_SOURCE_VALUES = ['MANUAL', 'PREALERT'] as const;

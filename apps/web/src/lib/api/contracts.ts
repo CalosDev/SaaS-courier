@@ -274,7 +274,7 @@ export type PrealertEmployeeSummary = {
 export type PrealertMatchedPackageSummary = {
   id: string;
   internalTrackingNumber: string;
-  status: "RECEPTION_PENDING" | "CANCELLED";
+  status: "RECEPTION_PENDING" | "RECEIVED_AT_ORIGIN" | "CANCELLED";
 };
 
 export type PrealertSummary = {
@@ -309,7 +309,10 @@ export type PrealertListResponse = {
   pagination: Pagination;
 };
 
-export type PackageStatus = "RECEPTION_PENDING" | "CANCELLED";
+export type PackageStatus =
+  | "RECEPTION_PENDING"
+  | "RECEIVED_AT_ORIGIN"
+  | "CANCELLED";
 
 export type PackageSource = "MANUAL" | "PREALERT";
 
@@ -355,6 +358,35 @@ export type PackageDetail = PackageSummary & {
 export type PackageListResponse = {
   items: PackageSummary[];
   pagination: Pagination;
+};
+
+export type PackageCondition =
+  | "SEALED"
+  | "OPEN"
+  | "DAMAGED"
+  | "WET"
+  | "CRUSHED"
+  | "OTHER";
+
+export type PackageReception = {
+  id: string;
+  packageId: string;
+  facility: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  receivedBy: PackageEmployeeSummary;
+  weight: string;
+  weightUnit: "LB" | "KG";
+  length: string;
+  width: string;
+  height: string;
+  dimensionUnit: "IN" | "CM";
+  pieceCount: number;
+  condition: PackageCondition;
+  receivedAt: string;
+  createdAt: string;
 };
 
 export type CustomerAddress = {

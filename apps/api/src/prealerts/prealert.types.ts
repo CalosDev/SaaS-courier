@@ -32,7 +32,7 @@ export interface PrealertEmployeeSummary {
 export interface PrealertMatchedPackageSummary {
   id: string;
   internalTrackingNumber: string;
-  status: 'RECEPTION_PENDING' | 'CANCELLED';
+  status: 'RECEPTION_PENDING' | 'RECEIVED_AT_ORIGIN' | 'CANCELLED';
 }
 
 export interface PrealertRecord {

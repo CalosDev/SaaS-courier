@@ -30,6 +30,7 @@ export const AUDIT_ACTIONS = [
   'package.created',
   'package.updated',
   'package.cancelled',
+  'package.received',
 ] as const;
 
 export type AuditActionCode = (typeof AUDIT_ACTIONS)[number];

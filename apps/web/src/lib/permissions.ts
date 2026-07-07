@@ -17,6 +17,7 @@ export const PERMISSION_CODES = [
   "prealerts.manage",
   "packages.read",
   "packages.manage",
+  "packages.receive",
 ] as const;
 
 export type PermissionCode = (typeof PERMISSION_CODES)[number];

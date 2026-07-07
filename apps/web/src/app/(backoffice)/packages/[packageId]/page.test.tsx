@@ -29,7 +29,13 @@ describe("PackageDetailPage", () => {
     useAuthMock.mockReturnValue({
       state: {
         status: "authenticated",
-        permissionCodes: ["packages.read", "packages.manage"],
+        permissionCodes: [
+          "packages.read",
+          "packages.manage",
+          "packages.receive",
+          "facilities.read",
+          "organizations.read",
+        ],
       },
     });
     backofficeApiMock.listCustomers.mockResolvedValue({
@@ -121,6 +127,10 @@ describe("PackageDetailPage", () => {
     });
 
     await screen.findByLabelText("Cliente");
+
+    expect(
+      screen.getByRole("link", { name: "Recibir paquete" }),
+    ).toHaveAttribute("href", "/packages/package-1/receive");
 
     fireEvent.change(screen.getByLabelText("Cliente"), {
       target: { value: "customer-2" },

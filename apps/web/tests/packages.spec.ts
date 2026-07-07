@@ -20,6 +20,8 @@ const PACKAGE_PERMISSIONS = [
   "organizations.read",
   "packages.read",
   "packages.manage",
+  "packages.receive",
+  "facilities.read",
   "customers.read",
   "prealerts.read",
 ] as const;
@@ -161,6 +163,9 @@ test("submits the manual package form without tenant or internal tracking fields
     await expect(page.getByText("Tracking interno")).toHaveCount(0);
 
     await page.getByRole("button", { name: "Registrar paquete" }).click();
+    await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}`, {
+      timeout: 15_000,
+    });
 
     expect(createPayload).toEqual({
       customerId: CUSTOMER.id,
@@ -169,10 +174,6 @@ test("submits the manual package form without tenant or internal tracking fields
     });
     expect(createPayload).not.toHaveProperty("organizationId");
     expect(createPayload).not.toHaveProperty("internalTrackingNumber");
-
-    await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}`, {
-      timeout: 15_000,
-    });
     await expect(
       page.getByRole("heading", {
         name: PACKAGE_DETAIL.internalTrackingNumber,
@@ -180,6 +181,55 @@ test("submits the manual package form without tenant or internal tracking fields
     ).toBeVisible();
   },
 );
+
+test("records package reception with assigned facility and configured units", async ({
+  page,
+}) => {
+  let receivePayload: Record<string, unknown> | null = null;
+
+  await page.route(`**/backend/packages/${PACKAGE_SUMMARY.id}/receive`, async (route) => {
+    receivePayload = (await route.request().postDataJSON()) as Record<
+      string,
+      unknown
+    >;
+    await fulfillJson(route, 200, {
+      id: "reception-1",
+      packageId: PACKAGE_SUMMARY.id,
+    });
+  });
+
+  await page.goto(`/packages/${PACKAGE_SUMMARY.id}`);
+  await page.getByRole("link", { name: "Recibir paquete" }).click();
+  await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}/receive`);
+
+  await expect(
+    page.getByRole("heading", { name: "Recibir paquete" }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Instalacion de recepcion")).toHaveValue(
+    "facility-1",
+  );
+  await page.getByLabel("Peso (LB)").fill("12.5");
+  await page.getByLabel("Largo (IN)").fill("10");
+  await page.getByLabel("Ancho (IN)").fill("8");
+  await page.getByLabel("Alto (IN)").fill("6");
+  await page.getByLabel("Piezas").fill("1");
+  await page.getByLabel("Condicion").selectOption("SEALED");
+  await page.getByRole("button", { name: "Confirmar recepcion" }).click();
+
+  expect(receivePayload).toEqual({
+    facilityId: "facility-1",
+    weight: 12.5,
+    length: 10,
+    width: 8,
+    height: 6,
+    pieceCount: 1,
+    condition: "SEALED",
+  });
+  expect(receivePayload).not.toHaveProperty("organizationId");
+  expect(receivePayload).not.toHaveProperty("employeeId");
+  expect(receivePayload).not.toHaveProperty("status");
+  await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}`);
+});
 
 async function mockBackoffice(page: Page): Promise<void> {
   await page.route("**/backend/**", async (route) => {
@@ -227,6 +277,35 @@ async function fulfillBackofficeRoute(route: Route): Promise<void> {
 
   if (method === "GET" && path === `/backend/packages/${PACKAGE_SUMMARY.id}`) {
     await fulfillJson(route, 200, PACKAGE_DETAIL);
+    return;
+  }
+
+  if (method === "GET" && path === "/backend/organizations/current/settings") {
+    await fulfillJson(route, 200, {
+      weightUnit: "LB",
+      dimensionUnit: "IN",
+    });
+    return;
+  }
+
+  if (method === "GET" && path === "/backend/facilities") {
+    await fulfillJson(route, 200, {
+      items: [
+        {
+          id: "facility-1",
+          code: "MIA-01",
+          name: "Miami Origin",
+          isActive: true,
+          isPackageOrigin: true,
+        },
+      ],
+      pagination: {
+        page: 1,
+        pageSize: 100,
+        totalItems: 1,
+        totalPages: 1,
+      },
+    });
     return;
   }
 
