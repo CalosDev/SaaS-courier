@@ -431,6 +431,109 @@ export type PackageDocumentUploadIntentResponse = {
   };
 };
 
+export type WarehouseLocationType =
+  | "RECEIVING"
+  | "SHELF"
+  | "RACK"
+  | "BIN"
+  | "STAGING"
+  | "HOLD"
+  | "DISPATCH";
+
+export type InventoryMovementType =
+  | "PUTAWAY"
+  | "MOVE"
+  | "HOLD"
+  | "RELEASE"
+  | "REMOVE";
+
+export type WarehouseLocation = {
+  id: string;
+  facility: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  code: string;
+  name: string;
+  type: WarehouseLocationType;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type WarehouseLocationListResponse = {
+  items: WarehouseLocation[];
+  pagination: Pagination;
+};
+
+export type InventoryPackage = {
+  id: string;
+  internalTrackingNumber: string;
+  externalTrackingNumber: string;
+  status: PackageStatus;
+  customer: {
+    id: string;
+    customerCode: string;
+    displayName: string;
+  };
+  reception: {
+    facility: {
+      id: string;
+      code: string;
+      name: string;
+    };
+    receivedAt: string;
+  };
+  currentPosition: {
+    location: {
+      id: string;
+      code: string;
+      name: string;
+      type: WarehouseLocationType;
+    };
+    placedAt: string;
+    updatedAt: string;
+  } | null;
+};
+
+export type InventoryPackageListResponse = {
+  items: InventoryPackage[];
+  pagination: Pagination;
+};
+
+export type InventoryMovement = {
+  id: string;
+  packageId: string;
+  facility: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  movementType: InventoryMovementType;
+  fromLocation: {
+    id: string;
+    code: string;
+    name: string;
+    type: WarehouseLocationType;
+  } | null;
+  toLocation: {
+    id: string;
+    code: string;
+    name: string;
+    type: WarehouseLocationType;
+  } | null;
+  movedBy: PackageEmployeeSummary;
+  note: string | null;
+  occurredAt: string;
+  createdAt: string;
+};
+
+export type InventoryMovementListResponse = {
+  items: InventoryMovement[];
+};
+
 export type CustomerAddress = {
   id: string;
   type: "HOME" | "WORK" | "BILLING" | "DELIVERY" | "OTHER";

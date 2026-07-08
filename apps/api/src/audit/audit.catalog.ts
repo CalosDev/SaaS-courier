@@ -34,6 +34,9 @@ export const AUDIT_ACTIONS = [
   'package.document.created',
   'package.document.available',
   'package.document.deleted',
+  'inventory.location.created',
+  'inventory.location.updated',
+  'inventory.package.moved',
 ] as const;
 
 export type AuditActionCode = (typeof AUDIT_ACTIONS)[number];
@@ -51,6 +54,8 @@ export const AUDIT_ENTITY_TYPES = [
   'PREALERT',
   'PACKAGE',
   'PACKAGE_DOCUMENT',
+  'WAREHOUSE_LOCATION',
+  'INVENTORY_MOVEMENT',
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

@@ -13,6 +13,9 @@ import type {
   EmployeeListResponse,
   Facility,
   FacilityListResponse,
+  InventoryMovementListResponse,
+  InventoryPackage,
+  InventoryPackageListResponse,
   Onboarding,
   Organization,
   OrganizationCapabilities,
@@ -30,6 +33,8 @@ import type {
   Role,
   RoleDetail,
   RoleListResponse,
+  WarehouseLocation,
+  WarehouseLocationListResponse,
 } from "@/lib/api/contracts";
 
 function buildQuery(params: Record<string, string | number | boolean | undefined>) {
@@ -93,6 +98,40 @@ export const backofficeApi = {
   },
   updateFacility(facilityId: string, body: Record<string, unknown>) {
     return apiClient.patch<Facility>(`/facilities/${facilityId}`, body);
+  },
+  listInventoryLocations(
+    params: Record<string, string | number | boolean | undefined>,
+  ) {
+    return apiClient.get<WarehouseLocationListResponse>(
+      `/inventory/locations${buildQuery(params)}`,
+    );
+  },
+  createInventoryLocation(body: Record<string, unknown>) {
+    return apiClient.post<WarehouseLocation>("/inventory/locations", body);
+  },
+  updateInventoryLocation(locationId: string, body: Record<string, unknown>) {
+    return apiClient.patch<WarehouseLocation>(
+      `/inventory/locations/${locationId}`,
+      body,
+    );
+  },
+  listInventoryPackages(
+    params: Record<string, string | number | boolean | undefined>,
+  ) {
+    return apiClient.get<InventoryPackageListResponse>(
+      `/inventory/packages${buildQuery(params)}`,
+    );
+  },
+  moveInventoryPackage(packageId: string, body: Record<string, unknown>) {
+    return apiClient.post<InventoryPackage>(
+      `/inventory/packages/${packageId}/move`,
+      body,
+    );
+  },
+  listPackageInventoryMovements(packageId: string) {
+    return apiClient.get<InventoryMovementListResponse>(
+      `/inventory/packages/${packageId}/movements`,
+    );
   },
   listEmployees(params: Record<string, string | number | boolean | undefined>) {
     return apiClient.get<EmployeeListResponse>(

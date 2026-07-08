@@ -114,6 +114,18 @@ const permissionCatalog = [
     description:
       'Allows creating, completing and deleting package documents within the current tenant.',
   },
+  {
+    code: 'inventory.read',
+    name: 'Read inventory',
+    description:
+      'Allows reading warehouse locations, current package positions and inventory movements within the current tenant.',
+  },
+  {
+    code: 'inventory.manage',
+    name: 'Manage inventory',
+    description:
+      'Allows managing warehouse locations and moving received packages within inventory for the current tenant.',
+  },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionCode = (typeof permissionCatalog)[number]['code'];

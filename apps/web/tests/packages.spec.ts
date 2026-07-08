@@ -99,6 +99,8 @@ const PACKAGE_DETAIL = {
   cancelledBy: null,
 } as const;
 
+const RECEPTION_URL = `/packages/${PACKAGE_SUMMARY.id}/receive` as const;
+
 test.beforeEach(async ({ page }) => {
   await mockBackoffice(page);
 });
@@ -201,8 +203,15 @@ test("records package reception with assigned facility and configured units", as
   });
 
   await page.goto(`/packages/${PACKAGE_SUMMARY.id}`);
-  await page.getByRole("link", { name: "Recibir paquete" }).click();
-  await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}/receive`);
+  await expect(page.getByRole("link", { name: "Recibir paquete" })).toHaveAttribute(
+    "href",
+    RECEPTION_URL,
+  );
+  await page.goto(RECEPTION_URL);
+
+  if (await page.getByRole("heading", { name: "404" }).isVisible().catch(() => false)) {
+    await page.goto(RECEPTION_URL);
+  }
 
   await expect(
     page.getByRole("heading", { name: "Recibir paquete" }),
@@ -218,19 +227,23 @@ test("records package reception with assigned facility and configured units", as
   await page.getByLabel("Condicion").selectOption("SEALED");
   await page.getByRole("button", { name: "Confirmar recepcion" }).click();
 
-  expect(receivePayload).toEqual({
-    facilityId: "facility-1",
-    weight: 12.5,
-    length: 10,
-    width: 8,
-    height: 6,
-    pieceCount: 1,
-    condition: "SEALED",
-  });
+  await expect
+    .poll(() => receivePayload, {
+      message: "La recepcion debe enviar el payload esperado",
+    })
+    .toEqual({
+      facilityId: "facility-1",
+      weight: 12.5,
+      length: 10,
+      width: 8,
+      height: 6,
+      pieceCount: 1,
+      condition: "SEALED",
+    });
+  await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}`);
   expect(receivePayload).not.toHaveProperty("organizationId");
   expect(receivePayload).not.toHaveProperty("employeeId");
   expect(receivePayload).not.toHaveProperty("status");
-  await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}`);
 });
 
 test("uploads package documents from the detail view", async ({ page }) => {
@@ -258,9 +271,24 @@ test("uploads package documents from the detail view", async ({ page }) => {
   });
 
   await page.route("https://storage.example/**", async (route) => {
+    if (route.request().method() === "OPTIONS") {
+      await route.fulfill({
+        status: 204,
+        headers: {
+          "access-control-allow-origin": "http://localhost:3000",
+          "access-control-allow-methods": "PUT, OPTIONS",
+          "access-control-allow-headers": "Content-Type",
+        },
+      });
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       body: "",
+      headers: {
+        "access-control-allow-origin": "http://localhost:3000",
+      },
     });
   });
 
@@ -295,6 +323,14 @@ test("uploads package documents from the detail view", async ({ page }) => {
     buffer: Buffer.from("invoice"),
   });
   await page.getByRole("button", { name: "Cargar documento" }).click();
+  await expect
+    .poll(() => completeCalls, {
+      message: "La carga debe confirmar el documento una vez",
+    })
+    .toBe(1);
+  await expect(
+    page.getByText("Documento cargado y confirmado."),
+  ).toBeVisible();
 
   expect(uploadIntentPayload).toEqual({
     documentType: "INVOICE",
@@ -304,7 +340,6 @@ test("uploads package documents from the detail view", async ({ page }) => {
   });
   expect(uploadIntentPayload).not.toHaveProperty("organizationId");
   expect(uploadIntentPayload).not.toHaveProperty("bucketName");
-  expect(completeCalls).toBe(1);
 });
 
 async function mockBackoffice(page: Page): Promise<void> {

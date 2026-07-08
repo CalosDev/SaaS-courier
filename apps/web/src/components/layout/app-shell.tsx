@@ -88,6 +88,18 @@ const NAV_ITEMS: NavItem[] = [
     icon: Package,
     requiredPermissions: ["packages.read"],
   },
+  {
+    href: "/inventory/packages",
+    label: "Inventario",
+    icon: PackageSearch,
+    requiredPermissions: ["inventory.read"],
+  },
+  {
+    href: "/inventory/locations",
+    label: "Ubicaciones",
+    icon: Warehouse,
+    requiredPermissions: ["inventory.read"],
+  },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

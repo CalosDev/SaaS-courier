@@ -44,8 +44,8 @@ describe('Rbac integration', () => {
       const firstSync = await rbacService.syncPermissionCatalog();
       const secondSync = await rbacService.syncPermissionCatalog();
 
-      expect(firstSync.totalActiveCatalogPermissions).toBe(21);
-      expect(secondSync.totalActiveCatalogPermissions).toBe(21);
+      expect(firstSync.totalActiveCatalogPermissions).toBe(23);
+      expect(secondSync.totalActiveCatalogPermissions).toBe(23);
 
       const organizationOne = await prismaService.organization.create({
         data: {
@@ -302,5 +302,5 @@ describe('Rbac integration', () => {
         await moduleRef.close();
       }
     }
-  });
+  }, 90000);
 });

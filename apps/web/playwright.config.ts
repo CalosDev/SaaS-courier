@@ -10,10 +10,10 @@ export default defineConfig({
     trace: "retain-on-failure",
   },
   webServer: {
-    command: "pnpm --filter @courier/web dev",
+    command: "pnpm --filter @courier/web build && pnpm --filter @courier/web start",
     url: "http://localhost:3000/login",
     reuseExistingServer: true,
-    timeout: 120_000,
+    timeout: 240_000,
   },
   projects: [
     {

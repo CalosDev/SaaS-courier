@@ -9,6 +9,7 @@ import { CustomerImportsModule } from './customer-imports/customer-imports.modul
 import { EmployeesModule } from './employees/employees.module';
 import { FacilitiesModule } from './facilities/facilities.module';
 import { HealthModule } from './health/health.module';
+import { InventoryModule } from './inventory/inventory.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { OrganizationSettingsModule } from './organization-settings/organization-settings.module';
 import { PackagesModule } from './packages/packages.module';
@@ -35,6 +36,7 @@ import { SessionsModule } from './sessions/sessions.module';
     EmployeesModule,
     FacilitiesModule,
     HealthModule,
+    InventoryModule,
     OrganizationSettingsModule,
     PackagesModule,
     PrealertsModule,
