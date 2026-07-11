@@ -1,6 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { SessionAuthGuard } from '../auth/http/session-auth.guard';
+import { REQUIRED_PERMISSIONS_KEY } from '../rbac/http/authorization.constants';
 import { PermissionsGuard } from '../rbac/http/permissions.guard';
+import { SHIPMENT_PERMISSIONS } from '../rbac/permission.catalog';
 import { DispatchesService } from './dispatches.service';
 import { MasterShipmentsController } from './master-shipments.controller';
 
@@ -47,6 +49,39 @@ describe('MasterShipmentsController', () => {
 
   it('should be defined', () => {
     expect(controller).toBeDefined();
+  });
+
+  it('uses shipment permissions for the master shipment API surface', () => {
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        controller.getMasterShipments,
+      ),
+    ).toEqual([SHIPMENT_PERMISSIONS.VIEW]);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        controller.getMasterShipmentById,
+      ),
+    ).toEqual([SHIPMENT_PERMISSIONS.VIEW]);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        controller.createMasterShipment,
+      ),
+    ).toEqual([SHIPMENT_PERMISSIONS.MANAGE]);
+    expect(
+      Reflect.getMetadata(
+        REQUIRED_PERMISSIONS_KEY,
+        controller.updateMasterShipment,
+      ),
+    ).toEqual([SHIPMENT_PERMISSIONS.MANAGE]);
+    expect(
+      Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, controller.addPackages),
+    ).toEqual([SHIPMENT_PERMISSIONS.MANAGE]);
+    expect(
+      Reflect.getMetadata(REQUIRED_PERMISSIONS_KEY, controller.removePackages),
+    ).toEqual([SHIPMENT_PERMISSIONS.MANAGE]);
   });
 
   it('getMasterShipments should delegate to dispatch listing', async () => {

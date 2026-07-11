@@ -14,13 +14,14 @@ import { DispatchesService } from './dispatches.service';
 import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
 import type { CommandContext } from '../request-context/request-context.types';
 import { RequirePermissions } from '../rbac/http/require-permissions.decorator';
+import { SHIPMENT_PERMISSIONS } from '../rbac/permission.catalog';
 
 @Controller('master-shipments')
 export class MasterShipmentsController {
   constructor(private readonly dispatchesService: DispatchesService) {}
 
   @Post()
-  @RequirePermissions('dispatches.manage')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
   async createMasterShipment(
     @CurrentCommandContext() ctx: CommandContext,
     @Body() dto: CreateDispatchDto,
@@ -29,13 +30,13 @@ export class MasterShipmentsController {
   }
 
   @Get()
-  @RequirePermissions('dispatches.read')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.VIEW)
   async getMasterShipments(@CurrentCommandContext() ctx: CommandContext) {
     return this.dispatchesService.getDispatches(ctx.organizationId);
   }
 
   @Get(':id')
-  @RequirePermissions('dispatches.read')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.VIEW)
   async getMasterShipmentById(
     @CurrentCommandContext() ctx: CommandContext,
     @Param('id') id: string,
@@ -44,7 +45,7 @@ export class MasterShipmentsController {
   }
 
   @Patch(':id')
-  @RequirePermissions('dispatches.manage')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
   async updateMasterShipment(
     @CurrentCommandContext() ctx: CommandContext,
     @Param('id') id: string,
@@ -54,7 +55,7 @@ export class MasterShipmentsController {
   }
 
   @Post(':id/packages')
-  @RequirePermissions('dispatches.manage')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
   async addPackages(
     @CurrentCommandContext() ctx: CommandContext,
     @Param('id') id: string,
@@ -64,7 +65,7 @@ export class MasterShipmentsController {
   }
 
   @Delete(':id/packages')
-  @RequirePermissions('dispatches.manage')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
   async removePackages(
     @CurrentCommandContext() ctx: CommandContext,
     @Param('id') id: string,
