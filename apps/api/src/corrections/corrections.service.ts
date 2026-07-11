@@ -20,40 +20,46 @@ export class CorrectionsService {
     if (!ctx.actorEmployeeId) {
       throw new Error('Employee ID is required');
     }
+    const actorEmployeeId = ctx.actorEmployeeId;
 
-    const correction = await this.repository.create({
-      organizationId: ctx.organizationId,
-      targetType: dto.targetType,
-      targetId: dto.targetId,
-      reason: dto.reason,
-      proposedData: dto.proposedData,
-      status: dto.status || CorrectionStatus.REQUESTED,
-      requestedByEmployeeId: ctx.actorEmployeeId,
+    return this.prisma.$transaction(async (tx) => {
+      const correction = await this.repository.create(
+        {
+          organizationId: ctx.organizationId,
+          targetType: dto.targetType,
+          targetId: dto.targetId,
+          reason: dto.reason,
+          proposedData: dto.proposedData,
+          status: dto.status || CorrectionStatus.REQUESTED,
+          requestedByEmployeeId: actorEmployeeId,
+        },
+        tx,
+      );
+
+      await this.auditWriter.write(tx, {
+        context: ctx,
+        action: 'correction_request.created',
+        entityId: correction.id,
+        entityType: 'CORRECTION_REQUEST',
+        changedFields: [
+          'id',
+          'status',
+          'reason',
+          'targetId',
+          'targetType',
+          'proposedData',
+        ],
+        payload: { ...correction },
+        metadata: {
+          correctionId: correction.id,
+          targetType: dto.targetType,
+          targetId: dto.targetId,
+          reason: dto.reason,
+        },
+      });
+
+      return correction;
     });
-
-    await this.auditWriter.write(this.prisma, {
-      context: ctx,
-      action: 'correction_request.created',
-      entityId: correction.id,
-      entityType: 'CORRECTION_REQUEST',
-      changedFields: [
-        'id',
-        'status',
-        'reason',
-        'targetId',
-        'targetType',
-        'proposedData',
-      ],
-      payload: { ...correction },
-      metadata: {
-        correctionId: correction.id,
-        targetType: dto.targetType,
-        targetId: dto.targetId,
-        reason: dto.reason,
-      },
-    });
-
-    return correction;
   }
 
   async getCorrectionRequests(
@@ -90,49 +96,58 @@ export class CorrectionsService {
     if (!ctx.actorEmployeeId) {
       throw new Error('Employee ID is required');
     }
+    const actorEmployeeId = ctx.actorEmployeeId;
 
-    const existing = await this.getCorrectionRequestById(
-      ctx.organizationId,
-      correctionId,
-    );
-
-    const updated = await this.repository.update(
-      ctx.organizationId,
-      correctionId,
-      {
-        status: dto.status !== undefined ? dto.status : existing.status,
-      },
-    );
-
-    if (
-      dto.status &&
-      (dto.status === CorrectionStatus.APPROVED ||
-        dto.status === CorrectionStatus.REJECTED) &&
-      existing.status !== dto.status
-    ) {
-      await this.repository.recordDecision(
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await this.repository.findById(
         ctx.organizationId,
         correctionId,
-        ctx.actorEmployeeId,
-        dto.status,
-        dto.reason,
+        tx,
+      );
+      if (!existing) {
+        throw new NotFoundException('Correction not found');
+      }
+
+      const updated = await this.repository.update(
+        ctx.organizationId,
+        correctionId,
+        {
+          status: dto.status !== undefined ? dto.status : existing.status,
+        },
+        tx,
       );
 
-      await this.auditWriter.write(this.prisma, {
-        context: ctx,
-        action: 'correction_request.decided',
-        entityId: updated.id,
-        entityType: 'CORRECTION_REQUEST',
-        changedFields: ['status'],
-        payload: { status: dto.status, reason: dto.reason },
-        metadata: {
-          correctionId: updated.id,
-          status: dto.status,
-          reason: dto.reason,
-        },
-      });
-    }
+      if (
+        dto.status &&
+        (dto.status === CorrectionStatus.APPROVED ||
+          dto.status === CorrectionStatus.REJECTED) &&
+        existing.status !== dto.status
+      ) {
+        await this.repository.recordDecision(
+          ctx.organizationId,
+          correctionId,
+          actorEmployeeId,
+          dto.status,
+          dto.reason,
+          tx,
+        );
 
-    return updated;
+        await this.auditWriter.write(tx, {
+          context: ctx,
+          action: 'correction_request.decided',
+          entityId: updated.id,
+          entityType: 'CORRECTION_REQUEST',
+          changedFields: ['status'],
+          payload: { status: dto.status, reason: dto.reason },
+          metadata: {
+            correctionId: updated.id,
+            status: dto.status,
+            reason: dto.reason,
+          },
+        });
+      }
+
+      return updated;
+    });
   }
 }

@@ -8,8 +8,9 @@ export class PrismaCorrectionsRepository {
 
   async create(
     data: Prisma.CorrectionRequestUncheckedCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<CorrectionRequest> {
-    return this.prisma.correctionRequest.create({ data });
+    return tx.correctionRequest.create({ data });
   }
 
   async findMany(params: {
@@ -22,8 +23,9 @@ export class PrismaCorrectionsRepository {
   async findById(
     organizationId: string,
     id: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<CorrectionRequest | null> {
-    return this.prisma.correctionRequest.findUnique({
+    return tx.correctionRequest.findUnique({
       where: { organizationId_id: { organizationId, id } },
       include: {
         decisions: true,
@@ -35,8 +37,9 @@ export class PrismaCorrectionsRepository {
     organizationId: string,
     id: string,
     data: Prisma.CorrectionRequestUncheckedUpdateInput,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<CorrectionRequest> {
-    return this.prisma.correctionRequest.update({
+    return tx.correctionRequest.update({
       where: { organizationId_id: { organizationId, id } },
       data,
     });
@@ -48,8 +51,9 @@ export class PrismaCorrectionsRepository {
     employeeId: string,
     decision: 'APPROVED' | 'REJECTED',
     reason?: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ) {
-    return this.prisma.correctionDecision.create({
+    return tx.correctionDecision.create({
       data: {
         organizationId,
         correctionRequestId,

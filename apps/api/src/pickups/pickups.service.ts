@@ -190,7 +190,7 @@ export class PickupRequestsService {
 
       // Update items
       await tx.pickupRequestItem.deleteMany({
-        where: { pickupRequestId: id },
+        where: { organizationId: context.organizationId, pickupRequestId: id },
       });
 
       const updated = await tx.pickupRequest.update({
@@ -239,7 +239,9 @@ export class PickupRequestsService {
         throw new ConflictException('Pickup request must be in DRAFT state');
 
       const updated = await tx.pickupRequest.update({
-        where: { id },
+        where: {
+          organizationId_id: { organizationId: context.organizationId, id },
+        },
         data: { status: 'READY' },
       });
 
@@ -272,7 +274,9 @@ export class PickupRequestsService {
         );
 
       const updated = await tx.pickupRequest.update({
-        where: { id },
+        where: {
+          organizationId_id: { organizationId: context.organizationId, id },
+        },
         data: {
           status: 'COMPLETED',
           completedByEmployeeId: context.actorEmployeeId!,
@@ -313,7 +317,9 @@ export class PickupRequestsService {
       }
 
       const updated = await tx.pickupRequest.update({
-        where: { id },
+        where: {
+          organizationId_id: { organizationId: context.organizationId, id },
+        },
         data: {
           status: 'CANCELLED',
           cancelledByEmployeeId: context.actorEmployeeId!,

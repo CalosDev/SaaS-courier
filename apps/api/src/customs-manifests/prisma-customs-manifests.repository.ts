@@ -24,9 +24,10 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
     organizationId: string,
     code: string,
     dto: CreateCustomsManifestDto,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<CustomsManifestRecord> {
     const arrivalDate = dto.arrivalDate ? new Date(dto.arrivalDate) : null;
-    return this.prisma.customsManifest.create({
+    return tx.customsManifest.create({
       data: {
         organizationId,
         code,
@@ -39,8 +40,9 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
   async findById(
     organizationId: string,
     id: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<CustomsManifestRecord | null> {
-    return this.prisma.customsManifest.findUnique({
+    return tx.customsManifest.findUnique({
       where: {
         organizationId_id: {
           organizationId,
@@ -68,6 +70,7 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
     organizationId: string,
     id: string,
     dto: UpdateCustomsManifestDto,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<CustomsManifestRecord> {
     const data: Prisma.CustomsManifestUpdateInput = {};
     if (dto.flightNumber !== undefined) {
@@ -77,7 +80,7 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
       data.arrivalDate = dto.arrivalDate ? new Date(dto.arrivalDate) : null;
     }
 
-    return this.prisma.customsManifest.update({
+    return tx.customsManifest.update({
       where: {
         organizationId_id: {
           organizationId,
@@ -92,9 +95,10 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
     organizationId: string,
     manifestId: string,
     packageIds: string[],
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.package.updateMany({
+    const run = async (client: Prisma.TransactionClient) => {
+      await client.package.updateMany({
         where: {
           organizationId,
           id: { in: packageIds },
@@ -105,7 +109,7 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
         },
       });
 
-      const manifestPackages = await tx.package.findMany({
+      const manifestPackages = await client.package.findMany({
         where: {
           organizationId,
           customsManifestId: manifestId,
@@ -130,7 +134,7 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
         }
       }
 
-      await tx.customsManifest.update({
+      await client.customsManifest.update({
         where: { organizationId_id: { organizationId, id: manifestId } },
         data: {
           totalPackages: manifestPackages.length,
@@ -138,16 +142,24 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
           totalValueMinor,
         },
       });
-    });
+    };
+
+    if (tx) {
+      await run(tx);
+      return;
+    }
+
+    await this.prisma.$transaction(run);
   }
 
   async removePackages(
     organizationId: string,
     manifestId: string,
     packageIds: string[],
+    tx?: Prisma.TransactionClient,
   ): Promise<void> {
-    await this.prisma.$transaction(async (tx) => {
-      await tx.package.updateMany({
+    const run = async (client: Prisma.TransactionClient) => {
+      await client.package.updateMany({
         where: {
           organizationId,
           id: { in: packageIds },
@@ -158,7 +170,7 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
         },
       });
 
-      const manifestPackages = await tx.package.findMany({
+      const manifestPackages = await client.package.findMany({
         where: {
           organizationId,
           customsManifestId: manifestId,
@@ -183,7 +195,7 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
         }
       }
 
-      await tx.customsManifest.update({
+      await client.customsManifest.update({
         where: { organizationId_id: { organizationId, id: manifestId } },
         data: {
           totalPackages: manifestPackages.length,
@@ -191,15 +203,23 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
           totalValueMinor,
         },
       });
-    });
+    };
+
+    if (tx) {
+      await run(tx);
+      return;
+    }
+
+    await this.prisma.$transaction(run);
   }
 
   async updateStatus(
     organizationId: string,
     id: string,
     status: CustomsManifestStatus,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<void> {
-    await this.prisma.customsManifest.update({
+    await tx.customsManifest.update({
       where: { organizationId_id: { organizationId, id } },
       data: { status },
     });

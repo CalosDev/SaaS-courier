@@ -38,25 +38,28 @@ export class CustomsManifestsService {
   ): Promise<CustomsManifestRecord> {
     const code = this.generateCode();
 
-    const manifest = await this.repository.create(
-      ctx.organizationId,
-      code,
-      dto,
-    );
+    return this.prisma.$transaction(async (tx) => {
+      const manifest = await this.repository.create(
+        ctx.organizationId,
+        code,
+        dto,
+        tx,
+      );
 
-    await this.auditOutbox.write(this.prisma, {
-      context: ctx,
-      action: 'customs_manifest.created',
-      entityType: 'CUSTOMS_MANIFEST',
-      entityId: manifest.id,
-      changedFields: ['flightNumber', 'arrivalDate'],
-      payload: {
-        flightNumber: manifest.flightNumber,
-        arrivalDate: manifest.arrivalDate,
-      },
+      await this.auditOutbox.write(tx, {
+        context: ctx,
+        action: 'customs_manifest.created',
+        entityType: 'CUSTOMS_MANIFEST',
+        entityId: manifest.id,
+        changedFields: ['flightNumber', 'arrivalDate'],
+        payload: {
+          flightNumber: manifest.flightNumber,
+          arrivalDate: manifest.arrivalDate,
+        },
+      });
+
+      return manifest;
     });
-
-    return manifest;
   }
 
   async findById(
@@ -75,35 +78,51 @@ export class CustomsManifestsService {
     id: string,
     dto: UpdateCustomsManifestDto,
   ): Promise<CustomsManifestRecord> {
-    const existing = await this.findById(ctx, id);
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await this.repository.findById(
+        ctx.organizationId,
+        id,
+        tx,
+      );
+      if (!existing) {
+        throw new NotFoundException(CustomsManifestErrors.NotFound.message);
+      }
 
-    if (existing.status !== CustomsManifestStatus.DRAFT) {
-      throw new ConflictException(CustomsManifestErrors.InvalidStatus.message);
-    }
+      if (existing.status !== CustomsManifestStatus.DRAFT) {
+        throw new ConflictException(
+          CustomsManifestErrors.InvalidStatus.message,
+        );
+      }
 
-    const updated = await this.repository.update(ctx.organizationId, id, dto);
+      const updated = await this.repository.update(
+        ctx.organizationId,
+        id,
+        dto,
+        tx,
+      );
 
-    await this.auditOutbox.write(this.prisma, {
-      context: ctx,
-      action: 'customs_manifest.updated',
-      entityType: 'CUSTOMS_MANIFEST',
-      entityId: updated.id,
-      changedFields: ['flightNumber', 'arrivalDate'],
-      payload: {
-        flightNumber: updated.flightNumber,
-        arrivalDate: updated.arrivalDate,
-      },
-      beforeData: {
-        flightNumber: existing.flightNumber,
-        arrivalDate: existing.arrivalDate,
-      },
-      afterData: {
-        flightNumber: updated.flightNumber,
-        arrivalDate: updated.arrivalDate,
-      },
+      await this.auditOutbox.write(tx, {
+        context: ctx,
+        action: 'customs_manifest.updated',
+        entityType: 'CUSTOMS_MANIFEST',
+        entityId: updated.id,
+        changedFields: ['flightNumber', 'arrivalDate'],
+        payload: {
+          flightNumber: updated.flightNumber,
+          arrivalDate: updated.arrivalDate,
+        },
+        beforeData: {
+          flightNumber: existing.flightNumber,
+          arrivalDate: existing.arrivalDate,
+        },
+        afterData: {
+          flightNumber: updated.flightNumber,
+          arrivalDate: updated.arrivalDate,
+        },
+      });
+
+      return updated;
     });
-
-    return updated;
   }
 
   async addPackages(
@@ -111,21 +130,37 @@ export class CustomsManifestsService {
     id: string,
     dto: AddPackagesToCustomsManifestDto,
   ): Promise<void> {
-    const manifest = await this.findById(ctx, id);
+    await this.prisma.$transaction(async (tx) => {
+      const manifest = await this.repository.findById(
+        ctx.organizationId,
+        id,
+        tx,
+      );
+      if (!manifest) {
+        throw new NotFoundException(CustomsManifestErrors.NotFound.message);
+      }
 
-    if (manifest.status !== CustomsManifestStatus.DRAFT) {
-      throw new ConflictException(CustomsManifestErrors.InvalidStatus.message);
-    }
+      if (manifest.status !== CustomsManifestStatus.DRAFT) {
+        throw new ConflictException(
+          CustomsManifestErrors.InvalidStatus.message,
+        );
+      }
 
-    await this.repository.addPackages(ctx.organizationId, id, dto.packageIds);
+      await this.repository.addPackages(
+        ctx.organizationId,
+        id,
+        dto.packageIds,
+        tx,
+      );
 
-    await this.auditOutbox.write(this.prisma, {
-      context: ctx,
-      action: 'customs_manifest.packages_added',
-      entityType: 'CUSTOMS_MANIFEST',
-      entityId: id,
-      changedFields: ['packages'],
-      payload: { addedPackages: dto.packageIds },
+      await this.auditOutbox.write(tx, {
+        context: ctx,
+        action: 'customs_manifest.packages_added',
+        entityType: 'CUSTOMS_MANIFEST',
+        entityId: id,
+        changedFields: ['packages'],
+        payload: { addedPackages: dto.packageIds },
+      });
     });
   }
 
@@ -134,25 +169,37 @@ export class CustomsManifestsService {
     id: string,
     dto: AddPackagesToCustomsManifestDto,
   ): Promise<void> {
-    const manifest = await this.findById(ctx, id);
+    await this.prisma.$transaction(async (tx) => {
+      const manifest = await this.repository.findById(
+        ctx.organizationId,
+        id,
+        tx,
+      );
+      if (!manifest) {
+        throw new NotFoundException(CustomsManifestErrors.NotFound.message);
+      }
 
-    if (manifest.status !== CustomsManifestStatus.DRAFT) {
-      throw new ConflictException(CustomsManifestErrors.InvalidStatus.message);
-    }
+      if (manifest.status !== CustomsManifestStatus.DRAFT) {
+        throw new ConflictException(
+          CustomsManifestErrors.InvalidStatus.message,
+        );
+      }
 
-    await this.repository.removePackages(
-      ctx.organizationId,
-      id,
-      dto.packageIds,
-    );
+      await this.repository.removePackages(
+        ctx.organizationId,
+        id,
+        dto.packageIds,
+        tx,
+      );
 
-    await this.auditOutbox.write(this.prisma, {
-      context: ctx,
-      action: 'customs_manifest.packages_removed',
-      entityType: 'CUSTOMS_MANIFEST',
-      entityId: id,
-      changedFields: ['packages'],
-      payload: { removedPackages: dto.packageIds },
+      await this.auditOutbox.write(tx, {
+        context: ctx,
+        action: 'customs_manifest.packages_removed',
+        entityType: 'CUSTOMS_MANIFEST',
+        entityId: id,
+        changedFields: ['packages'],
+        payload: { removedPackages: dto.packageIds },
+      });
     });
   }
 
@@ -179,30 +226,39 @@ export class CustomsManifestsService {
       );
     }
 
-    // Update status to SUBMITTED
-    await this.repository.updateStatus(
-      ctx.organizationId,
-      id,
-      CustomsManifestStatus.SUBMITTED,
-    );
+    return this.prisma.$transaction(async (tx) => {
+      await this.repository.updateStatus(
+        ctx.organizationId,
+        id,
+        CustomsManifestStatus.SUBMITTED,
+        tx,
+      );
 
-    const updated = await this.findById(ctx, id);
+      const updated = await this.repository.findById(
+        ctx.organizationId,
+        id,
+        tx,
+      );
+      if (!updated) {
+        throw new NotFoundException(CustomsManifestErrors.NotFound.message);
+      }
 
-    await this.auditOutbox.write(this.prisma, {
-      context: ctx,
-      action: 'customs_manifest.updated',
-      entityType: 'CUSTOMS_MANIFEST',
-      entityId: id,
-      changedFields: ['status'],
-      payload: {
-        sigaReferenceCode: response.sigaReferenceCode,
-        transmittedAt: response.transmittedAt,
-      },
-      beforeData: { status: manifest.status },
-      afterData: { status: updated.status },
+      await this.auditOutbox.write(tx, {
+        context: ctx,
+        action: 'customs_manifest.updated',
+        entityType: 'CUSTOMS_MANIFEST',
+        entityId: id,
+        changedFields: ['status'],
+        payload: {
+          sigaReferenceCode: response.sigaReferenceCode,
+          transmittedAt: response.transmittedAt,
+        },
+        beforeData: { status: manifest.status },
+        afterData: { status: updated.status },
+      });
+
+      return updated;
     });
-
-    return updated;
   }
 
   private generateCode(): string {

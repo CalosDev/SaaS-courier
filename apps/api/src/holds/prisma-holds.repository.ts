@@ -8,8 +8,9 @@ export class PrismaHoldsRepository {
 
   async create(
     data: Prisma.OperationalHoldUncheckedCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<OperationalHold> {
-    return this.prisma.operationalHold.create({ data });
+    return tx.operationalHold.create({ data });
   }
 
   async findMany(params: {
@@ -22,8 +23,9 @@ export class PrismaHoldsRepository {
   async findById(
     organizationId: string,
     id: string,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<OperationalHold | null> {
-    return this.prisma.operationalHold.findUnique({
+    return tx.operationalHold.findUnique({
       where: { organizationId_id: { organizationId, id } },
     });
   }
@@ -32,8 +34,9 @@ export class PrismaHoldsRepository {
     organizationId: string,
     id: string,
     data: Prisma.OperationalHoldUncheckedUpdateInput,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<OperationalHold> {
-    return this.prisma.operationalHold.update({
+    return tx.operationalHold.update({
       where: { organizationId_id: { organizationId, id } },
       data,
     });

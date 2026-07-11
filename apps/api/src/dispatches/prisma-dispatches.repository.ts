@@ -6,8 +6,11 @@ import { Prisma, Dispatch } from '../generated/prisma/client';
 export class PrismaDispatchesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(data: Prisma.DispatchUncheckedCreateInput): Promise<Dispatch> {
-    return this.prisma.dispatch.create({ data });
+  async create(
+    data: Prisma.DispatchUncheckedCreateInput,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<Dispatch> {
+    return tx.dispatch.create({ data });
   }
 
   async findMany(params: {
@@ -18,8 +21,12 @@ export class PrismaDispatchesRepository {
     return this.prisma.dispatch.findMany(params);
   }
 
-  async findById(organizationId: string, id: string): Promise<Dispatch | null> {
-    return this.prisma.dispatch.findUnique({
+  async findById(
+    organizationId: string,
+    id: string,
+    tx: Prisma.TransactionClient = this.prisma,
+  ): Promise<Dispatch | null> {
+    return tx.dispatch.findUnique({
       where: { organizationId_id: { organizationId, id } },
       include: {
         packages: true,
@@ -31,8 +38,9 @@ export class PrismaDispatchesRepository {
     organizationId: string,
     id: string,
     data: Prisma.DispatchUncheckedUpdateInput,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<Dispatch> {
-    return this.prisma.dispatch.update({
+    return tx.dispatch.update({
       where: { organizationId_id: { organizationId, id } },
       data,
     });
@@ -43,8 +51,9 @@ export class PrismaDispatchesRepository {
     dispatchId: string,
     packageIds: string[],
     connect: boolean,
+    tx: Prisma.TransactionClient = this.prisma,
   ): Promise<Dispatch> {
-    return this.prisma.dispatch.update({
+    return tx.dispatch.update({
       where: { organizationId_id: { organizationId, id: dispatchId } },
       data: {
         packages: {

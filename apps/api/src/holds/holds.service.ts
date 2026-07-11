@@ -20,31 +20,37 @@ export class HoldsService {
     if (!ctx.actorEmployeeId) {
       throw new Error('Employee ID is required');
     }
+    const actorEmployeeId = ctx.actorEmployeeId;
 
-    const hold = await this.repository.create({
-      organizationId: ctx.organizationId,
-      targetType: 'PACKAGE',
-      targetId: dto.packageId,
-      reason: dto.reason,
-      status: dto.status || HoldStatus.ACTIVE,
-      requestedByEmployeeId: ctx.actorEmployeeId,
+    return this.prisma.$transaction(async (tx) => {
+      const hold = await this.repository.create(
+        {
+          organizationId: ctx.organizationId,
+          targetType: 'PACKAGE',
+          targetId: dto.packageId,
+          reason: dto.reason,
+          status: dto.status || HoldStatus.ACTIVE,
+          requestedByEmployeeId: actorEmployeeId,
+        },
+        tx,
+      );
+
+      await this.auditWriter.write(tx, {
+        context: ctx,
+        action: 'operational_hold.created',
+        entityId: hold.id,
+        entityType: 'OPERATIONAL_HOLD',
+        changedFields: ['id', 'status', 'reason', 'targetId', 'targetType'],
+        payload: { ...hold },
+        metadata: {
+          holdId: hold.id,
+          targetId: dto.packageId,
+          reason: dto.reason,
+        },
+      });
+
+      return hold;
     });
-
-    await this.auditWriter.write(this.prisma, {
-      context: ctx,
-      action: 'operational_hold.created',
-      entityId: hold.id,
-      entityType: 'OPERATIONAL_HOLD',
-      changedFields: ['id', 'status', 'reason', 'targetId', 'targetType'],
-      payload: { ...hold },
-      metadata: {
-        holdId: hold.id,
-        targetId: dto.packageId,
-        reason: dto.reason,
-      },
-    });
-
-    return hold;
   }
 
   async getHolds(organizationId: string, packageId?: string) {
@@ -69,51 +75,69 @@ export class HoldsService {
     if (!ctx.actorEmployeeId) {
       throw new Error('Employee ID is required');
     }
+    const actorEmployeeId = ctx.actorEmployeeId;
 
-    const existing = await this.getHoldById(ctx.organizationId, holdId);
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await this.repository.findById(
+        ctx.organizationId,
+        holdId,
+        tx,
+      );
+      if (!existing) {
+        throw new NotFoundException('Hold not found');
+      }
 
-    const updated = await this.repository.update(ctx.organizationId, holdId, {
-      status: dto.status !== undefined ? dto.status : existing.status,
-      reason: dto.reason !== undefined ? dto.reason : existing.reason,
-      releaseReason:
-        dto.releaseReason !== undefined
-          ? dto.releaseReason
-          : existing.releaseReason,
-      releasedByEmployeeId:
-        dto.status === HoldStatus.RELEASED &&
-        existing.status !== HoldStatus.RELEASED
-          ? ctx.actorEmployeeId
-          : existing.releasedByEmployeeId,
-      releasedAt:
-        dto.status === HoldStatus.RELEASED &&
-        existing.status !== HoldStatus.RELEASED
-          ? new Date()
-          : existing.releasedAt,
-    });
-
-    if (
-      updated.status === HoldStatus.RELEASED &&
-      existing.status !== HoldStatus.RELEASED
-    ) {
-      await this.auditWriter.write(this.prisma, {
-        context: ctx,
-        action: 'operational_hold.released',
-        entityId: updated.id,
-        entityType: 'OPERATIONAL_HOLD',
-        changedFields: [
-          'status',
-          'releaseReason',
-          'releasedAt',
-          'releasedByEmployeeId',
-        ],
-        payload: {
-          status: updated.status,
-          releaseReason: updated.releaseReason,
+      const updated = await this.repository.update(
+        ctx.organizationId,
+        holdId,
+        {
+          status: dto.status !== undefined ? dto.status : existing.status,
+          reason: dto.reason !== undefined ? dto.reason : existing.reason,
+          releaseReason:
+            dto.releaseReason !== undefined
+              ? dto.releaseReason
+              : existing.releaseReason,
+          releasedByEmployeeId:
+            dto.status === HoldStatus.RELEASED &&
+            existing.status !== HoldStatus.RELEASED
+              ? actorEmployeeId
+              : existing.releasedByEmployeeId,
+          releasedAt:
+            dto.status === HoldStatus.RELEASED &&
+            existing.status !== HoldStatus.RELEASED
+              ? new Date()
+              : existing.releasedAt,
         },
-        metadata: { holdId: updated.id, releaseReason: updated.releaseReason },
-      });
-    }
+        tx,
+      );
 
-    return updated;
+      if (
+        updated.status === HoldStatus.RELEASED &&
+        existing.status !== HoldStatus.RELEASED
+      ) {
+        await this.auditWriter.write(tx, {
+          context: ctx,
+          action: 'operational_hold.released',
+          entityId: updated.id,
+          entityType: 'OPERATIONAL_HOLD',
+          changedFields: [
+            'status',
+            'releaseReason',
+            'releasedAt',
+            'releasedByEmployeeId',
+          ],
+          payload: {
+            status: updated.status,
+            releaseReason: updated.releaseReason,
+          },
+          metadata: {
+            holdId: updated.id,
+            releaseReason: updated.releaseReason,
+          },
+        });
+      }
+
+      return updated;
+    });
   }
 }

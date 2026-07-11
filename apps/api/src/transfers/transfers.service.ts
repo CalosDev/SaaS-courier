@@ -212,7 +212,12 @@ export class TransfersService {
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.facilityTransfer.update({
-        where: { id: transferId },
+        where: {
+          organizationId_id: {
+            organizationId: ctx.organizationId,
+            id: transferId,
+          },
+        },
         data: {
           status: FacilityTransferStatus.IN_TRANSIT,
           dispatchedAt: new Date(),
@@ -265,7 +270,12 @@ export class TransfersService {
 
     return this.prisma.$transaction(async (tx) => {
       const updatedItem = await tx.facilityTransferItem.update({
-        where: { id: itemId },
+        where: {
+          organizationId_id: {
+            organizationId: ctx.organizationId,
+            id: itemId,
+          },
+        },
         data: {
           status: dto.status,
           notes: dto.notes,
@@ -309,7 +319,7 @@ export class TransfersService {
 
       // Check if all items are processed (not PENDING)
       const allItems = await tx.facilityTransferItem.findMany({
-        where: { transferId },
+        where: { organizationId: ctx.organizationId, transferId },
       });
       const allProcessed = allItems.every(
         (i) => i.status !== FacilityTransferItemStatus.PENDING,
@@ -317,7 +327,12 @@ export class TransfersService {
 
       if (allProcessed) {
         await tx.facilityTransfer.update({
-          where: { id: transferId },
+          where: {
+            organizationId_id: {
+              organizationId: ctx.organizationId,
+              id: transferId,
+            },
+          },
           data: {
             status: FacilityTransferStatus.COMPLETED,
             receivedAt: new Date(),

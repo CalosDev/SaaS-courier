@@ -40,6 +40,7 @@ describe('CustomsManifestsService', () => {
         {
           provide: PrismaService,
           useValue: {
+            $transaction: jest.fn((callback) => callback(prisma)),
             outboxEvent: {
               create: jest.fn(),
             },
@@ -141,9 +142,14 @@ describe('CustomsManifestsService', () => {
         flightNumber: 'B',
       });
       expect(res).toEqual(updated);
-      expect(repository.update).toHaveBeenCalledWith('org-1', 'man-1', {
-        flightNumber: 'B',
-      });
+      expect(repository.update).toHaveBeenCalledWith(
+        'org-1',
+        'man-1',
+        {
+          flightNumber: 'B',
+        },
+        prisma,
+      );
       expect(prisma.outboxEvent.create).toHaveBeenCalled();
     });
   });
@@ -165,9 +171,12 @@ describe('CustomsManifestsService', () => {
       await service.addPackages(mockContext, 'man-1', {
         packageIds: ['pkg-1'],
       });
-      expect(repository.addPackages).toHaveBeenCalledWith('org-1', 'man-1', [
-        'pkg-1',
-      ]);
+      expect(repository.addPackages).toHaveBeenCalledWith(
+        'org-1',
+        'man-1',
+        ['pkg-1'],
+        prisma,
+      );
       expect(prisma.outboxEvent.create).toHaveBeenCalled();
     });
   });
@@ -189,9 +198,12 @@ describe('CustomsManifestsService', () => {
       await service.removePackages(mockContext, 'man-1', {
         packageIds: ['pkg-1'],
       });
-      expect(repository.removePackages).toHaveBeenCalledWith('org-1', 'man-1', [
-        'pkg-1',
-      ]);
+      expect(repository.removePackages).toHaveBeenCalledWith(
+        'org-1',
+        'man-1',
+        ['pkg-1'],
+        prisma,
+      );
       expect(prisma.outboxEvent.create).toHaveBeenCalled();
     });
   });

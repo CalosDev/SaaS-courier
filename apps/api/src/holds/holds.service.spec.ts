@@ -34,6 +34,7 @@ describe('HoldsService', () => {
         {
           provide: PrismaService,
           useValue: {
+            $transaction: jest.fn((callback) => callback(prisma)),
             outboxEvent: {
               create: jest.fn(),
             },
@@ -73,14 +74,17 @@ describe('HoldsService', () => {
         reason: 'Custom reason',
       });
       expect(result).toEqual(createdHold);
-      expect(repository.create).toHaveBeenCalledWith({
-        organizationId: 'org-1',
-        targetType: 'PACKAGE',
-        targetId: 'pkg-1',
-        reason: 'Custom reason',
-        status: HoldStatus.ACTIVE,
-        requestedByEmployeeId: 'emp-1',
-      });
+      expect(repository.create).toHaveBeenCalledWith(
+        {
+          organizationId: 'org-1',
+          targetType: 'PACKAGE',
+          targetId: 'pkg-1',
+          reason: 'Custom reason',
+          status: HoldStatus.ACTIVE,
+          requestedByEmployeeId: 'emp-1',
+        },
+        prisma,
+      );
       expect(prisma.outboxEvent.create).toHaveBeenCalled(); // via PrismaAuditOutboxWriter
     });
   });

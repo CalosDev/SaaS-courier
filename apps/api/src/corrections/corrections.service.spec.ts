@@ -35,6 +35,7 @@ describe('CorrectionsService', () => {
         {
           provide: PrismaService,
           useValue: {
+            $transaction: jest.fn((callback) => callback(prisma)),
             outboxEvent: {
               create: jest.fn(),
             },
@@ -88,15 +89,18 @@ describe('CorrectionsService', () => {
         dto as any,
       );
       expect(result).toEqual(createdCorrection);
-      expect(repository.create).toHaveBeenCalledWith({
-        organizationId: 'org-1',
-        targetType: 'PACKAGE',
-        targetId: 'pkg-1',
-        reason: 'test',
-        proposedData: { w: 10 },
-        status: CorrectionStatus.REQUESTED,
-        requestedByEmployeeId: 'emp-1',
-      });
+      expect(repository.create).toHaveBeenCalledWith(
+        {
+          organizationId: 'org-1',
+          targetType: 'PACKAGE',
+          targetId: 'pkg-1',
+          reason: 'test',
+          proposedData: { w: 10 },
+          status: CorrectionStatus.REQUESTED,
+          requestedByEmployeeId: 'emp-1',
+        },
+        prisma,
+      );
       expect(prisma.outboxEvent.create).toHaveBeenCalled(); // via PrismaAuditOutboxWriter
     });
   });
@@ -146,6 +150,7 @@ describe('CorrectionsService', () => {
         'emp-1',
         CorrectionStatus.APPROVED,
         'ok',
+        prisma,
       );
       expect(prisma.outboxEvent.create).toHaveBeenCalled();
     });

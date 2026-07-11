@@ -38,39 +38,50 @@ export class DispatchesService {
       );
     }
 
-    const dispatch = await this.repository.create({
-      id: randomUUID(),
-      organizationId: ctx.organizationId,
-      dispatchCode: this.generateCode(),
-      origin: dto.origin,
-      destination: dto.destination,
-      departureTime: dto.departureTime
-        ? new Date(dto.departureTime)
-        : undefined,
-      estimatedArrivalTime: dto.estimatedArrivalTime
-        ? new Date(dto.estimatedArrivalTime)
-        : undefined,
-      carrier: dto.carrier,
-      flightNumber: dto.flightNumber,
-      mawb: dto.mawb,
-      status: DispatchStatus.DRAFT,
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const dispatch = await this.repository.create(
+        {
+          id: randomUUID(),
+          organizationId: ctx.organizationId,
+          dispatchCode: this.generateCode(),
+          origin: dto.origin,
+          destination: dto.destination,
+          departureTime: dto.departureTime
+            ? new Date(dto.departureTime)
+            : undefined,
+          estimatedArrivalTime: dto.estimatedArrivalTime
+            ? new Date(dto.estimatedArrivalTime)
+            : undefined,
+          carrier: dto.carrier,
+          flightNumber: dto.flightNumber,
+          mawb: dto.mawb,
+          status: DispatchStatus.DRAFT,
+        },
+        tx,
+      );
 
-    await this.auditWriter.write(this.prisma, {
-      context: ctx,
-      action: 'dispatch.created',
-      entityId: dispatch.id,
-      entityType: 'DISPATCH',
-      changedFields: ['id', 'status', 'dispatchCode', 'origin', 'destination'],
-      payload: { ...dispatch },
-      metadata: {
-        code: dispatch.dispatchCode,
-        origin: dispatch.origin,
-        destination: dispatch.destination,
-      },
-    });
+      await this.auditWriter.write(tx, {
+        context: ctx,
+        action: 'dispatch.created',
+        entityId: dispatch.id,
+        entityType: 'DISPATCH',
+        changedFields: [
+          'id',
+          'status',
+          'dispatchCode',
+          'origin',
+          'destination',
+        ],
+        payload: { ...dispatch },
+        metadata: {
+          code: dispatch.dispatchCode,
+          origin: dispatch.origin,
+          destination: dispatch.destination,
+        },
+      });
 
-    return dispatch;
+      return dispatch;
+    });
   }
 
   async getDispatches(organizationId: string) {
@@ -93,78 +104,88 @@ export class DispatchesService {
     dispatchId: string,
     dto: UpdateDispatchDto,
   ) {
-    const existing = await this.getDispatchById(ctx.organizationId, dispatchId);
-
-    if (
-      existing.status === DispatchStatus.COMPLETED ||
-      existing.status === DispatchStatus.CANCELLED
-    ) {
-      throw new BadRequestException(
-        `Cannot update dispatch in ${existing.status} status`,
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await this.repository.findById(
+        ctx.organizationId,
+        dispatchId,
+        tx,
       );
-    }
+      if (!existing) {
+        throw new NotFoundException('Dispatch not found');
+      }
 
-    const updated = await this.repository.update(
-      ctx.organizationId,
-      dispatchId,
-      {
-        status: dto.status !== undefined ? dto.status : existing.status,
-        origin: dto.origin !== undefined ? dto.origin : existing.origin,
-        destination:
-          dto.destination !== undefined
-            ? dto.destination
-            : existing.destination,
-        departureTime:
-          dto.departureTime !== undefined
-            ? dto.departureTime
-              ? new Date(dto.departureTime)
-              : null
-            : existing.departureTime,
-        estimatedArrivalTime:
-          dto.estimatedArrivalTime !== undefined
-            ? dto.estimatedArrivalTime
-              ? new Date(dto.estimatedArrivalTime)
-              : null
-            : existing.estimatedArrivalTime,
-        actualArrivalTime:
-          dto.actualArrivalTime !== undefined
-            ? dto.actualArrivalTime
-              ? new Date(dto.actualArrivalTime)
-              : null
-            : existing.actualArrivalTime,
-        carrier: dto.carrier !== undefined ? dto.carrier : existing.carrier,
-        flightNumber:
-          dto.flightNumber !== undefined
-            ? dto.flightNumber
-            : existing.flightNumber,
-        mawb: dto.mawb !== undefined ? dto.mawb : existing.mawb,
-      },
-    );
+      if (
+        existing.status === DispatchStatus.COMPLETED ||
+        existing.status === DispatchStatus.CANCELLED
+      ) {
+        throw new BadRequestException(
+          `Cannot update dispatch in ${existing.status} status`,
+        );
+      }
 
-    const changedFields: string[] = [];
-    if (existing.status !== updated.status) changedFields.push('status');
-    if (existing.mawb !== updated.mawb) changedFields.push('mawb');
-
-    if (changedFields.length > 0 || Object.keys(dto).length > 0) {
-      await this.auditWriter.write(this.prisma, {
-        context: ctx,
-        action:
-          existing.status !== updated.status
-            ? 'dispatch.status_changed'
-            : 'dispatch.updated',
-        entityId: updated.id,
-        entityType: 'DISPATCH',
-        changedFields,
-        payload: { ...updated },
-        metadata: {
-          dispatchId: updated.id,
-          oldStatus: existing.status,
-          newStatus: updated.status,
+      const updated = await this.repository.update(
+        ctx.organizationId,
+        dispatchId,
+        {
+          status: dto.status !== undefined ? dto.status : existing.status,
+          origin: dto.origin !== undefined ? dto.origin : existing.origin,
+          destination:
+            dto.destination !== undefined
+              ? dto.destination
+              : existing.destination,
+          departureTime:
+            dto.departureTime !== undefined
+              ? dto.departureTime
+                ? new Date(dto.departureTime)
+                : null
+              : existing.departureTime,
+          estimatedArrivalTime:
+            dto.estimatedArrivalTime !== undefined
+              ? dto.estimatedArrivalTime
+                ? new Date(dto.estimatedArrivalTime)
+                : null
+              : existing.estimatedArrivalTime,
+          actualArrivalTime:
+            dto.actualArrivalTime !== undefined
+              ? dto.actualArrivalTime
+                ? new Date(dto.actualArrivalTime)
+                : null
+              : existing.actualArrivalTime,
+          carrier: dto.carrier !== undefined ? dto.carrier : existing.carrier,
+          flightNumber:
+            dto.flightNumber !== undefined
+              ? dto.flightNumber
+              : existing.flightNumber,
+          mawb: dto.mawb !== undefined ? dto.mawb : existing.mawb,
         },
-      });
-    }
+        tx,
+      );
 
-    return updated;
+      const changedFields: string[] = [];
+      if (existing.status !== updated.status) changedFields.push('status');
+      if (existing.mawb !== updated.mawb) changedFields.push('mawb');
+
+      if (changedFields.length > 0 || Object.keys(dto).length > 0) {
+        await this.auditWriter.write(tx, {
+          context: ctx,
+          action:
+            existing.status !== updated.status
+              ? 'dispatch.status_changed'
+              : 'dispatch.updated',
+          entityId: updated.id,
+          entityType: 'DISPATCH',
+          changedFields,
+          payload: { ...updated },
+          metadata: {
+            dispatchId: updated.id,
+            oldStatus: existing.status,
+            newStatus: updated.status,
+          },
+        });
+      }
+
+      return updated;
+    });
   }
 
   async addPackages(
@@ -172,33 +193,42 @@ export class DispatchesService {
     dispatchId: string,
     dto: AddPackagesDto,
   ) {
-    const existing = await this.getDispatchById(ctx.organizationId, dispatchId);
-
-    if (existing.status !== DispatchStatus.DRAFT) {
-      throw new BadRequestException(
-        'Can only add packages to a DRAFT dispatch',
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await this.repository.findById(
+        ctx.organizationId,
+        dispatchId,
+        tx,
       );
-    }
+      if (!existing) {
+        throw new NotFoundException('Dispatch not found');
+      }
 
-    // Connect packages
-    const updated = await this.repository.updatePackageAssociation(
-      ctx.organizationId,
-      dispatchId,
-      dto.packageIds,
-      true,
-    );
+      if (existing.status !== DispatchStatus.DRAFT) {
+        throw new BadRequestException(
+          'Can only add packages to a DRAFT dispatch',
+        );
+      }
 
-    await this.auditWriter.write(this.prisma, {
-      context: ctx,
-      action: 'dispatch.packages_added',
-      entityId: updated.id,
-      entityType: 'DISPATCH',
-      changedFields: ['packages'],
-      payload: { packageIds: dto.packageIds },
-      metadata: { dispatchId: updated.id, addedCount: dto.packageIds.length },
+      const updated = await this.repository.updatePackageAssociation(
+        ctx.organizationId,
+        dispatchId,
+        dto.packageIds,
+        true,
+        tx,
+      );
+
+      await this.auditWriter.write(tx, {
+        context: ctx,
+        action: 'dispatch.packages_added',
+        entityId: updated.id,
+        entityType: 'DISPATCH',
+        changedFields: ['packages'],
+        payload: { packageIds: dto.packageIds },
+        metadata: { dispatchId: updated.id, addedCount: dto.packageIds.length },
+      });
+
+      return updated;
     });
-
-    return updated;
   }
 
   async removePackages(
@@ -206,31 +236,44 @@ export class DispatchesService {
     dispatchId: string,
     dto: AddPackagesDto,
   ) {
-    const existing = await this.getDispatchById(ctx.organizationId, dispatchId);
-
-    if (existing.status !== DispatchStatus.DRAFT) {
-      throw new BadRequestException(
-        'Can only remove packages from a DRAFT dispatch',
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await this.repository.findById(
+        ctx.organizationId,
+        dispatchId,
+        tx,
       );
-    }
+      if (!existing) {
+        throw new NotFoundException('Dispatch not found');
+      }
 
-    const updated = await this.repository.updatePackageAssociation(
-      ctx.organizationId,
-      dispatchId,
-      dto.packageIds,
-      false,
-    );
+      if (existing.status !== DispatchStatus.DRAFT) {
+        throw new BadRequestException(
+          'Can only remove packages from a DRAFT dispatch',
+        );
+      }
 
-    await this.auditWriter.write(this.prisma, {
-      context: ctx,
-      action: 'dispatch.packages_removed',
-      entityId: updated.id,
-      entityType: 'DISPATCH',
-      changedFields: ['packages'],
-      payload: { packageIds: dto.packageIds },
-      metadata: { dispatchId: updated.id, removedCount: dto.packageIds.length },
+      const updated = await this.repository.updatePackageAssociation(
+        ctx.organizationId,
+        dispatchId,
+        dto.packageIds,
+        false,
+        tx,
+      );
+
+      await this.auditWriter.write(tx, {
+        context: ctx,
+        action: 'dispatch.packages_removed',
+        entityId: updated.id,
+        entityType: 'DISPATCH',
+        changedFields: ['packages'],
+        payload: { packageIds: dto.packageIds },
+        metadata: {
+          dispatchId: updated.id,
+          removedCount: dto.packageIds.length,
+        },
+      });
+
+      return updated;
     });
-
-    return updated;
   }
 }
