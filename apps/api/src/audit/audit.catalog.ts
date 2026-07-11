@@ -84,6 +84,7 @@ export const AUDIT_ACTIONS = [
   'operational_hold.released',
   'correction_request.created',
   'correction_request.decided',
+  'correction.applied',
   'facility_transfer.created',
   'facility_transfer.updated',
   'facility_transfer.dispatched',

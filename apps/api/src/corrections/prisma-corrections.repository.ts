@@ -49,7 +49,7 @@ export class PrismaCorrectionsRepository {
     organizationId: string,
     correctionRequestId: string,
     employeeId: string,
-    decision: 'APPROVED' | 'REJECTED',
+    decision: 'APPROVED' | 'REJECTED' | 'APPLIED',
     reason?: string,
     tx: Prisma.TransactionClient = this.prisma,
   ) {

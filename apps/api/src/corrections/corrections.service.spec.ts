@@ -36,6 +36,13 @@ describe('CorrectionsService', () => {
           provide: PrismaService,
           useValue: {
             $transaction: jest.fn((callback) => callback(prisma)),
+            $queryRaw: jest.fn(),
+            customer: {
+              findFirst: jest.fn(),
+            },
+            package: {
+              update: jest.fn(),
+            },
             outboxEvent: {
               create: jest.fn(),
             },
@@ -219,18 +226,164 @@ describe('CorrectionsService', () => {
       );
     });
 
-    it('does not mark an approved correction as applied without target rules', async () => {
-      repository.findById.mockResolvedValue({
-        id: 'corr-1',
-        status: CorrectionStatus.APPROVED,
-        targetType: 'PACKAGE',
-      } as any);
+    it('does not mark unsupported targets as applied', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'corr-1',
+          status: CorrectionStatus.APPROVED,
+          target_type: 'INVOICE',
+          target_id: 'invoice-1',
+          proposed_data: {},
+        },
+      ]);
 
       await expect(
         service.applyCorrectionRequest(mockContext, 'corr-1'),
       ).rejects.toThrow(ConflictException);
       expect(repository.update).not.toHaveBeenCalled();
       expect(repository.recordDecision).not.toHaveBeenCalled();
+    });
+
+    it('returns already applied corrections without reapplying package changes', async () => {
+      prisma.$queryRaw.mockResolvedValueOnce([
+        {
+          id: 'corr-1',
+          status: CorrectionStatus.APPLIED,
+          target_type: 'PACKAGE',
+          target_id: 'pkg-1',
+          proposed_data: { notes: 'already applied' },
+        },
+      ]);
+      repository.findById.mockResolvedValue({
+        id: 'corr-1',
+        status: CorrectionStatus.APPLIED,
+      } as any);
+
+      await expect(
+        service.applyCorrectionRequest(mockContext, 'corr-1'),
+      ).resolves.toEqual({
+        id: 'corr-1',
+        status: CorrectionStatus.APPLIED,
+      });
+      expect(prisma.package.update).not.toHaveBeenCalled();
+      expect(repository.update).not.toHaveBeenCalled();
+      expect(repository.recordDecision).not.toHaveBeenCalled();
+    });
+
+    it('applies approved package corrections atomically with audit and outbox', async () => {
+      repository.update.mockResolvedValue({
+        id: 'corr-1',
+        status: CorrectionStatus.APPLIED,
+      } as any);
+      repository.recordDecision.mockResolvedValue({} as any);
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'corr-1',
+            status: CorrectionStatus.APPROVED,
+            target_type: 'PACKAGE',
+            target_id: 'pkg-1',
+            proposed_data: {
+              externalTrackingNumber: ' 1z999aa10123456784 ',
+              notes: ' corrected notes ',
+            },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'pkg-1',
+            customer_id: 'customer-1',
+            prealert_id: null,
+            internal_tracking_number: 'PKG-001',
+            external_tracking_number: 'OLDTRACK',
+            external_tracking_number_normalized: 'OLDTRACK',
+            status: 'RECEPTION_PENDING',
+            notes: null,
+          },
+        ])
+        .mockResolvedValueOnce([]);
+      (prisma.package.update as jest.Mock).mockResolvedValue({
+        id: 'pkg-1',
+        customerId: 'customer-1',
+        prealertId: null,
+        internalTrackingNumber: 'PKG-001',
+        externalTrackingNumber: '1z999aa10123456784',
+        externalTrackingNumberNormalized: '1Z999AA10123456784',
+        status: 'RECEPTION_PENDING',
+        notes: 'corrected notes',
+      } as any);
+
+      const result = await service.applyCorrectionRequest(
+        mockContext,
+        'corr-1',
+      );
+
+      expect(result).toEqual({
+        id: 'corr-1',
+        status: CorrectionStatus.APPLIED,
+      });
+      expect(prisma.package.update).toHaveBeenCalledWith({
+        where: {
+          organizationId_id: {
+            organizationId: 'org-1',
+            id: 'pkg-1',
+          },
+        },
+        data: {
+          externalTrackingNumber: '1z999aa10123456784',
+          externalTrackingNumberNormalized: '1Z999AA10123456784',
+          notes: 'corrected notes',
+        },
+      });
+      expect(repository.update).toHaveBeenCalledWith(
+        'org-1',
+        'corr-1',
+        { status: CorrectionStatus.APPLIED },
+        prisma,
+      );
+      expect(repository.recordDecision).toHaveBeenCalledWith(
+        'org-1',
+        'corr-1',
+        'emp-1',
+        CorrectionStatus.APPLIED,
+        'Correction applied to package',
+        prisma,
+      );
+      expect(prisma.auditLog.create).toHaveBeenCalled();
+      expect(prisma.outboxEvent.create).toHaveBeenCalled();
+    });
+
+    it('rejects package corrections with unsupported proposed fields', async () => {
+      prisma.$queryRaw
+        .mockResolvedValueOnce([
+          {
+            id: 'corr-1',
+            status: CorrectionStatus.APPROVED,
+            target_type: 'PACKAGE',
+            target_id: 'pkg-1',
+            proposed_data: {
+              status: 'CANCELLED',
+            },
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'pkg-1',
+            customer_id: 'customer-1',
+            prealert_id: null,
+            internal_tracking_number: 'PKG-001',
+            external_tracking_number: 'OLDTRACK',
+            external_tracking_number_normalized: 'OLDTRACK',
+            status: 'RECEPTION_PENDING',
+            notes: null,
+          },
+        ]);
+
+      await expect(
+        service.applyCorrectionRequest(mockContext, 'corr-1'),
+      ).rejects.toThrow('Unsupported package correction fields');
+      expect(prisma.package.update).not.toHaveBeenCalled();
+      expect(repository.update).not.toHaveBeenCalled();
     });
   });
 });
