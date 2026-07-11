@@ -27,6 +27,7 @@ describe('HoldsController', () => {
             createHold: jest.fn(),
             getHolds: jest.fn(),
             getHoldById: jest.fn(),
+            releaseHold: jest.fn(),
             updateHold: jest.fn(),
           },
         },
@@ -77,5 +78,20 @@ describe('HoldsController', () => {
       hold,
     );
     expect(service.updateHold).toHaveBeenCalledWith(mockContext, 'hold-1', dto);
+  });
+
+  it('releaseHold should call service and return result', async () => {
+    const hold = { id: 'hold-1', status: HoldStatus.RELEASED } as any;
+    service.releaseHold.mockResolvedValue(hold);
+    const dto = { releaseReason: 'validated release' };
+
+    expect(await controller.releaseHold(mockContext, 'hold-1', dto)).toEqual(
+      hold,
+    );
+    expect(service.releaseHold).toHaveBeenCalledWith(
+      mockContext,
+      'hold-1',
+      dto,
+    );
   });
 });

@@ -71,6 +71,17 @@ export class HoldsService {
     return hold;
   }
 
+  async releaseHold(
+    ctx: CommandContext,
+    holdId: string,
+    dto: Pick<UpdateHoldDto, 'releaseReason'>,
+  ) {
+    return this.updateHold(ctx, holdId, {
+      status: HoldStatus.RELEASED,
+      releaseReason: dto.releaseReason,
+    });
+  }
+
   async updateHold(ctx: CommandContext, holdId: string, dto: UpdateHoldDto) {
     if (!ctx.actorEmployeeId) {
       throw new Error('Employee ID is required');

@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { HoldsService } from './holds.service';
 import { CreateHoldDto } from './dto/create-hold.dto';
+import { ReleaseHoldDto } from './dto/release-hold.dto';
 import { UpdateHoldDto } from './dto/update-hold.dto';
 import { RequirePermissions } from '../rbac/http/require-permissions.decorator';
 import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
@@ -43,6 +44,16 @@ export class HoldsController {
     @Param('id') id: string,
   ) {
     return this.holdsService.getHoldById(ctx.organizationId, id);
+  }
+
+  @Post(':id/release')
+  @RequirePermissions('holds.manage')
+  async releaseHold(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+    @Body() dto: ReleaseHoldDto,
+  ) {
+    return this.holdsService.releaseHold(ctx, id, dto);
   }
 
   @Patch(':id')

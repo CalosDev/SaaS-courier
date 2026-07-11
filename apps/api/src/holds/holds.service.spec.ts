@@ -128,4 +128,38 @@ describe('HoldsService', () => {
       expect(prisma.outboxEvent.create).toHaveBeenCalled();
     });
   });
+
+  describe('releaseHold', () => {
+    it('delegates to the controlled RELEASED transition', async () => {
+      const existingHold = {
+        id: 'hold-1',
+        status: HoldStatus.ACTIVE,
+        reason: 'test',
+      } as any;
+      const updatedHold = {
+        id: 'hold-1',
+        status: HoldStatus.RELEASED,
+        releaseReason: 'validated release',
+      } as any;
+
+      repository.findById.mockResolvedValue(existingHold);
+      repository.update.mockResolvedValue(updatedHold);
+
+      const result = await service.releaseHold(mockContext, 'hold-1', {
+        releaseReason: 'validated release',
+      });
+
+      expect(result).toEqual(updatedHold);
+      expect(repository.update).toHaveBeenCalledWith(
+        'org-1',
+        'hold-1',
+        expect.objectContaining({
+          status: HoldStatus.RELEASED,
+          releaseReason: 'validated release',
+          releasedByEmployeeId: 'emp-1',
+        }),
+        prisma,
+      );
+    });
+  });
 });

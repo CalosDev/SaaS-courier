@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { CorrectionsService } from './corrections.service';
 import { CreateCorrectionDto } from './dto/create-correction.dto';
+import { DecideCorrectionDto } from './dto/decide-correction.dto';
 import { UpdateCorrectionDto } from './dto/update-correction.dto';
 import { RequirePermissions } from '../rbac/http/require-permissions.decorator';
 import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
@@ -62,5 +63,34 @@ export class CorrectionsController {
     @Body() dto: UpdateCorrectionDto,
   ) {
     return this.correctionsService.updateCorrectionRequest(ctx, id, dto);
+  }
+
+  @Post(':id/approve')
+  @RequirePermissions('corrections.manage')
+  async approveCorrectionRequest(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+    @Body() dto: DecideCorrectionDto,
+  ) {
+    return this.correctionsService.approveCorrectionRequest(ctx, id, dto);
+  }
+
+  @Post(':id/reject')
+  @RequirePermissions('corrections.manage')
+  async rejectCorrectionRequest(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+    @Body() dto: DecideCorrectionDto,
+  ) {
+    return this.correctionsService.rejectCorrectionRequest(ctx, id, dto);
+  }
+
+  @Post(':id/apply')
+  @RequirePermissions('corrections.manage')
+  async applyCorrectionRequest(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+  ) {
+    return this.correctionsService.applyCorrectionRequest(ctx, id);
   }
 }

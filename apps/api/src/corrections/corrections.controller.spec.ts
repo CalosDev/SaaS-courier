@@ -28,6 +28,9 @@ describe('CorrectionsController', () => {
             getCorrectionRequests: jest.fn(),
             getCorrectionRequestById: jest.fn(),
             updateCorrectionRequest: jest.fn(),
+            approveCorrectionRequest: jest.fn(),
+            rejectCorrectionRequest: jest.fn(),
+            applyCorrectionRequest: jest.fn(),
           },
         },
       ],
@@ -101,6 +104,49 @@ describe('CorrectionsController', () => {
       mockContext,
       'corr-1',
       dto,
+    );
+  });
+
+  it('approveCorrectionRequest should call service and return result', async () => {
+    const corr = { id: 'corr-1', status: CorrectionStatus.APPROVED } as any;
+    service.approveCorrectionRequest.mockResolvedValue(corr);
+    const dto = { reason: 'approved data change' };
+
+    expect(
+      await controller.approveCorrectionRequest(mockContext, 'corr-1', dto),
+    ).toEqual(corr);
+    expect(service.approveCorrectionRequest).toHaveBeenCalledWith(
+      mockContext,
+      'corr-1',
+      dto,
+    );
+  });
+
+  it('rejectCorrectionRequest should call service and return result', async () => {
+    const corr = { id: 'corr-1', status: CorrectionStatus.REJECTED } as any;
+    service.rejectCorrectionRequest.mockResolvedValue(corr);
+    const dto = { reason: 'insufficient evidence' };
+
+    expect(
+      await controller.rejectCorrectionRequest(mockContext, 'corr-1', dto),
+    ).toEqual(corr);
+    expect(service.rejectCorrectionRequest).toHaveBeenCalledWith(
+      mockContext,
+      'corr-1',
+      dto,
+    );
+  });
+
+  it('applyCorrectionRequest should call service and return result', async () => {
+    const corr = { id: 'corr-1', status: CorrectionStatus.APPLIED } as any;
+    service.applyCorrectionRequest.mockResolvedValue(corr);
+
+    expect(
+      await controller.applyCorrectionRequest(mockContext, 'corr-1'),
+    ).toEqual(corr);
+    expect(service.applyCorrectionRequest).toHaveBeenCalledWith(
+      mockContext,
+      'corr-1',
     );
   });
 });

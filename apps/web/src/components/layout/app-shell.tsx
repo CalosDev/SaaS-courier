@@ -97,13 +97,13 @@ const NAV_ITEMS: NavItem[] = [
     requiredPermissions: ["packages.read"],
   },
   {
-    href: "/holds",
+    href: "/operations/holds",
     label: "Retenciones",
     icon: AlertTriangle,
     requiredPermissions: ["holds.read"],
   },
   {
-    href: "/corrections",
+    href: "/operations/corrections",
     label: "Correcciones",
     icon: FileEdit,
     requiredPermissions: ["corrections.read"],

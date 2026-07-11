@@ -510,6 +510,11 @@ export const backofficeApi = {
   updateHold(id: string, data: UpdateHoldDto) {
     return apiClient.patch<OperationalHold>(`/holds/${id}`, data as unknown as Record<string, unknown>);
   },
+  releaseHold(id: string, releaseReason: string) {
+    return apiClient.post<OperationalHold>(`/holds/${id}/release`, {
+      releaseReason,
+    });
+  },
 
   // Corrections
   listCorrections(params?: Record<string, string | number | boolean | undefined>) {
@@ -523,6 +528,19 @@ export const backofficeApi = {
   },
   updateCorrection(id: string, data: UpdateCorrectionDto) {
     return apiClient.patch<CorrectionRequest>(`/corrections/${id}`, data as unknown as Record<string, unknown>);
+  },
+  approveCorrection(id: string, reason?: string) {
+    return apiClient.post<CorrectionRequest>(`/corrections/${id}/approve`, {
+      reason,
+    });
+  },
+  rejectCorrection(id: string, reason?: string) {
+    return apiClient.post<CorrectionRequest>(`/corrections/${id}/reject`, {
+      reason,
+    });
+  },
+  applyCorrection(id: string) {
+    return apiClient.post<CorrectionRequest>(`/corrections/${id}/apply`, {});
   },
 
   // House Shipments

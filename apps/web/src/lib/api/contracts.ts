@@ -801,12 +801,24 @@ export interface UpdateHoldDto {
 }
 
 
-export type CorrectionStatus = "REQUESTED" | "APPROVED" | "REJECTED";
+export type CorrectionStatus =
+  | "REQUESTED"
+  | "APPROVED"
+  | "REJECTED"
+  | "APPLIED"
+  | "CANCELLED";
+
+export type CorrectionTargetType =
+  | "PACKAGE"
+  | "PREALERT"
+  | "MANIFEST"
+  | "CUSTOMS_CASE"
+  | "INVOICE";
 
 export interface CorrectionRequest {
   id: string;
   organizationId: string;
-  targetType: string;
+  targetType: CorrectionTargetType;
   targetId: string;
   reason: string;
   proposedData: Record<string, any>;
@@ -817,7 +829,7 @@ export interface CorrectionRequest {
 }
 
 export interface CreateCorrectionDto {
-  targetType: string;
+  targetType: CorrectionTargetType;
   targetId: string;
   reason: string;
   proposedData: Record<string, any>;

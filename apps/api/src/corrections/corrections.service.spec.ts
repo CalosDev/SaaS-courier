@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CorrectionsService } from './corrections.service';
 import { PrismaCorrectionsRepository } from './prisma-corrections.repository';
 import { PrismaService } from '../prisma/prisma.service';
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CorrectionStatus } from '../generated/prisma/client';
 
 describe('CorrectionsService', () => {
@@ -153,6 +153,84 @@ describe('CorrectionsService', () => {
         prisma,
       );
       expect(prisma.outboxEvent.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('controlled decisions', () => {
+    it('approves through the approved transition', async () => {
+      const existing = {
+        id: 'corr-1',
+        status: CorrectionStatus.REQUESTED,
+      } as any;
+      const updated = {
+        id: 'corr-1',
+        status: CorrectionStatus.APPROVED,
+      } as any;
+
+      repository.findById.mockResolvedValue(existing);
+      repository.update.mockResolvedValue(updated);
+      repository.recordDecision.mockResolvedValue({} as any);
+
+      await service.approveCorrectionRequest(mockContext, 'corr-1', {
+        reason: 'approved data change',
+      });
+
+      expect(repository.update).toHaveBeenCalledWith(
+        'org-1',
+        'corr-1',
+        { status: CorrectionStatus.APPROVED },
+        prisma,
+      );
+      expect(repository.recordDecision).toHaveBeenCalledWith(
+        'org-1',
+        'corr-1',
+        'emp-1',
+        CorrectionStatus.APPROVED,
+        'approved data change',
+        prisma,
+      );
+    });
+
+    it('rejects through the rejected transition', async () => {
+      const existing = {
+        id: 'corr-1',
+        status: CorrectionStatus.REQUESTED,
+      } as any;
+      const updated = {
+        id: 'corr-1',
+        status: CorrectionStatus.REJECTED,
+      } as any;
+
+      repository.findById.mockResolvedValue(existing);
+      repository.update.mockResolvedValue(updated);
+      repository.recordDecision.mockResolvedValue({} as any);
+
+      await service.rejectCorrectionRequest(mockContext, 'corr-1', {
+        reason: 'insufficient evidence',
+      });
+
+      expect(repository.recordDecision).toHaveBeenCalledWith(
+        'org-1',
+        'corr-1',
+        'emp-1',
+        CorrectionStatus.REJECTED,
+        'insufficient evidence',
+        prisma,
+      );
+    });
+
+    it('does not mark an approved correction as applied without target rules', async () => {
+      repository.findById.mockResolvedValue({
+        id: 'corr-1',
+        status: CorrectionStatus.APPROVED,
+        targetType: 'PACKAGE',
+      } as any);
+
+      await expect(
+        service.applyCorrectionRequest(mockContext, 'corr-1'),
+      ).rejects.toThrow(ConflictException);
+      expect(repository.update).not.toHaveBeenCalled();
+      expect(repository.recordDecision).not.toHaveBeenCalled();
     });
   });
 });

@@ -1,13 +1,12 @@
 "use client";
 
-import useSWR from "swr";
+import Link from "next/link";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
+import useSWR from "swr";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { backofficeApi } from "@/lib/api/backoffice";
-import type { CorrectionRequest } from "@/lib/api/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,52 +21,64 @@ import { Table } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { ApiError } from "@/lib/api/api-error";
+import { backofficeApi } from "@/lib/api/backoffice";
+import type { CorrectionRequest } from "@/lib/api/contracts";
+
+const correctionTargetTypes = [
+  "PACKAGE",
+  "PREALERT",
+  "MANIFEST",
+  "CUSTOMS_CASE",
+  "INVOICE",
+] as const;
 
 const createCorrectionSchema = z.object({
   targetId: z.string().min(1, "El ID del objeto a corregir es requerido"),
-  targetType: z.enum(["PACKAGE", "PREALERT"]),
-  reason: z.string().min(5, "Describe el motivo de la corrección (mínimo 5 caracteres)"),
+  targetType: z.enum(correctionTargetTypes),
+  reason: z
+    .string()
+    .min(5, "Describe el motivo de la correccion (minimo 5 caracteres)"),
   field: z.string().min(1, "Indica el campo a corregir"),
   newValue: z.string().min(1, "Indica el nuevo valor"),
 });
 
-const approveSchema = z.object({
-  status: z.enum(["APPROVED", "REJECTED"]),
-});
-
 type CreateCorrectionForm = z.infer<typeof createCorrectionSchema>;
-type ApproveForm = z.infer<typeof approveSchema>;
 
 const STATUS_LABEL: Record<CorrectionRequest["status"], string> = {
   REQUESTED: "Solicitada",
   APPROVED: "Aprobada",
   REJECTED: "Rechazada",
+  APPLIED: "Aplicada",
+  CANCELLED: "Cancelada",
 };
 
-const STATUS_TONE: Record<CorrectionRequest["status"], "neutral" | "success" | "warning" | "danger"> = {
+const STATUS_TONE: Record<
+  CorrectionRequest["status"],
+  "neutral" | "success" | "warning" | "danger"
+> = {
   REQUESTED: "warning",
   APPROVED: "success",
   REJECTED: "danger",
+  APPLIED: "success",
+  CANCELLED: "neutral",
 };
 
 export default function CorrectionsPage() {
   const [showCreate, setShowCreate] = useState(false);
-  const [approveTarget, setApproveTarget] = useState<CorrectionRequest | null>(null);
   const { pushToast } = useToast();
 
-  const { data: corrections, error, isLoading, mutate: refetch } = useSWR<CorrectionRequest[]>(
-    "/corrections",
-    () => backofficeApi.listCorrections()
+  const {
+    data: corrections,
+    error,
+    isLoading,
+    mutate: refetch,
+  } = useSWR<CorrectionRequest[]>("/corrections", () =>
+    backofficeApi.listCorrections(),
   );
 
   const createForm = useForm<CreateCorrectionForm>({
     resolver: zodResolver(createCorrectionSchema),
     defaultValues: { targetType: "PACKAGE" },
-  });
-
-  const approveForm = useForm<ApproveForm>({
-    resolver: zodResolver(approveSchema),
-    defaultValues: { status: "APPROVED" },
   });
 
   async function onCreateSubmit(values: CreateCorrectionForm) {
@@ -78,25 +89,16 @@ export default function CorrectionsPage() {
         reason: values.reason,
         proposedData: { [values.field]: values.newValue },
       });
-      pushToast("Solicitud de corrección creada.");
-      createForm.reset();
+      pushToast("Solicitud de correccion creada.");
+      createForm.reset({ targetType: "PACKAGE" });
       setShowCreate(false);
       await refetch();
     } catch (err) {
-      pushToast(err instanceof ApiError ? err.message : "No fue posible crear la solicitud.");
-    }
-  }
-
-  async function onApproveSubmit(values: ApproveForm) {
-    if (!approveTarget) return;
-    try {
-      await backofficeApi.updateCorrection(approveTarget.id, { status: values.status });
-      pushToast(values.status === "APPROVED" ? "Corrección aprobada." : "Corrección rechazada.");
-      approveForm.reset();
-      setApproveTarget(null);
-      await refetch();
-    } catch (err) {
-      pushToast(err instanceof ApiError ? err.message : "No fue posible actualizar la corrección.");
+      pushToast(
+        err instanceof ApiError
+          ? err.message
+          : "No fue posible crear la solicitud.",
+      );
     }
   }
 
@@ -104,8 +106,8 @@ export default function CorrectionsPage() {
     <div className="page-stack">
       <section className="page-header">
         <div>
-          <h1>Solicitudes de Corrección</h1>
-          <p>Gestión de correcciones de medidas y datos de paquetes.</p>
+          <h1>Solicitudes de Correccion</h1>
+          <p>Gestion de correcciones controladas para objetos operativos.</p>
         </div>
         <Button onClick={() => setShowCreate(true)}>
           <Plus className="button-icon" />
@@ -117,86 +119,127 @@ export default function CorrectionsPage() {
         {isLoading ? (
           <LoadingState label="Cargando solicitudes..." />
         ) : error ? (
-          <ErrorState title="Error al cargar solicitudes" description={error.message} onRetry={() => void refetch()} />
+          <ErrorState
+            title="Error al cargar solicitudes"
+            description={error.message}
+            onRetry={() => void refetch()}
+          />
         ) : !corrections || corrections.length === 0 ? (
-          <EmptyState title="No hay solicitudes de corrección" description="Crea una cuando necesites modificar datos registrados en un paquete." />
+          <EmptyState
+            title="No hay solicitudes de correccion"
+            description="Crea una cuando necesites modificar datos registrados sin sobrescribir el historial original."
+          />
         ) : (
           <Table
-            columns={["Target", "Tipo", "Motivo", "Estado", "Fecha", "Acción"]}
-            rows={corrections.map((corr) => [
-              <span key={`t-${corr.id}`} className="inline-code">{corr.targetId}</span>,
-              corr.targetType,
-              corr.reason,
-              <Badge key={`s-${corr.id}`} tone={STATUS_TONE[corr.status]}>{STATUS_LABEL[corr.status]}</Badge>,
-              new Date(corr.createdAt).toLocaleDateString("es-DO"),
-              corr.status === "REQUESTED" ? (
-                <Button key={`a-${corr.id}`} variant="secondary" onClick={() => setApproveTarget(corr)}>
-                  Resolver
-                </Button>
-              ) : <span key={`na-${corr.id}`}>—</span>,
+            columns={["Target", "Tipo", "Motivo", "Estado", "Fecha", "Accion"]}
+            rows={corrections.map((correction) => [
+              <span key={`t-${correction.id}`} className="inline-code">
+                {correction.targetId}
+              </span>,
+              correction.targetType,
+              correction.reason,
+              <Badge
+                key={`s-${correction.id}`}
+                tone={STATUS_TONE[correction.status]}
+              >
+                {STATUS_LABEL[correction.status]}
+              </Badge>,
+              new Date(correction.createdAt).toLocaleDateString("es-DO"),
+              <Link
+                key={`a-${correction.id}`}
+                href={`/operations/corrections/${correction.id}`}
+                className="inline-flex min-h-[42px] items-center justify-center rounded-lg bg-[#dde6ed] px-4 font-medium text-[#17242d] transition-colors hover:bg-[#c8d6e0]"
+              >
+                Ver detalle
+              </Link>,
             ])}
           />
         )}
       </Card>
 
-      {/* Modal: Crear solicitud */}
       <Dialog
         open={showCreate}
-        title="Nueva solicitud de corrección"
-        onClose={() => { setShowCreate(false); createForm.reset(); }}
+        title="Nueva solicitud de correccion"
+        onClose={() => {
+          setShowCreate(false);
+          createForm.reset({ targetType: "PACKAGE" });
+        }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => { setShowCreate(false); createForm.reset(); }}>Cancelar</Button>
-            <Button type="submit" form="create-correction-form" disabled={createForm.formState.isSubmitting}>
-              {createForm.formState.isSubmitting ? "Enviando..." : "Solicitar corrección"}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowCreate(false);
+                createForm.reset({ targetType: "PACKAGE" });
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="create-correction-form"
+              disabled={createForm.formState.isSubmitting}
+            >
+              {createForm.formState.isSubmitting
+                ? "Enviando..."
+                : "Solicitar correccion"}
             </Button>
           </>
         }
       >
-        <form id="create-correction-form" className="form-grid" onSubmit={createForm.handleSubmit(onCreateSubmit)}>
-          <FormField label="Tipo de objeto" error={createForm.formState.errors.targetType?.message}>
+        <form
+          id="create-correction-form"
+          className="form-grid"
+          onSubmit={createForm.handleSubmit(onCreateSubmit)}
+        >
+          <FormField
+            label="Tipo de objeto"
+            error={createForm.formState.errors.targetType?.message}
+          >
             <Select {...createForm.register("targetType")}>
               <option value="PACKAGE">Paquete</option>
               <option value="PREALERT">Prealerta</option>
+              <option value="MANIFEST">Manifiesto</option>
+              <option value="CUSTOMS_CASE">Caso aduanal</option>
+              <option value="INVOICE">Factura</option>
             </Select>
           </FormField>
-          <FormField label="ID del objeto" error={createForm.formState.errors.targetId?.message}>
-            <Input {...createForm.register("targetId")} placeholder="UUID del paquete o prealerta" />
+          <FormField
+            label="ID del objeto"
+            error={createForm.formState.errors.targetId?.message}
+          >
+            <Input
+              {...createForm.register("targetId")}
+              placeholder="UUID del recurso a corregir"
+            />
           </FormField>
-          <FormField label="Campo a corregir" error={createForm.formState.errors.field?.message}>
-            <Input {...createForm.register("field")} placeholder="Ej: weightLb, dimensions" />
+          <FormField
+            label="Campo a corregir"
+            error={createForm.formState.errors.field?.message}
+          >
+            <Input
+              {...createForm.register("field")}
+              placeholder="Ej: weightLb, dimensions"
+            />
           </FormField>
-          <FormField label="Nuevo valor" error={createForm.formState.errors.newValue?.message}>
-            <Input {...createForm.register("newValue")} placeholder="El valor corregido" />
+          <FormField
+            label="Nuevo valor"
+            error={createForm.formState.errors.newValue?.message}
+          >
+            <Input
+              {...createForm.register("newValue")}
+              placeholder="El valor corregido"
+            />
           </FormField>
-          <FormField label="Motivo de la corrección" error={createForm.formState.errors.reason?.message}>
-            <Textarea {...createForm.register("reason")} rows={3} placeholder="Describe por qué se requiere esta corrección..." />
-          </FormField>
-        </form>
-      </Dialog>
-
-      {/* Modal: Aprobar/Rechazar */}
-      <Dialog
-        open={!!approveTarget}
-        title={`Resolver corrección — ${approveTarget?.targetId ?? ""}`}
-        onClose={() => { setApproveTarget(null); approveForm.reset(); }}
-        actions={
-          <>
-            <Button variant="secondary" onClick={() => { setApproveTarget(null); approveForm.reset(); }}>Cancelar</Button>
-            <Button type="submit" form="approve-correction-form" disabled={approveForm.formState.isSubmitting}>
-              {approveForm.formState.isSubmitting ? "Guardando..." : "Confirmar resolución"}
-            </Button>
-          </>
-        }
-      >
-        <form id="approve-correction-form" className="form-grid" onSubmit={approveForm.handleSubmit(onApproveSubmit)}>
-          <p><strong>Motivo:</strong> {approveTarget?.reason}</p>
-          <p><strong>Datos propuestos:</strong> {JSON.stringify(approveTarget?.proposedData)}</p>
-          <FormField label="Decisión" error={approveForm.formState.errors.status?.message}>
-            <Select {...approveForm.register("status")}>
-              <option value="APPROVED">Aprobar corrección</option>
-              <option value="REJECTED">Rechazar corrección</option>
-            </Select>
+          <FormField
+            label="Motivo de la correccion"
+            error={createForm.formState.errors.reason?.message}
+          >
+            <Textarea
+              {...createForm.register("reason")}
+              rows={3}
+              placeholder="Describe por que se requiere esta correccion..."
+            />
           </FormField>
         </form>
       </Dialog>

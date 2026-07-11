@@ -1,13 +1,11 @@
 "use client";
 
-import useSWR from "swr";
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
+import useSWR from "swr";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { backofficeApi } from "@/lib/api/backoffice";
-import type { OperationalHold } from "@/lib/api/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -21,14 +19,20 @@ import { Table } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { ApiError } from "@/lib/api/api-error";
+import { backofficeApi } from "@/lib/api/backoffice";
+import type { OperationalHold } from "@/lib/api/contracts";
 
 const createHoldSchema = z.object({
   packageId: z.string().min(1, "El ID del paquete es requerido"),
-  reason: z.string().min(5, "Describe el motivo de la retención (mínimo 5 caracteres)"),
+  reason: z
+    .string()
+    .min(5, "Describe el motivo de la retencion (minimo 5 caracteres)"),
 });
 
 const releaseHoldSchema = z.object({
-  releaseReason: z.string().min(5, "Describe el motivo de la liberación (mínimo 5 caracteres)"),
+  releaseReason: z
+    .string()
+    .min(5, "Describe el motivo de la liberacion (minimo 5 caracteres)"),
 });
 
 type CreateHoldForm = z.infer<typeof createHoldSchema>;
@@ -40,7 +44,10 @@ const STATUS_LABEL: Record<OperationalHold["status"], string> = {
   CANCELLED: "Cancelada",
 };
 
-const STATUS_TONE: Record<OperationalHold["status"], "neutral" | "success" | "warning" | "danger"> = {
+const STATUS_TONE: Record<
+  OperationalHold["status"],
+  "neutral" | "success" | "warning" | "danger"
+> = {
   ACTIVE: "danger",
   RELEASED: "success",
   CANCELLED: "neutral",
@@ -48,13 +55,17 @@ const STATUS_TONE: Record<OperationalHold["status"], "neutral" | "success" | "wa
 
 export default function HoldsPage() {
   const [showCreate, setShowCreate] = useState(false);
-  const [releaseTarget, setReleaseTarget] = useState<OperationalHold | null>(null);
+  const [releaseTarget, setReleaseTarget] = useState<OperationalHold | null>(
+    null,
+  );
   const { pushToast } = useToast();
 
-  const { data: holds, error, isLoading, mutate: refetch } = useSWR<OperationalHold[]>(
-    "/holds",
-    () => backofficeApi.listHolds()
-  );
+  const {
+    data: holds,
+    error,
+    isLoading,
+    mutate: refetch,
+  } = useSWR<OperationalHold[]>("/holds", () => backofficeApi.listHolds());
 
   const createForm = useForm<CreateHoldForm>({
     resolver: zodResolver(createHoldSchema),
@@ -66,29 +77,40 @@ export default function HoldsPage() {
 
   async function onCreateSubmit(values: CreateHoldForm) {
     try {
-      await backofficeApi.createHold({ packageId: values.packageId, reason: values.reason });
-      pushToast("Retención aplicada exitosamente.");
+      await backofficeApi.createHold({
+        packageId: values.packageId,
+        reason: values.reason,
+      });
+      pushToast("Retencion aplicada exitosamente.");
       createForm.reset();
       setShowCreate(false);
       await refetch();
     } catch (err) {
-      pushToast(err instanceof ApiError ? err.message : "No fue posible aplicar la retención.");
+      pushToast(
+        err instanceof ApiError
+          ? err.message
+          : "No fue posible aplicar la retencion.",
+      );
     }
   }
 
   async function onReleaseSubmit(values: ReleaseHoldForm) {
-    if (!releaseTarget) return;
+    if (!releaseTarget) {
+      return;
+    }
+
     try {
-      await backofficeApi.updateHold(releaseTarget.id, {
-        status: "RELEASED",
-        releaseReason: values.releaseReason,
-      });
-      pushToast("Retención liberada exitosamente.");
+      await backofficeApi.releaseHold(releaseTarget.id, values.releaseReason);
+      pushToast("Retencion liberada exitosamente.");
       releaseForm.reset();
       setReleaseTarget(null);
       await refetch();
     } catch (err) {
-      pushToast(err instanceof ApiError ? err.message : "No fue posible liberar la retención.");
+      pushToast(
+        err instanceof ApiError
+          ? err.message
+          : "No fue posible liberar la retencion.",
+      );
     }
   }
 
@@ -97,11 +119,11 @@ export default function HoldsPage() {
       <section className="page-header">
         <div>
           <h1>Retenciones Operativas</h1>
-          <p>Gestión de paquetes retenidos en almacén.</p>
+          <p>Gestion de paquetes retenidos en almacen.</p>
         </div>
         <Button onClick={() => setShowCreate(true)}>
           <Plus className="button-icon" />
-          Aplicar retención
+          Aplicar retencion
         </Button>
       </section>
 
@@ -109,16 +131,27 @@ export default function HoldsPage() {
         {isLoading ? (
           <LoadingState label="Cargando retenciones..." />
         ) : error ? (
-          <ErrorState title="Error al cargar retenciones" description={error.message} onRetry={() => void refetch()} />
+          <ErrorState
+            title="Error al cargar retenciones"
+            description={error.message}
+            onRetry={() => void refetch()}
+          />
         ) : !holds || holds.length === 0 ? (
-          <EmptyState title="No hay retenciones activas" description="Aplica una retención cuando un paquete requiera ser bloqueado." />
+          <EmptyState
+            title="No hay retenciones activas"
+            description="Aplica una retencion cuando un paquete requiera ser bloqueado."
+          />
         ) : (
           <Table
-            columns={["Paquete (Target)", "Motivo", "Estado", "Fecha", "Acción"]}
+            columns={["Paquete (Target)", "Motivo", "Estado", "Fecha", "Accion"]}
             rows={holds.map((hold) => [
-              <span key={`t-${hold.id}`} className="inline-code">{hold.targetId}</span>,
+              <span key={`t-${hold.id}`} className="inline-code">
+                {hold.targetId}
+              </span>,
               hold.reason,
-              <Badge key={`s-${hold.id}`} tone={STATUS_TONE[hold.status]}>{STATUS_LABEL[hold.status]}</Badge>,
+              <Badge key={`s-${hold.id}`} tone={STATUS_TONE[hold.status]}>
+                {STATUS_LABEL[hold.status]}
+              </Badge>,
               new Date(hold.createdAt).toLocaleDateString("es-DO"),
               hold.status === "ACTIVE" ? (
                 <Button
@@ -128,53 +161,115 @@ export default function HoldsPage() {
                 >
                   Liberar
                 </Button>
-              ) : <span key={`na-${hold.id}`}>—</span>,
+              ) : (
+                <span key={`na-${hold.id}`}>-</span>
+              ),
             ])}
           />
         )}
       </Card>
 
-      {/* Modal: Crear retención */}
       <Dialog
         open={showCreate}
-        title="Aplicar retención"
-        onClose={() => { setShowCreate(false); createForm.reset(); }}
+        title="Aplicar retencion"
+        onClose={() => {
+          setShowCreate(false);
+          createForm.reset();
+        }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => { setShowCreate(false); createForm.reset(); }}>Cancelar</Button>
-            <Button type="submit" form="create-hold-form" disabled={createForm.formState.isSubmitting}>
-              {createForm.formState.isSubmitting ? "Aplicando..." : "Aplicar retención"}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowCreate(false);
+                createForm.reset();
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="create-hold-form"
+              disabled={createForm.formState.isSubmitting}
+            >
+              {createForm.formState.isSubmitting
+                ? "Aplicando..."
+                : "Aplicar retencion"}
             </Button>
           </>
         }
       >
-        <form id="create-hold-form" className="form-grid" onSubmit={createForm.handleSubmit(onCreateSubmit)}>
-          <FormField label="ID del paquete" error={createForm.formState.errors.packageId?.message}>
-            <Input {...createForm.register("packageId")} placeholder="UUID del paquete" />
+        <form
+          id="create-hold-form"
+          className="form-grid"
+          onSubmit={createForm.handleSubmit(onCreateSubmit)}
+        >
+          <FormField
+            label="ID del paquete"
+            error={createForm.formState.errors.packageId?.message}
+          >
+            <Input
+              {...createForm.register("packageId")}
+              placeholder="UUID del paquete"
+            />
           </FormField>
-          <FormField label="Motivo de la retención" error={createForm.formState.errors.reason?.message}>
-            <Textarea {...createForm.register("reason")} rows={3} placeholder="Describe el motivo..." />
+          <FormField
+            label="Motivo de la retencion"
+            error={createForm.formState.errors.reason?.message}
+          >
+            <Textarea
+              {...createForm.register("reason")}
+              rows={3}
+              placeholder="Describe el motivo..."
+            />
           </FormField>
         </form>
       </Dialog>
 
-      {/* Modal: Liberar retención */}
       <Dialog
         open={!!releaseTarget}
-        title={`Liberar retención — ${releaseTarget?.targetId ?? ""}`}
-        onClose={() => { setReleaseTarget(null); releaseForm.reset(); }}
+        title={`Liberar retencion - ${releaseTarget?.targetId ?? ""}`}
+        onClose={() => {
+          setReleaseTarget(null);
+          releaseForm.reset();
+        }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => { setReleaseTarget(null); releaseForm.reset(); }}>Cancelar</Button>
-            <Button type="submit" form="release-hold-form" disabled={releaseForm.formState.isSubmitting}>
-              {releaseForm.formState.isSubmitting ? "Liberando..." : "Confirmar liberación"}
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setReleaseTarget(null);
+                releaseForm.reset();
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              form="release-hold-form"
+              disabled={releaseForm.formState.isSubmitting}
+            >
+              {releaseForm.formState.isSubmitting
+                ? "Liberando..."
+                : "Confirmar liberacion"}
             </Button>
           </>
         }
       >
-        <form id="release-hold-form" className="form-grid" onSubmit={releaseForm.handleSubmit(onReleaseSubmit)}>
-          <FormField label="Motivo de la liberación" error={releaseForm.formState.errors.releaseReason?.message}>
-            <Textarea {...releaseForm.register("releaseReason")} rows={3} placeholder="Indica la razón para liberar..." />
+        <form
+          id="release-hold-form"
+          className="form-grid"
+          onSubmit={releaseForm.handleSubmit(onReleaseSubmit)}
+        >
+          <FormField
+            label="Motivo de la liberacion"
+            error={releaseForm.formState.errors.releaseReason?.message}
+          >
+            <Textarea
+              {...releaseForm.register("releaseReason")}
+              rows={3}
+              placeholder="Indica la razon para liberar..."
+            />
           </FormField>
         </form>
       </Dialog>

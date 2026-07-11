@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaCorrectionsRepository } from './prisma-corrections.repository';
 import { CreateCorrectionDto } from './dto/create-correction.dto';
 import { UpdateCorrectionDto } from './dto/update-correction.dto';
@@ -86,6 +90,50 @@ export class CorrectionsService {
       throw new NotFoundException('Correction not found');
     }
     return correction;
+  }
+
+  async approveCorrectionRequest(
+    ctx: CommandContext,
+    correctionId: string,
+    dto: Pick<UpdateCorrectionDto, 'reason'>,
+  ) {
+    return this.updateCorrectionRequest(ctx, correctionId, {
+      status: CorrectionStatus.APPROVED,
+      reason: dto.reason,
+    });
+  }
+
+  async rejectCorrectionRequest(
+    ctx: CommandContext,
+    correctionId: string,
+    dto: Pick<UpdateCorrectionDto, 'reason'>,
+  ) {
+    return this.updateCorrectionRequest(ctx, correctionId, {
+      status: CorrectionStatus.REJECTED,
+      reason: dto.reason,
+    });
+  }
+
+  async applyCorrectionRequest(ctx: CommandContext, correctionId: string) {
+    if (!ctx.actorEmployeeId) {
+      throw new Error('Employee ID is required');
+    }
+
+    const existing = await this.repository.findById(
+      ctx.organizationId,
+      correctionId,
+    );
+    if (!existing) {
+      throw new NotFoundException('Correction not found');
+    }
+
+    if (existing.status !== CorrectionStatus.APPROVED) {
+      throw new ConflictException('Only approved corrections can be applied');
+    }
+
+    throw new ConflictException(
+      `Correction application is not configured for ${existing.targetType}`,
+    );
   }
 
   async updateCorrectionRequest(
