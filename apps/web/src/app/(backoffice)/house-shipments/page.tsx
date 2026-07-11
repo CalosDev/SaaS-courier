@@ -3,28 +3,11 @@
 import { useState } from "react";
 import useSWR from "swr";
 
-import { Badge } from "@/components/ui/badge";
+import { HouseShipmentStatusBadge } from "@/components/house-shipments/HouseShipmentStatusBadge";
 import { FormField } from "@/components/ui/form-field";
 import { Select } from "@/components/ui/select";
 import { backofficeApi } from "@/lib/api/backoffice";
-import type {
-  HouseShipment,
-  HouseShipmentStatus,
-  MasterShipment,
-} from "@/lib/api/contracts";
-
-function houseShipmentStatusBadge(status: HouseShipmentStatus) {
-  switch (status) {
-    case "DRAFT":
-      return <Badge tone="neutral">Borrador</Badge>;
-    case "CLOSED":
-      return <Badge tone="success">Cerrado</Badge>;
-    case "CANCELLED":
-      return <Badge tone="danger">Cancelado</Badge>;
-    default:
-      return <Badge tone="neutral">{status}</Badge>;
-  }
-}
+import type { HouseShipment, MasterShipment } from "@/lib/api/contracts";
 
 function masterShipmentOptionLabel(masterShipment: MasterShipment) {
   const route = [masterShipment.origin, masterShipment.destination]
@@ -141,7 +124,9 @@ export default function HouseShipmentsPage() {
                       <td>
                         <span className="inline-code">{shipment.hawb}</span>
                       </td>
-                      <td>{houseShipmentStatusBadge(shipment.status)}</td>
+                      <td>
+                        <HouseShipmentStatusBadge status={shipment.status} />
+                      </td>
                       <td>{shipment.packages?.length ?? 0}</td>
                       <td>{shipment.notes || "-"}</td>
                     </tr>
