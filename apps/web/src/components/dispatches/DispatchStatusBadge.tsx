@@ -5,9 +5,9 @@ export function DispatchStatusBadge({ status }: { status: DispatchStatus }) {
   switch (status) {
     case "DRAFT":
       return <Badge tone="neutral">Borrador</Badge>;
-    case "SCHEDULED":
-      return <Badge tone="neutral">Programado</Badge>;
-    case "IN_TRANSIT":
+    case "CLOSED":
+      return <Badge tone="neutral">Cerrado</Badge>;
+    case "DEPARTED":
       return <Badge tone="warning">En Tránsito</Badge>;
     case "ARRIVED":
       return <Badge tone="neutral">Llegó a Destino</Badge>;

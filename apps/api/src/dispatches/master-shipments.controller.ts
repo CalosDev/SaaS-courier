@@ -6,9 +6,11 @@ import {
   Param,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { AddPackagesDto } from './dto/add-packages.dto';
 import { CreateDispatchDto } from './dto/create-dispatch.dto';
+import { UpdateMawbDto } from './dto/update-mawb.dto';
 import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { DispatchesService } from './dispatches.service';
 import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
@@ -54,6 +56,26 @@ export class MasterShipmentsController {
     return this.dispatchesService.updateDispatch(ctx, id, dto);
   }
 
+  @Patch(':id/mawb')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
+  async updateMawb(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+    @Body() dto: UpdateMawbDto,
+  ) {
+    return this.dispatchesService.updateMasterShipmentMawb(ctx, id, dto.mawb);
+  }
+
+  @Put(':id/packages')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
+  async replacePackages(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+    @Body() dto: AddPackagesDto,
+  ) {
+    return this.dispatchesService.replaceMasterShipmentPackages(ctx, id, dto);
+  }
+
   @Post(':id/packages')
   @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
   async addPackages(
@@ -72,5 +94,41 @@ export class MasterShipmentsController {
     @Body() dto: AddPackagesDto,
   ) {
     return this.dispatchesService.removePackages(ctx, id, dto);
+  }
+
+  @Post(':id/close')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
+  async closeMasterShipment(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+  ) {
+    return this.dispatchesService.closeMasterShipment(ctx, id);
+  }
+
+  @Post(':id/depart')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
+  async departMasterShipment(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+  ) {
+    return this.dispatchesService.departMasterShipment(ctx, id);
+  }
+
+  @Post(':id/arrive')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
+  async arriveMasterShipment(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+  ) {
+    return this.dispatchesService.arriveMasterShipment(ctx, id);
+  }
+
+  @Post(':id/cancel')
+  @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
+  async cancelMasterShipment(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+  ) {
+    return this.dispatchesService.cancelMasterShipment(ctx, id);
   }
 }

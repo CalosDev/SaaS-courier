@@ -10,9 +10,18 @@ import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { AddPackagesDto } from './dto/add-packages.dto';
 import { DispatchStatus } from '../generated/prisma/client';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
+import type { AuditActionCode } from '../audit/audit.catalog';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CommandContext } from '../request-context/request-context.types';
 import { randomUUID } from 'crypto';
+
+type MasterShipmentTransition = {
+  action: AuditActionCode;
+  targetStatus: DispatchStatus;
+  allowedPreviousStatuses: readonly DispatchStatus[];
+  timestampField?: 'departureTime' | 'actualArrivalTime';
+  emitOutbox?: boolean;
+};
 
 @Injectable()
 export class DispatchesService {
@@ -115,6 +124,7 @@ export class DispatchesService {
       }
 
       if (
+        existing.status === DispatchStatus.CLOSED ||
         existing.status === DispatchStatus.COMPLETED ||
         existing.status === DispatchStatus.CANCELLED
       ) {
@@ -183,6 +193,250 @@ export class DispatchesService {
           },
         });
       }
+
+      return updated;
+    });
+  }
+
+  async replaceMasterShipmentPackages(
+    ctx: CommandContext,
+    dispatchId: string,
+    dto: AddPackagesDto,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await this.repository.findById(
+        ctx.organizationId,
+        dispatchId,
+        tx,
+      );
+      if (!existing) {
+        throw new NotFoundException('Master shipment not found');
+      }
+
+      if (existing.status !== DispatchStatus.DRAFT) {
+        throw new BadRequestException(
+          'Can only replace packages on a DRAFT master shipment',
+        );
+      }
+
+      const packageIds = [...new Set(dto.packageIds)];
+      if (packageIds.length !== dto.packageIds.length) {
+        throw new BadRequestException('Package IDs must be unique');
+      }
+
+      const packages = await tx.package.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          id: { in: packageIds },
+        },
+        select: {
+          id: true,
+          dispatchId: true,
+        },
+      });
+
+      if (packages.length !== packageIds.length) {
+        throw new NotFoundException('One or more packages not found');
+      }
+
+      const assignedToAnotherShipment = packages.find(
+        (pkg) => pkg.dispatchId && pkg.dispatchId !== dispatchId,
+      );
+      if (assignedToAnotherShipment) {
+        throw new BadRequestException(
+          `Package ${assignedToAnotherShipment.id} is already assigned to another master shipment`,
+        );
+      }
+
+      await tx.package.updateMany({
+        where: {
+          organizationId: ctx.organizationId,
+          dispatchId,
+          id: { notIn: packageIds },
+        },
+        data: { dispatchId: null },
+      });
+
+      await tx.package.updateMany({
+        where: {
+          organizationId: ctx.organizationId,
+          id: { in: packageIds },
+        },
+        data: { dispatchId },
+      });
+
+      const updated = await this.repository.findById(
+        ctx.organizationId,
+        dispatchId,
+        tx,
+      );
+      if (!updated) {
+        throw new NotFoundException('Master shipment not found');
+      }
+
+      await this.auditWriter.write(tx, {
+        context: ctx,
+        action: 'master_shipment.packages.replaced',
+        entityId: updated.id,
+        entityType: 'MASTER_SHIPMENT',
+        changedFields: ['packages'],
+        payload: { packageIds },
+        metadata: {
+          masterShipmentId: updated.id,
+          packageCount: packageIds.length,
+        },
+        emitOutbox: false,
+      });
+
+      return updated;
+    });
+  }
+
+  async closeMasterShipment(ctx: CommandContext, dispatchId: string) {
+    return this.transitionMasterShipment(ctx, dispatchId, {
+      action: 'master_shipment.closed',
+      targetStatus: DispatchStatus.CLOSED,
+      allowedPreviousStatuses: [DispatchStatus.DRAFT],
+    });
+  }
+
+  async departMasterShipment(ctx: CommandContext, dispatchId: string) {
+    return this.transitionMasterShipment(ctx, dispatchId, {
+      action: 'master_shipment.departed',
+      targetStatus: DispatchStatus.DEPARTED,
+      allowedPreviousStatuses: [DispatchStatus.CLOSED],
+      timestampField: 'departureTime',
+    });
+  }
+
+  async arriveMasterShipment(ctx: CommandContext, dispatchId: string) {
+    return this.transitionMasterShipment(ctx, dispatchId, {
+      action: 'master_shipment.arrived',
+      targetStatus: DispatchStatus.ARRIVED,
+      allowedPreviousStatuses: [DispatchStatus.DEPARTED],
+      timestampField: 'actualArrivalTime',
+    });
+  }
+
+  async cancelMasterShipment(ctx: CommandContext, dispatchId: string) {
+    return this.transitionMasterShipment(ctx, dispatchId, {
+      action: 'master_shipment.cancelled',
+      targetStatus: DispatchStatus.CANCELLED,
+      allowedPreviousStatuses: [DispatchStatus.DRAFT, DispatchStatus.CLOSED],
+      emitOutbox: false,
+    });
+  }
+
+  async updateMasterShipmentMawb(
+    ctx: CommandContext,
+    dispatchId: string,
+    mawb: string,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await this.repository.findById(
+        ctx.organizationId,
+        dispatchId,
+        tx,
+      );
+      if (!existing) {
+        throw new NotFoundException('Master shipment not found');
+      }
+
+      if (existing.status === DispatchStatus.CANCELLED) {
+        throw new BadRequestException(
+          'Cannot update MAWB on a CANCELLED master shipment',
+        );
+      }
+
+      if (existing.mawb === mawb) {
+        return existing;
+      }
+
+      const updated = await this.repository.update(
+        ctx.organizationId,
+        dispatchId,
+        { mawb },
+        tx,
+      );
+
+      await this.auditWriter.write(tx, {
+        context: ctx,
+        action: 'master_shipment.mawb.updated',
+        entityId: updated.id,
+        entityType: 'MASTER_SHIPMENT',
+        changedFields: ['mawb'],
+        beforeData: { mawb: existing.mawb },
+        afterData: { mawb: updated.mawb },
+        payload: { masterShipmentId: updated.id, mawb: updated.mawb },
+        metadata: { masterShipmentId: updated.id },
+      });
+
+      return updated;
+    });
+  }
+
+  private async transitionMasterShipment(
+    ctx: CommandContext,
+    dispatchId: string,
+    transition: MasterShipmentTransition,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const existing = await this.repository.findById(
+        ctx.organizationId,
+        dispatchId,
+        tx,
+      );
+      if (!existing) {
+        throw new NotFoundException('Master shipment not found');
+      }
+
+      if (existing.status === transition.targetStatus) {
+        return existing;
+      }
+
+      if (!transition.allowedPreviousStatuses.includes(existing.status)) {
+        throw new BadRequestException(
+          `Cannot transition master shipment from ${existing.status} to ${transition.targetStatus}`,
+        );
+      }
+
+      const timestamp = new Date();
+      const data =
+        transition.timestampField === undefined
+          ? { status: transition.targetStatus }
+          : {
+              status: transition.targetStatus,
+              [transition.timestampField]:
+                existing[transition.timestampField] ?? timestamp,
+            };
+
+      const updated = await this.repository.update(
+        ctx.organizationId,
+        dispatchId,
+        data,
+        tx,
+      );
+
+      await this.auditWriter.write(tx, {
+        context: ctx,
+        action: transition.action,
+        entityId: updated.id,
+        entityType: 'MASTER_SHIPMENT',
+        changedFields: ['status'],
+        beforeData: { status: existing.status },
+        afterData: { status: updated.status },
+        payload: {
+          masterShipmentId: updated.id,
+          previousStatus: existing.status,
+          newStatus: updated.status,
+        },
+        metadata: {
+          masterShipmentId: updated.id,
+          previousStatus: existing.status,
+          newStatus: updated.status,
+        },
+        emitOutbox: transition.emitOutbox,
+      });
 
       return updated;
     });

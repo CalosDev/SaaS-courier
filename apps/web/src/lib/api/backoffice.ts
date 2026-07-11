@@ -49,6 +49,7 @@ import type {
   MasterShipment,
   CreateMasterShipmentDto,
   UpdateMasterShipmentDto,
+  UpdateMawbDto,
   AddPackagesToMasterShipmentDto,
   CreateDispatchDto,
   UpdateDispatchDto,
@@ -471,11 +472,29 @@ export const backofficeApi = {
   updateMasterShipment(id: string, data: UpdateMasterShipmentDto) {
     return apiClient.patch<MasterShipment>(`/master-shipments/${id}`, data as unknown as Record<string, unknown>);
   },
+  updateMasterShipmentMawb(id: string, data: UpdateMawbDto) {
+    return apiClient.patch<MasterShipment>(`/master-shipments/${id}/mawb`, data as unknown as Record<string, unknown>);
+  },
+  replaceMasterShipmentPackages(id: string, data: AddPackagesToMasterShipmentDto) {
+    return apiClient.put<MasterShipment>(`/master-shipments/${id}/packages`, data as unknown as Record<string, unknown>);
+  },
   addPackagesToMasterShipment(id: string, data: AddPackagesToMasterShipmentDto) {
     return apiClient.post<MasterShipment>(`/master-shipments/${id}/packages`, data as unknown as Record<string, unknown>);
   },
   removePackagesFromMasterShipment(id: string, data: AddPackagesToMasterShipmentDto) {
     return apiClient.delete<MasterShipment>(`/master-shipments/${id}/packages`, data as unknown as Record<string, unknown>);
+  },
+  closeMasterShipment(id: string) {
+    return apiClient.post<MasterShipment>(`/master-shipments/${id}/close`, {});
+  },
+  departMasterShipment(id: string) {
+    return apiClient.post<MasterShipment>(`/master-shipments/${id}/depart`, {});
+  },
+  arriveMasterShipment(id: string) {
+    return apiClient.post<MasterShipment>(`/master-shipments/${id}/arrive`, {});
+  },
+  cancelMasterShipment(id: string) {
+    return apiClient.post<MasterShipment>(`/master-shipments/${id}/cancel`, {});
   },
 
   // Holds

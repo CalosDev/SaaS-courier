@@ -283,6 +283,7 @@ enum CorrectionTargetType {
 
 enum DispatchStatus {
   DRAFT
+  CLOSED
   DEPARTED
   ARRIVED
   COMPLETED

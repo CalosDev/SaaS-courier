@@ -2,6 +2,7 @@ import { DispatchStatus } from '../generated/prisma/client';
 
 export const DISPATCH_STATUS_VALUES = [
   DispatchStatus.DRAFT,
+  DispatchStatus.CLOSED,
   DispatchStatus.DEPARTED,
   DispatchStatus.ARRIVED,
   DispatchStatus.COMPLETED,

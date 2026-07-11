@@ -712,8 +712,8 @@ export type CustomsCaseListResponse = {
 
 export type DispatchStatus =
   | "DRAFT"
-  | "SCHEDULED"
-  | "IN_TRANSIT"
+  | "CLOSED"
+  | "DEPARTED"
   | "ARRIVED"
   | "COMPLETED"
   | "CANCELLED";
@@ -759,6 +759,10 @@ export interface UpdateDispatchDto {
 
 export interface AddPackagesToDispatchDto {
   packageIds: string[];
+}
+
+export interface UpdateMawbDto {
+  mawb: string;
 }
 
 export type MasterShipmentStatus = DispatchStatus;
