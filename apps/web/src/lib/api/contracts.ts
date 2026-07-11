@@ -856,7 +856,7 @@ export interface CustomsManifest {
   organizationId: string;
   code: string;
   flightNumber: string;
-  arrivalDate: string;
+  arrivalDate: string | null;
   status: CustomsManifestStatus;
   createdAt: string;
   updatedAt: string;
@@ -865,7 +865,7 @@ export interface CustomsManifest {
 
 export interface CreateCustomsManifestDto {
   flightNumber: string;
-  arrivalDate: string;
+  arrivalDate?: string;
 }
 
 export interface UpdateCustomsManifestDto {

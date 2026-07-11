@@ -7,6 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 
+function formatArrivalDate(arrivalDate: CustomsManifest["arrivalDate"]) {
+  return arrivalDate ? new Date(arrivalDate).toLocaleDateString() : "Sin fecha";
+}
+
 export default function CustomsManifestsPage() {
   const { data: manifests, error, isLoading, mutate } = useSWR<CustomsManifest[]>(
     "/customs-manifests",
@@ -83,7 +87,7 @@ export default function CustomsManifestsPage() {
                       {manifest.flightNumber}
                     </td>
                     <td>
-                      {new Date(manifest.arrivalDate).toLocaleDateString()}
+                      {formatArrivalDate(manifest.arrivalDate)}
                     </td>
                     <td>
                       {getStatusBadge(manifest.status)}
