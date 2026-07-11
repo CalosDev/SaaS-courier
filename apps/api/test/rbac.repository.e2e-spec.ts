@@ -3,6 +3,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 
 import { AppModule } from '../src/app.module';
+import { PERMISSION_CATALOG_CODES } from '../src/rbac/permission.catalog';
 import {
   EmployeeRoleConflictError,
   RoleCodeConflictError,
@@ -44,8 +45,12 @@ describe('Rbac integration', () => {
       const firstSync = await rbacService.syncPermissionCatalog();
       const secondSync = await rbacService.syncPermissionCatalog();
 
-      expect(firstSync.totalActiveCatalogPermissions).toBe(23);
-      expect(secondSync.totalActiveCatalogPermissions).toBe(23);
+      expect(firstSync.totalActiveCatalogPermissions).toBe(
+        PERMISSION_CATALOG_CODES.size,
+      );
+      expect(secondSync.totalActiveCatalogPermissions).toBe(
+        PERMISSION_CATALOG_CODES.size,
+      );
 
       const organizationOne = await prismaService.organization.create({
         data: {

@@ -1,8 +1,28 @@
 -- CreateEnum
 CREATE TYPE "package_status" AS ENUM ('RECEPTION_PENDING', 'CANCELLED');
 
--- AlterEnum
-ALTER TYPE "prealert_status" ADD VALUE 'MATCHED';
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type
+    WHERE typname = 'prealert_status'
+  ) THEN
+    CREATE TYPE "prealert_status" AS ENUM ('PENDING_ARRIVAL', 'CANCELLED');
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type t
+    INNER JOIN pg_enum e
+      ON e.enumtypid = t.oid
+    WHERE t.typname = 'prealert_status'
+      AND e.enumlabel = 'MATCHED'
+  ) THEN
+    ALTER TYPE "prealert_status" ADD VALUE 'MATCHED';
+  END IF;
+END
+$$;
 
 -- CreateTable
 CREATE TABLE "packages" (
@@ -83,9 +103,6 @@ ALTER TABLE "packages" ADD CONSTRAINT "packages_organization_id_fkey" FOREIGN KE
 
 -- AddForeignKey
 ALTER TABLE "packages" ADD CONSTRAINT "packages_organization_id_customer_id_fkey" FOREIGN KEY ("organization_id", "customer_id") REFERENCES "customers"("organization_id", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "packages" ADD CONSTRAINT "packages_organization_id_prealert_id_fkey" FOREIGN KEY ("organization_id", "prealert_id") REFERENCES "prealerts"("organization_id", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "packages" ADD CONSTRAINT "packages_organization_id_registered_by_employee_id_fkey" FOREIGN KEY ("organization_id", "registered_by_employee_id") REFERENCES "employees"("organization_id", "id") ON DELETE RESTRICT ON UPDATE CASCADE;

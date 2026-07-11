@@ -1,4 +1,5 @@
 import type { CommandContext } from '../request-context/request-context.types';
+import type { PackageStatus } from '../generated/prisma/client';
 
 export const PREALERT_STATUS_VALUES = [
   'PENDING_ARRIVAL',
@@ -32,7 +33,7 @@ export interface PrealertEmployeeSummary {
 export interface PrealertMatchedPackageSummary {
   id: string;
   internalTrackingNumber: string;
-  status: 'RECEPTION_PENDING' | 'RECEIVED_AT_ORIGIN' | 'CANCELLED';
+  status: PackageStatus;
 }
 
 export interface PrealertRecord {

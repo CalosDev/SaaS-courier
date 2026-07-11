@@ -1,0 +1,62 @@
+import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { Prisma, CorrectionRequest } from '../generated/prisma/client';
+
+@Injectable()
+export class PrismaCorrectionsRepository {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async create(
+    data: Prisma.CorrectionRequestUncheckedCreateInput,
+  ): Promise<CorrectionRequest> {
+    return this.prisma.correctionRequest.create({ data });
+  }
+
+  async findMany(params: {
+    where?: Prisma.CorrectionRequestWhereInput;
+    orderBy?: Prisma.CorrectionRequestOrderByWithRelationInput;
+  }): Promise<CorrectionRequest[]> {
+    return this.prisma.correctionRequest.findMany(params);
+  }
+
+  async findById(
+    organizationId: string,
+    id: string,
+  ): Promise<CorrectionRequest | null> {
+    return this.prisma.correctionRequest.findUnique({
+      where: { organizationId_id: { organizationId, id } },
+      include: {
+        decisions: true,
+      },
+    });
+  }
+
+  async update(
+    organizationId: string,
+    id: string,
+    data: Prisma.CorrectionRequestUncheckedUpdateInput,
+  ): Promise<CorrectionRequest> {
+    return this.prisma.correctionRequest.update({
+      where: { organizationId_id: { organizationId, id } },
+      data,
+    });
+  }
+
+  async recordDecision(
+    organizationId: string,
+    correctionRequestId: string,
+    employeeId: string,
+    decision: 'APPROVED' | 'REJECTED',
+    reason?: string,
+  ) {
+    return this.prisma.correctionDecision.create({
+      data: {
+        organizationId,
+        correctionRequestId,
+        decidedByEmployeeId: employeeId,
+        decision,
+        reason,
+      },
+    });
+  }
+}

@@ -58,6 +58,16 @@ const permissionCatalog = [
     description: 'Allows managing customer records within the current tenant.',
   },
   {
+    code: 'customs.read',
+    name: 'Read customs cases',
+    description: 'Allows reading customs cases within the current tenant.',
+  },
+  {
+    code: 'customs.manage',
+    name: 'Manage customs cases',
+    description: 'Allows managing customs cases within the current tenant.',
+  },
+  {
     code: 'customers.customs.read',
     name: 'Read customer customs profiles',
     description:
@@ -126,6 +136,138 @@ const permissionCatalog = [
     description:
       'Allows managing warehouse locations and moving received packages within inventory for the current tenant.',
   },
+  {
+    code: 'rates.read',
+    name: 'Read rates',
+    description:
+      'Allows reading courier services, rate cards and deterministic quotes within the current tenant.',
+  },
+  {
+    code: 'rates.manage',
+    name: 'Manage rates',
+    description:
+      'Allows managing courier services, draft rate cards, rate rules and activations within the current tenant.',
+  },
+  {
+    code: 'billing.read',
+    name: 'Read billing',
+    description:
+      'Allows reading invoices and billing data within the current tenant.',
+  },
+  {
+    code: 'billing.manage',
+    name: 'Manage billing',
+    description:
+      'Allows creating and managing invoices within the current tenant.',
+  },
+  {
+    code: 'payments.manage',
+    name: 'Manage payments',
+    description:
+      'Allows recording, applying, and voiding payments within the current tenant.',
+  },
+  {
+    code: 'pickups.read',
+    name: 'Read pickup requests',
+    description:
+      'Allows reading pickup requests and their status within the current tenant.',
+  },
+  {
+    code: 'pickups.manage',
+    name: 'Manage pickup requests',
+    description:
+      'Allows creating, updating and processing pickup requests within the current tenant.',
+  },
+  {
+    code: 'tracking.read',
+    name: 'Read package tracking',
+    description:
+      'Allows reading package tracking events within the current tenant.',
+  },
+  {
+    code: 'tracking.manage',
+    name: 'Manage package tracking',
+    description:
+      'Allows adding tracking events to packages within the current tenant.',
+  },
+  {
+    code: 'dispatches.read',
+    name: 'Read dispatches',
+    description: 'Allows reading flight dispatches within the current tenant.',
+  },
+  {
+    code: 'dispatches.manage',
+    name: 'Manage dispatches',
+    description: 'Allows managing flight dispatches within the current tenant.',
+  },
+  {
+    code: 'customs_manifests.read',
+    name: 'Read customs manifests',
+    description: 'Allows reading customs manifests within the current tenant.',
+  },
+  {
+    code: 'customs_manifests.manage',
+    name: 'Manage customs manifests',
+    description: 'Allows managing customs manifests within the current tenant.',
+  },
+  {
+    code: 'shipments.read',
+    name: 'Read shipments',
+    description:
+      'Allows reading house and master shipments within the current tenant.',
+  },
+  {
+    code: 'shipments.manage',
+    name: 'Manage shipments',
+    description:
+      'Allows managing house and master shipments within the current tenant.',
+  },
+  {
+    code: 'holds.read',
+    name: 'Read holds',
+    description: 'Allows reading operational holds within the current tenant.',
+  },
+  {
+    code: 'holds.manage',
+    name: 'Manage holds',
+    description: 'Allows managing operational holds within the current tenant.',
+  },
+  {
+    code: 'corrections.read',
+    name: 'Read corrections',
+    description:
+      'Allows reading correction requests within the current tenant.',
+  },
+  {
+    code: 'corrections.manage',
+    name: 'Manage corrections',
+    description:
+      'Allows managing correction requests within the current tenant.',
+  },
+  {
+    code: 'transfers.read',
+    name: 'Read transfers',
+    description:
+      'Allows reading internal facility transfers within the current tenant.',
+  },
+  {
+    code: 'transfers.manage',
+    name: 'Manage transfers',
+    description:
+      'Allows managing internal facility transfers within the current tenant.',
+  },
+  {
+    code: 'deliveries.read',
+    name: 'Read deliveries',
+    description:
+      'Allows reading final delivery orders and attempts within the current tenant.',
+  },
+  {
+    code: 'deliveries.manage',
+    name: 'Manage deliveries',
+    description:
+      'Allows creating, updating and dispatching final deliveries within the current tenant.',
+  },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionCode = (typeof permissionCatalog)[number]['code'];
@@ -137,3 +279,32 @@ export const PERMISSION_CATALOG = Object.freeze(
 export const PERMISSION_CATALOG_CODES = new Set<PermissionCode>(
   PERMISSION_CATALOG.map((definition) => definition.code),
 );
+export const CUSTOMS_MANIFEST_PERMISSIONS = {
+  VIEW: 'customs_manifests.read',
+  MANAGE: 'customs_manifests.manage',
+} as const;
+
+export const CUSTOMS_PERMISSIONS = {
+  READ: 'customs.read',
+  MANAGE: 'customs.manage',
+} as const;
+
+export const CUSTOMER_PERMISSIONS = {
+  VIEW: 'shipments.read',
+  MANAGE: 'shipments.manage',
+} as const;
+
+export const SHIPMENT_PERMISSIONS = {
+  VIEW: 'shipments.read',
+  MANAGE: 'shipments.manage',
+} as const;
+
+export const TRANSFER_PERMISSIONS = {
+  VIEW: 'transfers.read',
+  MANAGE: 'transfers.manage',
+} as const;
+
+export const DELIVERY_PERMISSIONS = {
+  READ: 'deliveries.read',
+  MANAGE: 'deliveries.manage',
+} as const;

@@ -1,4 +1,14 @@
-CREATE TYPE "prealert_status" AS ENUM ('PENDING_ARRIVAL', 'CANCELLED');
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_type
+    WHERE typname = 'prealert_status'
+  ) THEN
+    CREATE TYPE "prealert_status" AS ENUM ('PENDING_ARRIVAL', 'CANCELLED');
+  END IF;
+END
+$$;
 CREATE TYPE "prealert_invoice_status" AS ENUM ('NOT_REQUIRED', 'PENDING', 'PROVIDED', 'REJECTED', 'VERIFIED');
 
 CREATE TABLE "prealerts" (
@@ -67,3 +77,20 @@ ALTER TABLE "prealerts" ADD CONSTRAINT "prealerts_organization_id_created_by_emp
   FOREIGN KEY ("organization_id", "created_by_employee_id") REFERENCES "employees"("organization_id", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "prealerts" ADD CONSTRAINT "prealerts_organization_id_cancelled_by_employee_id_fkey"
   FOREIGN KEY ("organization_id", "cancelled_by_employee_id") REFERENCES "employees"("organization_id", "id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'packages_organization_id_prealert_id_fkey'
+  ) THEN
+    ALTER TABLE "packages"
+      ADD CONSTRAINT "packages_organization_id_prealert_id_fkey"
+      FOREIGN KEY ("organization_id", "prealert_id")
+      REFERENCES "prealerts"("organization_id", "id")
+      ON DELETE RESTRICT
+      ON UPDATE CASCADE;
+  END IF;
+END
+$$;

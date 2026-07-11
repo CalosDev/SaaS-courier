@@ -3,6 +3,7 @@ import {
   Prisma,
   type Employee,
   type Prealert,
+  type PackageStatus,
 } from '../generated/prisma/client';
 
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
@@ -38,7 +39,7 @@ type PrealertWithRelations = Prealert & {
   packages: Array<{
     id: string;
     internalTrackingNumber: string;
-    status: 'RECEPTION_PENDING' | 'RECEIVED_AT_ORIGIN' | 'CANCELLED';
+    status: PackageStatus;
   }>;
   createdByEmployee: Pick<Employee, 'id' | 'firstName' | 'lastName'>;
   cancelledByEmployee: Pick<Employee, 'id' | 'firstName' | 'lastName'> | null;

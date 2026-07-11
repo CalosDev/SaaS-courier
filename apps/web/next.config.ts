@@ -3,7 +3,7 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   async rewrites() {
     const apiInternalUrl =
-      process.env.API_INTERNAL_URL?.trim() || "http://localhost:4000";
+      process.env.API_INTERNAL_URL?.trim() || "http://127.0.0.1:4000";
 
     return [
       {

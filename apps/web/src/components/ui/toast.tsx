@@ -6,7 +6,9 @@ import {
   useContext,
   useMemo,
   useState,
+  useEffect,
 } from "react";
+import { onApiError } from "@/lib/api/api-events";
 
 const ToastContext = createContext<{
   pushToast: (message: string) => void;
@@ -22,6 +24,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       setMessages((current) => current.filter((item) => item !== message));
     }, 3000);
   }, []);
+
+  useEffect(() => {
+    return onApiError((message) => {
+      pushToast(message);
+    });
+  }, [pushToast]);
 
   const value = useMemo(() => ({ pushToast }), [pushToast]);
 

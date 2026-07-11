@@ -3,6 +3,10 @@ import type { CommandContext } from '../request-context/request-context.types';
 export const PACKAGE_STATUS_VALUES = [
   'RECEPTION_PENDING',
   'RECEIVED_AT_ORIGIN',
+  'IN_TRANSIT',
+  'ARRIVED_AT_DESTINATION',
+  'OUT_FOR_DELIVERY',
+  'DELIVERED',
   'CANCELLED',
 ] as const;
 export const PACKAGE_SOURCE_VALUES = ['MANUAL', 'PREALERT'] as const;

@@ -76,4 +76,42 @@ describe('PrismaAuditOutboxWriter', () => {
       }),
     ).rejects.toThrow('prohibited');
   });
+
+  it('can write audit without creating an outbox event', async () => {
+    const auditCreate = jest
+      .fn<Promise<{ id: string }>, [Prisma.AuditLogCreateArgs]>()
+      .mockResolvedValue({ id: 'audit-only-id' });
+    const outboxCreate = jest
+      .fn<Promise<{ id: string }>, [Prisma.OutboxEventCreateArgs]>()
+      .mockResolvedValue({ id: 'event-id' });
+    const tx = {
+      auditLog: { create: auditCreate },
+      outboxEvent: { create: outboxCreate },
+    } as unknown as Prisma.TransactionClient;
+    const writer = new PrismaAuditOutboxWriter();
+
+    await writer.write(tx, {
+      context: {
+        organizationId: 'a83a1f26-40f9-4be0-86a5-b78de4a06ea9',
+        actorType: 'EMPLOYEE',
+        actorUserId: '0c20e5ee-43c1-41bd-b357-d617559e59cc',
+        actorEmployeeId: '8641345f-b454-447c-a034-bf80c06e7062',
+        source: 'HTTP',
+        requestId: '613769cc-6261-41bc-bb57-b76367f67eaa',
+        correlationId: 'admin:update',
+        ipAddress: null,
+        userAgent: null,
+      },
+      action: 'service.updated',
+      entityType: 'COURIER_SERVICE',
+      entityId: 'service-id',
+      changedFields: ['name'],
+      afterData: { name: 'Updated' },
+      payload: { serviceId: 'service-id' },
+      emitOutbox: false,
+    });
+
+    expect(auditCreate).toHaveBeenCalledTimes(1);
+    expect(outboxCreate).not.toHaveBeenCalled();
+  });
 });

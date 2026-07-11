@@ -13,6 +13,14 @@ import {
   ShieldCheck,
   Users,
   Warehouse,
+  Plane,
+  AlertTriangle,
+  FileEdit,
+  Truck,
+  FileText,
+  Receipt,
+  CreditCard,
+  MapPin,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -89,16 +97,76 @@ const NAV_ITEMS: NavItem[] = [
     requiredPermissions: ["packages.read"],
   },
   {
+    href: "/holds",
+    label: "Retenciones",
+    icon: AlertTriangle,
+    requiredPermissions: ["holds.read"],
+  },
+  {
+    href: "/corrections",
+    label: "Correcciones",
+    icon: FileEdit,
+    requiredPermissions: ["corrections.read"],
+  },
+  {
+    href: "/house-shipments",
+    label: "Envíos",
+    icon: Truck,
+    requiredPermissions: ["shipments.read"],
+  },
+  {
+    href: "/customs-manifests",
+    label: "Manifiestos",
+    icon: FileText,
+    requiredPermissions: ["customs_manifests.read"],
+  },
+  {
+    href: "/customs/cases",
+    label: "Casos DGA",
+    icon: ShieldCheck,
+    requiredPermissions: ["customs.read"],
+  },
+  {
     href: "/inventory/packages",
     label: "Inventario",
     icon: PackageSearch,
     requiredPermissions: ["inventory.read"],
   },
   {
+    href: "/dispatches",
+    label: "Despachos",
+    icon: Plane,
+    requiredPermissions: ["dispatches.read"],
+  },
+  {
+    href: "/pickups",
+    label: "Recolecciones",
+    icon: MapPin,
+    requiredPermissions: ["pickups.read"],
+  },
+  {
+    href: "/billing/invoices",
+    label: "Facturación",
+    icon: Receipt,
+    requiredPermissions: ["billing.read"],
+  },
+  {
+    href: "/billing/payments",
+    label: "Pagos",
+    icon: CreditCard,
+    requiredPermissions: ["billing.read"],
+  },
+  {
     href: "/inventory/locations",
     label: "Ubicaciones",
     icon: Warehouse,
     requiredPermissions: ["inventory.read"],
+  },
+  {
+    href: "/transfers",
+    label: "Transferencias",
+    icon: Truck,
+    requiredPermissions: ["transfers.read"],
   },
 ];
 

@@ -12,6 +12,7 @@ import { configureHttpApp } from '../src/http/configure-http-app';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { AuthenticatedOnly } from '../src/rbac/http/authenticated-only.decorator';
 import { RequirePermissions } from '../src/rbac/http/require-permissions.decorator';
+import { PERMISSION_CATALOG_CODES } from '../src/rbac/permission.catalog';
 import { RbacService } from '../src/rbac/rbac.service';
 import { SessionsService } from '../src/sessions/sessions.service';
 import { AuthCookieService } from '../src/auth/http/auth-cookie.service';
@@ -150,31 +151,9 @@ describe('HTTP authorization with effective permissions', () => {
         },
       });
 
-      expect(permissionCatalog.map((permission) => permission.code)).toEqual([
-        'audit.read',
-        'customers.customs.manage',
-        'customers.customs.read',
-        'customers.manage',
-        'customers.read',
-        'employees.manage',
-        'employees.read',
-        'facilities.manage',
-        'facilities.read',
-        'inventory.manage',
-        'inventory.read',
-        'organizations.manage',
-        'organizations.read',
-        'package_documents.manage',
-        'package_documents.read',
-        'packages.manage',
-        'packages.read',
-        'packages.receive',
-        'permissions.read',
-        'prealerts.manage',
-        'prealerts.read',
-        'roles.manage',
-        'roles.read',
-      ]);
+      expect(permissionCatalog.map((permission) => permission.code)).toEqual(
+        [...PERMISSION_CATALOG_CODES].sort(),
+      );
 
       const permissionsByCode = new Map(
         permissionCatalog.map((permission) => [permission.code, permission]),

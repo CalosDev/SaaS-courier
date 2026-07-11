@@ -1,45 +1,60 @@
 "use client";
 
-import { useCallback } from "react";
-
+import useSWR from "swr";
+import { backofficeApi } from "@/lib/api/backoffice";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
-import { useAsyncState } from "@/hooks/use-async-state";
-import { backofficeApi } from "@/lib/api/backoffice";
+import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
-  const resource = useAsyncState(
-    useCallback(
-      () =>
-      Promise.all([
+  const { data, error, isLoading } = useSWR(
+    "/dashboard-data",
+    async () => {
+      const [organization, capabilities, onboarding, metricsResponse] = await Promise.all([
         backofficeApi.getCurrentOrganization(),
         backofficeApi.getCapabilities(),
         backofficeApi.getOnboarding(),
-      ]).then(([organization, capabilities, onboarding]) => ({
-        organization,
-        capabilities,
-        onboarding,
-      })),
-      [],
-    ),
+        backofficeApi.getDashboardMetrics(),
+      ]);
+      return { organization, capabilities, onboarding, metrics: metricsResponse };
+    }
   );
 
-  if (resource.status === "loading") {
+  const handleExportCsv = async () => {
+    try {
+      const response = await fetch('/backend/reports/packages-export.csv');
+      if (!response.ok) throw new Error("Error fetching CSV");
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'paquetes_activos.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (err) {
+      alert("No se pudo descargar el reporte.");
+      console.error(err);
+    }
+  };
+
+  if (isLoading) {
     return <LoadingState label="Cargando dashboard..." />;
   }
 
-  if (resource.status === "error") {
+  if (error || !data) {
     return (
       <ErrorState
         title="No fue posible cargar el dashboard"
-        description={resource.error.message}
-        onRetry={() => void resource.refresh()}
+        description={error?.message || "Ocurrió un error inesperado."}
       />
     );
   }
 
-  const { organization, capabilities, onboarding } = resource.data;
+  const { organization, capabilities, onboarding, metrics } = data;
 
   return (
     <div className="page-stack">
@@ -48,9 +63,26 @@ export default function DashboardPage() {
           <h1>Dashboard</h1>
           <p>{organization.commercialName}</p>
         </div>
+        <div className="actions-row">
+          <Button onClick={handleExportCsv} variant="primary">
+            Exportar Paquetes (CSV)
+          </Button>
+        </div>
       </section>
 
       <section className="stats-grid">
+        <Card>
+          <h2>Paquetes Pendientes</h2>
+          <strong>{metrics.pendingPackages}</strong>
+        </Card>
+        <Card>
+          <h2>Prealertas sin Match</h2>
+          <strong>{metrics.unmatchedPrealerts}</strong>
+        </Card>
+        <Card>
+          <h2>Envíos Activos</h2>
+          <strong>{metrics.activeShipments}</strong>
+        </Card>
         <Card>
           <h2>Plan</h2>
           <strong>{capabilities.planCode}</strong>

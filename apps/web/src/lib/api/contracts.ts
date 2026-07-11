@@ -57,6 +57,27 @@ export type AuthorizationResponse = {
   permissionCodes: PermissionCode[];
 };
 
+export type ExternalTrackingEvent = {
+  timestamp: string;
+  status: string;
+  location: string;
+  description: string;
+};
+
+export type ExternalTrackingResponse = {
+  trackingNumber: string;
+  carrier: string;
+  isDelivered: boolean;
+  estimatedDelivery: string | null;
+  events: ExternalTrackingEvent[];
+};
+
+export type DashboardMetrics = {
+  pendingPackages: number;
+  unmatchedPrealerts: number;
+  activeShipments: number;
+};
+
 export type Organization = {
   id: string;
   legalName: string;
@@ -592,3 +613,460 @@ export type CustomerImportJob = {
   importedRows: number;
   rows?: CustomerImportRow[];
 };
+
+export type CourierService = {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CourierServiceListResponse = {
+  items: CourierService[];
+  pagination: Pagination;
+};
+
+export type RateRule = {
+  id: string;
+  sortOrder: number;
+  minWeight: string | null;
+  maxWeight: string | null;
+  flatAmountMinor: number | null;
+  unitAmountMinor: number | null;
+};
+
+export type RateCard = {
+  id: string;
+  service: {
+    id: string;
+    code: string;
+    name: string;
+  };
+  name: string;
+  segmentKey: string;
+  segmentName: string;
+  calculationType: "FLAT" | "PER_WEIGHT" | "TIERED_WEIGHT" | "PER_PIECE";
+  version: number;
+  status: "DRAFT" | "ACTIVE" | "RETIRED";
+  currencyCode: string;
+  weightUnit: "LB" | "KG";
+  rules: RateRule[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type RateCardListResponse = {
+  items: RateCard[];
+  pagination: Pagination;
+};
+
+export type RateQuote = {
+  rateCard: RateCard;
+  appliedRule: RateRule;
+  quote: {
+    weight: string;
+    pieceCount: number;
+    courierAmountMinor: string;
+    customsAmountMinor: string;
+    totalAmountMinor: string;
+  };
+};
+export type CustomsCaseStatus =
+  | "PENDING_REVIEW"
+  | "UNDER_REVIEW"
+  | "RELEASED"
+  | "HELD"
+  | "REJECTED"
+  | "CANCELLED";
+
+export type CustomsEventSource =
+  | "MANUAL"
+  | "OFFICIAL_PORTAL"
+  | "AUTHORIZED_INTEGRATION";
+
+export type CustomsCaseEvent = {
+  id: string;
+  source: CustomsEventSource;
+  eventDate: string;
+  description: string;
+  createdAt: string;
+};
+
+export type CustomsCase = {
+  id: string;
+  organizationId: string;
+  caseNumber: string;
+  status: CustomsCaseStatus;
+  createdAt: string;
+  updatedAt: string;
+  events?: CustomsCaseEvent[];
+};
+
+export type CustomsCaseListResponse = {
+  items: CustomsCase[];
+  total: number;
+};
+
+export type DispatchStatus =
+  | "DRAFT"
+  | "SCHEDULED"
+  | "IN_TRANSIT"
+  | "ARRIVED"
+  | "COMPLETED"
+  | "CANCELLED";
+
+export interface Dispatch {
+  id: string;
+  organizationId: string;
+  dispatchCode: string;
+  status: DispatchStatus;
+  origin: string | null;
+  destination: string | null;
+  departureTime: string | null;
+  estimatedArrivalTime: string | null;
+  actualArrivalTime: string | null;
+  carrier: string | null;
+  flightNumber: string | null;
+  mawb: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateDispatchDto {
+  origin?: string;
+  destination?: string;
+  departureTime?: string;
+  estimatedArrivalTime?: string;
+  carrier?: string;
+  flightNumber?: string;
+  mawb?: string;
+}
+
+export interface UpdateDispatchDto {
+  status?: DispatchStatus;
+  origin?: string;
+  destination?: string;
+  departureTime?: string;
+  estimatedArrivalTime?: string;
+  actualArrivalTime?: string;
+  carrier?: string;
+  flightNumber?: string;
+  mawb?: string;
+}
+
+export interface AddPackagesToDispatchDto {
+  packageIds: string[];
+}
+
+
+export type HoldStatus = "ACTIVE" | "RELEASED" | "CANCELLED";
+
+export interface OperationalHold {
+  id: string;
+  organizationId: string;
+  targetType: string;
+  targetId: string;
+  reason: string;
+  status: HoldStatus;
+  releaseReason: string | null;
+  requestedByEmployeeId: string;
+  releasedByEmployeeId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  releasedAt: string | null;
+}
+
+export interface CreateHoldDto {
+  packageId: string;
+  reason: string;
+  status?: HoldStatus;
+}
+
+export interface UpdateHoldDto {
+  status?: HoldStatus;
+  reason?: string;
+  releaseReason?: string;
+}
+
+
+export type CorrectionStatus = "REQUESTED" | "APPROVED" | "REJECTED";
+
+export interface CorrectionRequest {
+  id: string;
+  organizationId: string;
+  targetType: string;
+  targetId: string;
+  reason: string;
+  proposedData: Record<string, any>;
+  status: CorrectionStatus;
+  requestedByEmployeeId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateCorrectionDto {
+  targetType: string;
+  targetId: string;
+  reason: string;
+  proposedData: Record<string, any>;
+  status?: CorrectionStatus;
+}
+
+export interface UpdateCorrectionDto {
+  status?: CorrectionStatus;
+  reason?: string;
+}
+
+
+export type HouseShipmentStatus = "DRAFT" | "CLOSED" | "CANCELLED";
+
+export interface HouseShipment {
+  id: string;
+  organizationId: string;
+  dispatchId: string;
+  hawb: string;
+  notes?: string;
+  status: HouseShipmentStatus;
+  createdAt: string;
+  updatedAt: string;
+  packages: any[]; // Depending on what is returned
+}
+
+export interface CreateHouseShipmentDto {
+  hawb: string;
+  notes?: string;
+}
+
+export interface UpdateHouseShipmentDto {
+  hawb?: string;
+  notes?: string;
+}
+
+export interface AddPackagesToHouseShipmentDto {
+  packageIds: string[];
+}
+
+export type CustomsManifestStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
+
+export interface CustomsManifest {
+  id: string;
+  organizationId: string;
+  code: string;
+  flightNumber: string;
+  arrivalDate: string;
+  status: CustomsManifestStatus;
+  createdAt: string;
+  updatedAt: string;
+  packages: any[];
+}
+
+export interface CreateCustomsManifestDto {
+  flightNumber: string;
+  arrivalDate: string;
+}
+
+export interface UpdateCustomsManifestDto {
+  flightNumber?: string;
+  arrivalDate?: string;
+}
+
+export interface AddPackagesToCustomsManifestDto {
+  packageIds: string[];
+}
+
+
+
+
+export interface CreateCustomsCaseDto {
+  caseNumber: string;
+}
+
+export interface RecordCustomsEventDto {
+  source: string;
+  eventDate: string;
+  description: string;
+}
+
+export interface ChangeCustomsCaseStatusDto {
+  status: CustomsCaseStatus;
+}
+
+
+
+export type InvoiceStatus = "DRAFT" | "ISSUED" | "PARTIALLY_PAID" | "PAID" | "VOID";
+export type PaymentStatus = "RECORDED" | "APPLIED" | "VOID";
+export type PaymentMethod = "CASH" | "CARD" | "BANK_TRANSFER" | "OTHER";
+export type InvoiceLineType = "TRANSPORT" | "STORAGE" | "INSURANCE" | "DELIVERY" | "HANDLING" | "OTHER";
+
+export interface InvoiceLineRecord {
+  id: string;
+  type: InvoiceLineType;
+  description: string;
+  quantity: number;
+  unitPriceMinor: string;
+  totalPriceMinor: string;
+}
+
+export interface InvoiceRecord {
+  id: string;
+  customerId: string;
+  invoiceNumber: string;
+  status: InvoiceStatus;
+  currencyCode: string;
+  subtotalMinor: string;
+  taxMinor: string;
+  totalMinor: string;
+  balanceDueMinor: string;
+  issuedAt: string | null;
+  dueDate: string | null;
+  voidedAt: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  lines: InvoiceLineRecord[];
+}
+
+export interface PaymentAllocationRecord {
+  id: string;
+  paymentId: string;
+  invoiceId: string;
+  amountMinor: string;
+  appliedAt: string;
+}
+
+export interface PaymentRecord {
+  id: string;
+  customerId: string;
+  paymentNumber: string;
+  method: PaymentMethod;
+  amountMinor: string;
+  currencyCode: string;
+  reference: string | null;
+  status: PaymentStatus;
+  recordedAt: string;
+  voidedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  allocations: PaymentAllocationRecord[];
+}
+
+export interface CreateInvoiceDto {
+  customerId: string;
+  currencyCode: string;
+  dueDate?: string;
+  notes?: string;
+  lines: Omit<InvoiceLineRecord, "id" | "totalPriceMinor">[];
+}
+
+export interface UpdateInvoiceDto {
+  dueDate?: string;
+  notes?: string;
+  lines?: Omit<InvoiceLineRecord, "id" | "totalPriceMinor">[];
+}
+
+export interface VoidReasonDto {
+  reason: string;
+}
+
+export interface CreatePaymentDto {
+  customerId: string;
+  method: PaymentMethod;
+  amountMinor: string;
+  currencyCode: string;
+  reference?: string;
+}
+
+export interface ApplyPaymentDto {
+  invoiceId: string;
+  amountMinor: string;
+}
+
+
+
+export type PickupRequestStatus = "DRAFT" | "READY" | "COMPLETED" | "CANCELLED";
+
+export interface PickupRequestItemRecord {
+  id: string;
+  packageId: string;
+  pickupRequestId: string;
+  createdAt: string;
+}
+
+export interface PickupRequestRecord {
+  id: string;
+  facilityId: string;
+  customerId: string;
+  pickupNumber: string;
+  status: PickupRequestStatus;
+  requestedByEmployeeId: string;
+  completedByEmployeeId: string | null;
+  cancelledByEmployeeId: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items?: PickupRequestItemRecord[];
+}
+
+export interface CreatePickupRequestDto {
+  facilityId: string;
+  customerId: string;
+  packageIds: string[];
+}
+
+export interface UpdatePickupRequestDto {
+  packageIds?: string[];
+}
+
+export type FacilityTransferStatus = "DRAFT" | "IN_TRANSIT" | "COMPLETED" | "CANCELLED";
+export type FacilityTransferItemStatus = "PENDING" | "RECEIVED" | "MISSING" | "DAMAGED";
+
+export interface FacilityTransferItem {
+  id: string;
+  packageId: string;
+  status: FacilityTransferItemStatus;
+  receivedAt?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FacilityTransfer {
+  id: string;
+  transferNumber: string;
+  originFacilityId: string;
+  destinationFacilityId: string;
+  status: FacilityTransferStatus;
+  notes?: string;
+  vehicleInfo?: string;
+  dispatchedAt?: string;
+  dispatchedById?: string;
+  receivedAt?: string;
+  receivedById?: string;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  items?: FacilityTransferItem[];
+}
+
+export interface CreateTransferDto {
+  originFacilityId: string;
+  destinationFacilityId: string;
+  notes?: string;
+}
+
+export interface AddTransferItemDto {
+  packageId: string;
+}
+
+export interface DispatchTransferDto {
+  vehicleInfo?: string;
+}
+
+export interface ReceiveTransferItemDto {
+  status: FacilityTransferItemStatus;
+  notes?: string;
+}

@@ -21,6 +21,7 @@ export interface AuditOutboxWriteInput {
   payload: Record<string, unknown>;
   idempotencyKey?: string;
   occurredAt?: Date;
+  emitOutbox?: boolean;
 }
 
 export class PrismaAuditOutboxWriter {
@@ -67,24 +68,26 @@ export class PrismaAuditOutboxWriter {
       },
     });
 
-    await tx.outboxEvent.create({
-      data: {
-        id: randomUUID(),
-        organizationId: input.context.organizationId,
-        eventType: input.action,
-        aggregateType: input.entityType,
-        aggregateId: input.entityId,
-        schemaVersion: 1,
-        payload,
-        metadata,
-        idempotencyKey:
-          input.idempotencyKey ??
-          `${input.context.requestId}:${input.action}:${input.entityType}:${input.entityId}`,
-        status: 'PENDING',
-        occurredAt,
-        availableAt: occurredAt,
-      },
-    });
+    if (input.emitOutbox ?? true) {
+      await tx.outboxEvent.create({
+        data: {
+          id: randomUUID(),
+          organizationId: input.context.organizationId,
+          eventType: input.action,
+          aggregateType: input.entityType,
+          aggregateId: input.entityId,
+          schemaVersion: 1,
+          payload,
+          metadata,
+          idempotencyKey:
+            input.idempotencyKey ??
+            `${input.context.requestId}:${input.action}:${input.entityType}:${input.entityId}`,
+          status: 'PENDING',
+          occurredAt,
+          availableAt: occurredAt,
+        },
+      });
+    }
   }
 
   private toJsonObject(

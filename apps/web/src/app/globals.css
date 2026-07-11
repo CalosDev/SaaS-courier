@@ -1,6 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  color: #16202a;
-  background: #eef3f7;
+  --bg-base: #eef3f7;
+  --text-base: #16202a;
+  --primary: #0f5c7e;
+  --primary-hover: #0b4661;
+  --border: #c3d0da;
+
+  color: var(--text-base);
+  background: var(--bg-base);
   font-family: Arial, Helvetica, sans-serif;
   line-height: 1.5;
 }

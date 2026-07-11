@@ -110,7 +110,14 @@ export interface InventoryPackageRecord {
   id: string;
   internalTrackingNumber: string;
   externalTrackingNumber: string;
-  status: 'RECEPTION_PENDING' | 'RECEIVED_AT_ORIGIN' | 'CANCELLED';
+  status:
+    | 'RECEPTION_PENDING'
+    | 'RECEIVED_AT_ORIGIN'
+    | 'IN_TRANSIT'
+    | 'ARRIVED_AT_DESTINATION'
+    | 'OUT_FOR_DELIVERY'
+    | 'DELIVERED'
+    | 'CANCELLED';
   customer: {
     id: string;
     customerCode: string;

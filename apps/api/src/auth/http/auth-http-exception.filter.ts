@@ -97,6 +97,15 @@ import {
   WarehouseLocationUnavailableError,
 } from '../../inventory/inventory.errors';
 import {
+  CourierServiceCodeConflictError,
+  CourierServiceNotFoundError,
+  CourierServiceUnavailableError,
+  InvalidRatesInputError,
+  RateCardConflictError,
+  RateCardNotFoundError,
+  RateQuoteConflictError,
+} from '../../rates/rates.errors';
+import {
   InvalidOrganizationInputError,
   OrganizationNotFoundError,
   OrganizationSlugConflictError,
@@ -160,6 +169,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof InvalidPackageInputError ||
       exception instanceof InvalidPackageDocumentInputError ||
       exception instanceof InvalidInventoryInputError ||
+      exception instanceof InvalidRatesInputError ||
       exception instanceof InvalidCustomerImportInputError ||
       exception instanceof InvalidCustomerCustomsProfileError ||
       exception instanceof InvalidEmployeeInputError ||
@@ -233,6 +243,8 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof PackageNotFoundError ||
       exception instanceof PackageDocumentNotFoundError ||
       exception instanceof WarehouseLocationNotFoundError ||
+      exception instanceof CourierServiceNotFoundError ||
+      exception instanceof RateCardNotFoundError ||
       exception instanceof PackageReceptionNotFoundError ||
       exception instanceof CustomerImportJobNotFoundError ||
       exception instanceof CustomerAddressNotFoundError ||
@@ -268,6 +280,10 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof WarehouseLocationCodeConflictError ||
       exception instanceof WarehouseLocationUnavailableError ||
       exception instanceof InventoryMovementConflictError ||
+      exception instanceof CourierServiceCodeConflictError ||
+      exception instanceof CourierServiceUnavailableError ||
+      exception instanceof RateCardConflictError ||
+      exception instanceof RateQuoteConflictError ||
       exception instanceof InvalidPackageStatusTransitionError ||
       exception instanceof PackageReceptionConflictError ||
       exception instanceof PackageReceptionFacilityUnavailableError ||
@@ -373,6 +389,9 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
         path.startsWith('/customers') ||
         path.startsWith('/customer-imports') ||
         path.startsWith('/inventory') ||
+        path.startsWith('/services') ||
+        path.startsWith('/rate-cards') ||
+        path.startsWith('/rates') ||
         path.startsWith('/packages') ||
         path.startsWith('/prealerts'))
     );

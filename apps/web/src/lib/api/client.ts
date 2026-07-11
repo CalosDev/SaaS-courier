@@ -6,6 +6,7 @@ import {
   emitForbiddenEvent,
   emitUnauthorizedEvent,
 } from "@/lib/api/auth-events";
+import { emitApiErrorEvent } from "@/lib/api/api-events";
 import { csrfManager } from "@/lib/api/csrf-manager";
 
 type RequestOptions = Omit<RequestInit, "body"> & {
@@ -136,6 +137,10 @@ async function requestInternal<T>(
     emitUnauthorizedEvent();
   } else if (error.status === 403) {
     emitForbiddenEvent();
+  } else if (error.status >= 500) {
+    emitApiErrorEvent("Error interno del servidor. Intente nuevamente más tarde.");
+  } else if (error.status >= 400) {
+    emitApiErrorEvent(error.message || "Error en la solicitud.");
   }
 
   throw error;
@@ -154,8 +159,8 @@ export const apiClient = {
   patch<T>(path: string, body?: Record<string, unknown> | null): Promise<T> {
     return requestInternal<T>(path, { method: "PATCH", body });
   },
-  delete<T>(path: string): Promise<T> {
-    return requestInternal<T>(path, { method: "DELETE" });
+  delete<T>(path: string, body?: Record<string, unknown> | null): Promise<T> {
+    return requestInternal<T>(path, { method: "DELETE", body });
   },
   clearCsrf(): void {
     csrfManager.clear();
