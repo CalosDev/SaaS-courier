@@ -901,7 +901,7 @@ export interface CreateCustomsCaseDto {
 }
 
 export interface RecordCustomsEventDto {
-  source: string;
+  source: CustomsEventSource;
   eventDate: string;
   description: string;
 }

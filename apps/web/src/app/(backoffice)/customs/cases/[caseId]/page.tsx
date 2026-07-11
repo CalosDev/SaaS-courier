@@ -4,33 +4,23 @@ import Link from "next/link";
 import { use, useCallback, useState } from "react";
 
 import { PermissionBoundary } from "@/components/auth/permission-boundary";
-import { Badge } from "@/components/ui/badge";
+import { CustomsCaseStatusBadge } from "@/components/customs-cases/CustomsCaseStatusBadge";
+import {
+  CUSTOMS_CASE_STATUS_LABELS,
+  CUSTOMS_EVENT_SOURCE_LABELS,
+} from "@/components/customs-cases/customs-case-labels";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
-import { Select } from "@/components/ui/select";
 import { LoadingState } from "@/components/ui/loading-state";
+import { Select } from "@/components/ui/select";
 import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { useAsyncState } from "@/hooks/use-async-state";
 import { backofficeApi } from "@/lib/api/backoffice";
-import { CustomsCaseStatus, CustomsEventSource } from "@/lib/api/contracts";
-
-const STATUS_LABELS: Record<string, string> = {
-  PENDING_REVIEW: "Pendiente revisión",
-  UNDER_REVIEW: "En revisión",
-  RELEASED: "Liberado",
-  HELD: "Retenido",
-  REJECTED: "Rechazado",
-  CANCELLED: "Cancelado",
-};
-
-const SOURCE_LABELS: Record<string, string> = {
-  MANUAL: "Manual",
-  OFFICIAL_PORTAL: "Portal Oficial",
-  AUTHORIZED_INTEGRATION: "Integración Autorizada",
-};
+import type { CustomsCaseStatus, CustomsEventSource } from "@/lib/api/contracts";
 
 export default function CustomsCaseDetailPage({
   params,
@@ -39,13 +29,8 @@ export default function CustomsCaseDetailPage({
 }) {
   const { caseId } = use(params);
   const { pushToast } = useToast();
-
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Status Change State
   const [newStatus, setNewStatus] = useState<CustomsCaseStatus | "">("");
-
-  // Event Record State
   const [eventSource, setEventSource] = useState<CustomsEventSource | "">("");
   const [eventDate, setEventDate] = useState("");
   const [eventDescription, setEventDescription] = useState("");
@@ -54,9 +39,11 @@ export default function CustomsCaseDetailPage({
     useCallback(() => backofficeApi.getCustomsCase(caseId), [caseId]),
   );
 
-  const handleChangeStatus = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newStatus) return;
+  const handleChangeStatus = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newStatus) {
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -73,19 +60,18 @@ export default function CustomsCaseDetailPage({
     }
   };
 
-  const handleRecordEvent = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!eventSource || !eventDate || !eventDescription) return;
+  const handleRecordEvent = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!eventSource || !eventDate || !eventDescription.trim()) {
+      return;
+    }
 
     try {
       setIsSubmitting(true);
-      // Constructing Date in ISO Format
-      const dateISO = new Date(eventDate).toISOString();
-
       await backofficeApi.recordCustomsCaseEvent(caseId, {
         source: eventSource,
-        eventDate: dateISO,
-        description: eventDescription,
+        eventDate: new Date(eventDate).toISOString(),
+        description: eventDescription.trim(),
       });
       pushToast("Evento registrado exitosamente");
       setEventSource("");
@@ -129,10 +115,9 @@ export default function CustomsCaseDetailPage({
         <section className="page-header">
           <div>
             <h1>Caso Aduanero: {customsCase.caseNumber}</h1>
-            <p>
-              Estado actual:{" "}
-              <Badge>{STATUS_LABELS[customsCase.status] || customsCase.status}</Badge>
-            </p>
+            <div className="mt-2">
+              <CustomsCaseStatusBadge status={customsCase.status} />
+            </div>
           </div>
           <div>
             <Link href="/customs/cases" className="ui-button ui-button--outline">
@@ -153,41 +138,51 @@ export default function CustomsCaseDetailPage({
                     <FormField label="Fuente *">
                       <Select
                         value={eventSource}
-                        onChange={(e) => setEventSource(e.target.value as CustomsEventSource)}
+                        onChange={(event) =>
+                          setEventSource(event.target.value as CustomsEventSource)
+                        }
                         disabled={isSubmitting}
                       >
                         <option value="">Seleccione...</option>
-                        {Object.entries(SOURCE_LABELS).map(([val, lbl]) => (
-                          <option key={val} value={val}>
-                            {lbl}
-                          </option>
-                        ))}
+                        {Object.entries(CUSTOMS_EVENT_SOURCE_LABELS).map(
+                          ([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ),
+                        )}
                       </Select>
                     </FormField>
                     <FormField label="Fecha del evento *">
                       <Input
                         type="datetime-local"
                         value={eventDate}
-                        onChange={(e) => setEventDate(e.target.value)}
+                        onChange={(event) => setEventDate(event.target.value)}
                         disabled={isSubmitting}
                       />
                     </FormField>
                     <FormField label="Descripción *">
                       <Input
                         value={eventDescription}
-                        onChange={(e) => setEventDescription(e.target.value)}
+                        onChange={(event) =>
+                          setEventDescription(event.target.value)
+                        }
                         disabled={isSubmitting}
                       />
                     </FormField>
                   </div>
                   <div className="ui-form__actions">
-                    <button
+                    <Button
                       type="submit"
-                      className="ui-button ui-button--primary"
-                      disabled={isSubmitting || !eventSource || !eventDate || !eventDescription}
+                      disabled={
+                        isSubmitting ||
+                        !eventSource ||
+                        !eventDate ||
+                        !eventDescription.trim()
+                      }
                     >
                       Registrar evento
-                    </button>
+                    </Button>
                   </div>
                 </form>
               </Card>
@@ -202,15 +197,11 @@ export default function CustomsCaseDetailPage({
                   </p>
                 ) : (
                   <Table
-                    columns={[
-                      "Fecha",
-                      "Fuente",
-                      "Descripción",
-                    ]}
-                    rows={customsCase.events.map((ev) => [
-                      new Date(ev.eventDate).toLocaleString(),
-                      SOURCE_LABELS[ev.source] || ev.source,
-                      ev.description,
+                    columns={["Fecha", "Fuente", "Descripción"]}
+                    rows={customsCase.events.map((event) => [
+                      new Date(event.eventDate).toLocaleString(),
+                      CUSTOMS_EVENT_SOURCE_LABELS[event.source] || event.source,
+                      event.description,
                     ])}
                   />
                 )}
@@ -227,27 +218,34 @@ export default function CustomsCaseDetailPage({
                     <FormField label="Nuevo estado *">
                       <Select
                         value={newStatus}
-                        onChange={(e) => setNewStatus(e.target.value as CustomsCaseStatus)}
+                        onChange={(event) =>
+                          setNewStatus(event.target.value as CustomsCaseStatus)
+                        }
                         disabled={isSubmitting}
                       >
                         <option value="">Seleccione...</option>
-                        {Object.entries(STATUS_LABELS).map(([val, lbl]) => (
-                          <option key={val} value={val}>
-                            {lbl}
-                          </option>
-                        ))}
+                        {Object.entries(CUSTOMS_CASE_STATUS_LABELS).map(
+                          ([value, label]) => (
+                            <option key={value} value={value}>
+                              {label}
+                            </option>
+                          ),
+                        )}
                       </Select>
                     </FormField>
                   </div>
                   <div className="ui-form__actions">
-                    <button
+                    <Button
                       type="submit"
-                      className="ui-button ui-button--primary"
-                      disabled={isSubmitting || !newStatus || newStatus === customsCase.status}
+                      disabled={
+                        isSubmitting ||
+                        !newStatus ||
+                        newStatus === customsCase.status
+                      }
                       style={{ width: "100%" }}
                     >
                       Actualizar estado
-                    </button>
+                    </Button>
                   </div>
                 </form>
               </Card>

@@ -2,6 +2,10 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CustomsCasesService } from './customs-cases.service';
 import { PrismaCustomsCasesRepository } from './prisma-customs-cases.repository';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  CustomsCaseStatus,
+  CustomsEventSource,
+} from '../generated/prisma/client';
 
 jest.mock('../audit/prisma-audit-outbox.writer', () => {
   return {
@@ -112,35 +116,47 @@ describe('CustomsCasesService', () => {
     prisma.customsCaseEvent.create.mockResolvedValue({ id: 'event-1' });
 
     const result = await service.recordEvent(mockContext, 'case-1', {
-      source: 'DGA',
+      source: CustomsEventSource.MANUAL,
       eventDate: '2023-01-01',
       description: 'Desc',
-    } as any);
+    });
 
     expect(result).toEqual({ id: 'event-1' });
     expect(prisma.customsCaseEvent.create).toHaveBeenCalled();
   });
 
   it('changeStatus should update status if different', async () => {
-    repository.findById.mockResolvedValue({ id: 'case-1', status: 'OPEN' });
+    repository.findById.mockResolvedValue({
+      id: 'case-1',
+      status: CustomsCaseStatus.PENDING_REVIEW,
+    });
     prisma.customsCase.update.mockResolvedValue({
       id: 'case-1',
-      status: 'CLOSED',
+      status: CustomsCaseStatus.UNDER_REVIEW,
     });
 
     const result = await service.changeStatus(mockContext, 'case-1', {
-      status: 'CLOSED',
-    } as any);
-    expect(result).toEqual({ id: 'case-1', status: 'CLOSED' });
+      status: CustomsCaseStatus.UNDER_REVIEW,
+    });
+    expect(result).toEqual({
+      id: 'case-1',
+      status: CustomsCaseStatus.UNDER_REVIEW,
+    });
     expect(prisma.customsCase.update).toHaveBeenCalled();
   });
 
   it('changeStatus should do nothing if status is same', async () => {
-    repository.findById.mockResolvedValue({ id: 'case-1', status: 'OPEN' });
+    repository.findById.mockResolvedValue({
+      id: 'case-1',
+      status: CustomsCaseStatus.PENDING_REVIEW,
+    });
     const result = await service.changeStatus(mockContext, 'case-1', {
-      status: 'OPEN',
-    } as any);
-    expect(result).toEqual({ id: 'case-1', status: 'OPEN' });
+      status: CustomsCaseStatus.PENDING_REVIEW,
+    });
+    expect(result).toEqual({
+      id: 'case-1',
+      status: CustomsCaseStatus.PENDING_REVIEW,
+    });
     expect(prisma.customsCase.update).not.toHaveBeenCalled();
   });
 });

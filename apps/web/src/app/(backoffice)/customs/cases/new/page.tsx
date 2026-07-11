@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { PermissionBoundary } from "@/components/auth/permission-boundary";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -27,7 +28,7 @@ export default function NewCustomsCasePage() {
     try {
       setIsSubmitting(true);
       const data = await backofficeApi.createCustomsCase({
-        caseNumber,
+        caseNumber: caseNumber.trim(),
       });
       pushToast("Caso aduanero registrado correctamente");
       router.push(`/customs/cases/${data.id}`);
@@ -56,29 +57,25 @@ export default function NewCustomsCasePage() {
               <FormField label="Número de caso *">
                 <Input
                   value={caseNumber}
-                  onChange={(e) => setCaseNumber(e.target.value)}
-                  placeholder="Ej. CASO-2023-0001"
+                  onChange={(event) => setCaseNumber(event.target.value)}
+                  placeholder="Ej. CASO-2026-0001"
                   disabled={isSubmitting}
                 />
               </FormField>
             </div>
 
             <div className="ui-form__actions">
-              <button
+              <Button
                 type="button"
-                className="ui-button ui-button--outline"
+                variant="secondary"
                 onClick={() => router.back()}
                 disabled={isSubmitting}
               >
                 Cancelar
-              </button>
-              <button
-                type="submit"
-                className="ui-button ui-button--primary"
-                disabled={isSubmitting}
-              >
+              </Button>
+              <Button type="submit" disabled={isSubmitting}>
                 Registrar
-              </button>
+              </Button>
             </div>
           </form>
         </Card>
