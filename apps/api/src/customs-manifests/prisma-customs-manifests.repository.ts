@@ -10,6 +10,16 @@ import { CustomsManifestRecord } from './customs-manifest.types';
 export class PrismaCustomsManifestsRepository implements CustomsManifestsRepository {
   constructor(private readonly prisma: PrismaService) {}
 
+  async findMany(organizationId: string): Promise<CustomsManifestRecord[]> {
+    return this.prisma.customsManifest.findMany({
+      where: {
+        organizationId,
+        deletedAt: null,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   async create(
     organizationId: string,
     code: string,

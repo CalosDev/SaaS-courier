@@ -8,6 +8,8 @@ export const CustomsManifestsRepositoryToken = Symbol(
 );
 
 export interface CustomsManifestsRepository {
+  findMany(organizationId: string): Promise<CustomsManifestRecord[]>;
+
   create(
     organizationId: string,
     code: string,

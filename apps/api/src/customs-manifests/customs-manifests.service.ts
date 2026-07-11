@@ -28,6 +28,10 @@ export class CustomsManifestsService {
     private readonly sigaApi: SigaApiService,
   ) {}
 
+  async list(ctx: CommandContext): Promise<CustomsManifestRecord[]> {
+    return this.repository.findMany(ctx.organizationId);
+  }
+
   async create(
     ctx: CommandContext,
     dto: CreateCustomsManifestDto,

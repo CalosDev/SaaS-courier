@@ -290,8 +290,8 @@ export const CUSTOMS_PERMISSIONS = {
 } as const;
 
 export const CUSTOMER_PERMISSIONS = {
-  VIEW: 'shipments.read',
-  MANAGE: 'shipments.manage',
+  VIEW: 'customers.read',
+  MANAGE: 'customers.manage',
 } as const;
 
 export const SHIPMENT_PERMISSIONS = {

@@ -24,6 +24,12 @@ export class CustomsManifestsController {
     private readonly customsManifestsService: CustomsManifestsService,
   ) {}
 
+  @Get()
+  @RequirePermissions(CUSTOMS_MANIFEST_PERMISSIONS.VIEW)
+  list(@CurrentCommandContext() ctx: CommandContext) {
+    return this.customsManifestsService.list(ctx);
+  }
+
   @Post()
   @RequirePermissions(CUSTOMS_MANIFEST_PERMISSIONS.MANAGE)
   create(

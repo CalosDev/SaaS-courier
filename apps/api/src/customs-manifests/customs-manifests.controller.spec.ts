@@ -29,6 +29,7 @@ describe('CustomsManifestsController', () => {
         {
           provide: CustomsManifestsService,
           useValue: {
+            list: jest.fn(),
             create: jest.fn(),
             findById: jest.fn(),
             update: jest.fn(),
@@ -63,6 +64,13 @@ describe('CustomsManifestsController', () => {
     service.create.mockResolvedValue(res);
     expect(await controller.create(mockContext, {} as any)).toEqual(res);
     expect(service.create).toHaveBeenCalledWith(mockContext, {});
+  });
+
+  it('list should call service', async () => {
+    const res = [{ id: 'man-1' }] as any;
+    service.list.mockResolvedValue(res);
+    expect(await controller.list(mockContext)).toEqual(res);
+    expect(service.list).toHaveBeenCalledWith(mockContext);
   });
 
   it('findOne should call service', async () => {

@@ -21,6 +21,7 @@ describe('CustomsManifestsService', () => {
 
   beforeEach(async () => {
     repository = {
+      findMany: jest.fn(),
       create: jest.fn(),
       findById: jest.fn(),
       update: jest.fn(),
@@ -84,6 +85,16 @@ describe('CustomsManifestsService', () => {
       expect(res).toEqual(manifest);
       expect(repository.create).toHaveBeenCalled();
       expect(prisma.outboxEvent.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('list', () => {
+    it('should return organization manifests', async () => {
+      const manifests = [{ id: 'man-1' }];
+      repository.findMany.mockResolvedValue(manifests);
+
+      await expect(service.list(mockContext)).resolves.toEqual(manifests);
+      expect(repository.findMany).toHaveBeenCalledWith('org-1');
     });
   });
 
