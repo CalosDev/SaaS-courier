@@ -8,9 +8,9 @@ import { FormField } from "@/components/ui/form-field";
 import { Select } from "@/components/ui/select";
 import { backofficeApi } from "@/lib/api/backoffice";
 import type {
-  Dispatch,
   HouseShipment,
   HouseShipmentStatus,
+  MasterShipment,
 } from "@/lib/api/contracts";
 
 function houseShipmentStatusBadge(status: HouseShipmentStatus) {
@@ -26,32 +26,38 @@ function houseShipmentStatusBadge(status: HouseShipmentStatus) {
   }
 }
 
-function dispatchOptionLabel(dispatch: Dispatch) {
-  const route = [dispatch.origin, dispatch.destination].filter(Boolean).join(" -> ");
-  return route ? `${dispatch.dispatchCode} - ${route}` : dispatch.dispatchCode;
+function masterShipmentOptionLabel(masterShipment: MasterShipment) {
+  const route = [masterShipment.origin, masterShipment.destination]
+    .filter(Boolean)
+    .join(" -> ");
+  return route
+    ? `${masterShipment.dispatchCode} - ${route}`
+    : masterShipment.dispatchCode;
 }
 
 export default function HouseShipmentsPage() {
-  const [selectedDispatchId, setSelectedDispatchId] = useState("");
+  const [selectedMasterShipmentId, setSelectedMasterShipmentId] = useState("");
   const {
-    data: dispatches,
-    error: dispatchesError,
-    isLoading: dispatchesLoading,
-  } = useSWR<Dispatch[]>("/dispatches", () => backofficeApi.listDispatches());
+    data: masterShipments,
+    error: masterShipmentsError,
+    isLoading: masterShipmentsLoading,
+  } = useSWR<MasterShipment[]>("/master-shipments", () =>
+    backofficeApi.listMasterShipments(),
+  );
 
   const {
     data: houseShipments,
     error: houseShipmentsError,
     isLoading: houseShipmentsLoading,
   } = useSWR<HouseShipment[]>(
-    selectedDispatchId
-      ? ["/master-shipments", selectedDispatchId, "house-shipments"]
+    selectedMasterShipmentId
+      ? ["/master-shipments", selectedMasterShipmentId, "house-shipments"]
       : null,
-    () => backofficeApi.listHouseShipments(selectedDispatchId),
+    () => backofficeApi.listHouseShipments(selectedMasterShipmentId),
   );
 
-  const selectedDispatch = dispatches?.find(
-    (dispatch) => dispatch.id === selectedDispatchId,
+  const selectedMasterShipment = masterShipments?.find(
+    (masterShipment) => masterShipment.id === selectedMasterShipmentId,
   );
 
   return (
@@ -64,13 +70,13 @@ export default function HouseShipmentsPage() {
       </div>
 
       <div className="ui-card">
-        {dispatchesLoading ? (
+        {masterShipmentsLoading ? (
           <div className="ui-state">Cargando Master Shipments...</div>
-        ) : dispatchesError ? (
+        ) : masterShipmentsError ? (
           <div className="ui-state ui-state--error">
             Error al cargar los Master Shipments.
           </div>
-        ) : !dispatches || dispatches.length === 0 ? (
+        ) : !masterShipments || masterShipments.length === 0 ? (
           <div className="ui-state">
             No hay Master Shipments disponibles para consultar envÃ­os.
           </div>
@@ -78,13 +84,15 @@ export default function HouseShipmentsPage() {
           <div className="form-grid">
             <FormField label="Master Shipment">
               <Select
-                value={selectedDispatchId}
-                onChange={(event) => setSelectedDispatchId(event.target.value)}
+                value={selectedMasterShipmentId}
+                onChange={(event) =>
+                  setSelectedMasterShipmentId(event.target.value)
+                }
               >
                 <option value="">Selecciona un Master Shipment</option>
-                {dispatches.map((dispatch) => (
-                  <option key={dispatch.id} value={dispatch.id}>
-                    {dispatchOptionLabel(dispatch)}
+                {masterShipments.map((masterShipment) => (
+                  <option key={masterShipment.id} value={masterShipment.id}>
+                    {masterShipmentOptionLabel(masterShipment)}
                   </option>
                 ))}
               </Select>
@@ -93,14 +101,14 @@ export default function HouseShipmentsPage() {
         )}
       </div>
 
-      {selectedDispatchId ? (
+      {selectedMasterShipmentId ? (
         <div className="ui-card">
           <div className="page-header">
             <div>
               <h2>HAWBs</h2>
               <p>
-                {selectedDispatch
-                  ? dispatchOptionLabel(selectedDispatch)
+                {selectedMasterShipment
+                  ? masterShipmentOptionLabel(selectedMasterShipment)
                   : "Master Shipment seleccionado"}
               </p>
             </div>

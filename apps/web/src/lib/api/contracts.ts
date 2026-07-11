@@ -761,6 +761,11 @@ export interface AddPackagesToDispatchDto {
   packageIds: string[];
 }
 
+export type MasterShipmentStatus = DispatchStatus;
+export type MasterShipment = Dispatch;
+export type CreateMasterShipmentDto = CreateDispatchDto;
+export type UpdateMasterShipmentDto = UpdateDispatchDto;
+export type AddPackagesToMasterShipmentDto = AddPackagesToDispatchDto;
 
 export type HoldStatus = "ACTIVE" | "RELEASED" | "CANCELLED";
 

@@ -11,7 +11,7 @@ vi.mock("swr", () => ({
 
 vi.mock("@/lib/api/backoffice", () => ({
   backofficeApi: {
-    listDispatches: vi.fn(),
+    listMasterShipments: vi.fn(),
     listHouseShipments: vi.fn(),
   },
 }));
@@ -20,7 +20,7 @@ describe("HouseShipmentsPage", () => {
   beforeEach(() => {
     swrMock.mockReset();
     swrMock.mockImplementation((key: unknown) => {
-      if (key === "/dispatches") {
+      if (key === "/master-shipments") {
         return {
           data: [
             {

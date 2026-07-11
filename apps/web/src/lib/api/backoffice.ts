@@ -46,6 +46,10 @@ import type {
   CustomsCaseListResponse,
   CustomsCaseEvent,
   Dispatch,
+  MasterShipment,
+  CreateMasterShipmentDto,
+  UpdateMasterShipmentDto,
+  AddPackagesToMasterShipmentDto,
   CreateDispatchDto,
   UpdateDispatchDto,
   AddPackagesToDispatchDto,
@@ -452,6 +456,26 @@ export const backofficeApi = {
   },
   removePackagesFromDispatch(id: string, data: AddPackagesToDispatchDto) {
     return apiClient.delete<Dispatch>(`/dispatches/${id}/packages`, data as unknown as Record<string, unknown>);
+  },
+
+  // Master Shipments
+  listMasterShipments(params?: Record<string, string | number | boolean | undefined>) {
+    return apiClient.get<MasterShipment[]>(`/master-shipments${buildQuery(params || {})}`);
+  },
+  getMasterShipment(id: string) {
+    return apiClient.get<MasterShipment>(`/master-shipments/${id}`);
+  },
+  createMasterShipment(data: CreateMasterShipmentDto) {
+    return apiClient.post<MasterShipment>("/master-shipments", data as unknown as Record<string, unknown>);
+  },
+  updateMasterShipment(id: string, data: UpdateMasterShipmentDto) {
+    return apiClient.patch<MasterShipment>(`/master-shipments/${id}`, data as unknown as Record<string, unknown>);
+  },
+  addPackagesToMasterShipment(id: string, data: AddPackagesToMasterShipmentDto) {
+    return apiClient.post<MasterShipment>(`/master-shipments/${id}/packages`, data as unknown as Record<string, unknown>);
+  },
+  removePackagesFromMasterShipment(id: string, data: AddPackagesToMasterShipmentDto) {
+    return apiClient.delete<MasterShipment>(`/master-shipments/${id}/packages`, data as unknown as Record<string, unknown>);
   },
 
   // Holds
