@@ -1,6 +1,9 @@
 import { CreateCustomsManifestDto } from './dto/create-customs-manifest.dto';
 import { UpdateCustomsManifestDto } from './dto/update-customs-manifest.dto';
-import { CustomsManifestRecord } from './customs-manifest.types';
+import {
+  CustomsManifestDetailRecord,
+  CustomsManifestRecord,
+} from './customs-manifest.types';
 import { CustomsManifestStatus, Prisma } from '../generated/prisma/client';
 
 export const CustomsManifestsRepositoryToken = Symbol(
@@ -22,6 +25,11 @@ export interface CustomsManifestsRepository {
     id: string,
     tx?: Prisma.TransactionClient,
   ): Promise<CustomsManifestRecord | null>;
+
+  findDetailById(
+    organizationId: string,
+    id: string,
+  ): Promise<CustomsManifestDetailRecord | null>;
 
   findByCode(
     organizationId: string,

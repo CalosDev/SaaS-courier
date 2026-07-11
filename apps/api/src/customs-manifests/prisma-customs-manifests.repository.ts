@@ -4,7 +4,10 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CustomsManifestsRepository } from './customs-manifests.repository';
 import { CreateCustomsManifestDto } from './dto/create-customs-manifest.dto';
 import { UpdateCustomsManifestDto } from './dto/update-customs-manifest.dto';
-import { CustomsManifestRecord } from './customs-manifest.types';
+import {
+  CustomsManifestDetailRecord,
+  CustomsManifestRecord,
+} from './customs-manifest.types';
 
 @Injectable()
 export class PrismaCustomsManifestsRepository implements CustomsManifestsRepository {
@@ -48,6 +51,23 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
           organizationId,
           id,
         },
+      },
+    });
+  }
+
+  async findDetailById(
+    organizationId: string,
+    id: string,
+  ): Promise<CustomsManifestDetailRecord | null> {
+    return this.prisma.customsManifest.findUnique({
+      where: {
+        organizationId_id: {
+          organizationId,
+          id,
+        },
+      },
+      include: {
+        packages: true,
       },
     });
   }

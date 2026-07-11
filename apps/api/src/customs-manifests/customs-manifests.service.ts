@@ -11,7 +11,10 @@ import type { CustomsManifestsRepository } from './customs-manifests.repository'
 import { CustomsManifestsRepositoryToken } from './customs-manifests.repository';
 import { CustomsManifestErrors } from './customs-manifest.errors';
 import { CustomsManifestStatus } from '../generated/prisma/client';
-import { CustomsManifestRecord } from './customs-manifest.types';
+import {
+  CustomsManifestDetailRecord,
+  CustomsManifestRecord,
+} from './customs-manifest.types';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import type { CommandContext } from '../request-context/request-context.types';
 import { PrismaService } from '../prisma/prisma.service';
@@ -67,6 +70,20 @@ export class CustomsManifestsService {
     id: string,
   ): Promise<CustomsManifestRecord> {
     const manifest = await this.repository.findById(ctx.organizationId, id);
+    if (!manifest) {
+      throw new NotFoundException(CustomsManifestErrors.NotFound.message);
+    }
+    return manifest;
+  }
+
+  async findDetailById(
+    ctx: CommandContext,
+    id: string,
+  ): Promise<CustomsManifestDetailRecord> {
+    const manifest = await this.repository.findDetailById(
+      ctx.organizationId,
+      id,
+    );
     if (!manifest) {
       throw new NotFoundException(CustomsManifestErrors.NotFound.message);
     }

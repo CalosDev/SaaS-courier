@@ -860,6 +860,13 @@ export interface AddPackagesToHouseShipmentDto {
 
 export type CustomsManifestStatus = "DRAFT" | "SUBMITTED" | "APPROVED" | "REJECTED";
 
+export interface CustomsManifestPackageSummary {
+  id: string;
+  internalTrackingNumber: string;
+  externalTrackingNumber: string;
+  status: PackageStatus;
+}
+
 export interface CustomsManifest {
   id: string;
   organizationId: string;
@@ -869,7 +876,7 @@ export interface CustomsManifest {
   status: CustomsManifestStatus;
   createdAt: string;
   updatedAt: string;
-  packages: any[];
+  packages?: CustomsManifestPackageSummary[];
 }
 
 export interface CreateCustomsManifestDto {

@@ -1,4 +1,5 @@
 import { CustomsManifestStatus } from '../generated/prisma/client';
+import type { Prisma } from '../generated/prisma/client';
 
 export type CustomsManifestRecord = {
   id: string;
@@ -14,6 +15,12 @@ export type CustomsManifestRecord = {
   updatedAt: Date;
   deletedAt: Date | null;
 };
+
+export type CustomsManifestDetailRecord = Prisma.CustomsManifestGetPayload<{
+  include: {
+    packages: true;
+  };
+}>;
 
 export const CUSTOMS_MANIFEST_STATUS_VALUES = Object.values(
   CustomsManifestStatus,

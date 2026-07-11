@@ -32,6 +32,7 @@ describe('CustomsManifestsController', () => {
             list: jest.fn(),
             create: jest.fn(),
             findById: jest.fn(),
+            findDetailById: jest.fn(),
             update: jest.fn(),
             addPackages: jest.fn(),
             removePackages: jest.fn(),
@@ -74,10 +75,10 @@ describe('CustomsManifestsController', () => {
   });
 
   it('findOne should call service', async () => {
-    const res = { id: 'man-1' } as any;
-    service.findById.mockResolvedValue(res);
+    const res = { id: 'man-1', packages: [{ id: 'pkg-1' }] } as any;
+    service.findDetailById.mockResolvedValue(res);
     expect(await controller.findOne(mockContext, 'man-1')).toEqual(res);
-    expect(service.findById).toHaveBeenCalledWith(mockContext, 'man-1');
+    expect(service.findDetailById).toHaveBeenCalledWith(mockContext, 'man-1');
   });
 
   it('update should call service', async () => {

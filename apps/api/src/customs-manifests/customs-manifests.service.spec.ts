@@ -24,6 +24,7 @@ describe('CustomsManifestsService', () => {
       findMany: jest.fn(),
       create: jest.fn(),
       findById: jest.fn(),
+      findDetailById: jest.fn(),
       update: jest.fn(),
       addPackages: jest.fn(),
       removePackages: jest.fn(),
@@ -111,6 +112,28 @@ describe('CustomsManifestsService', () => {
       const manifest = { id: 'man-1' };
       repository.findById.mockResolvedValue(manifest);
       expect(await service.findById(mockContext, 'man-1')).toEqual(manifest);
+    });
+  });
+
+  describe('findDetailById', () => {
+    it('should throw NotFoundException if detail is not found', async () => {
+      repository.findDetailById.mockResolvedValue(null);
+      await expect(
+        service.findDetailById(mockContext, 'man-1'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should return manifest detail with packages if found', async () => {
+      const manifest = {
+        id: 'man-1',
+        packages: [{ id: 'pkg-1', internalTrackingNumber: 'PK-001' }],
+      };
+      repository.findDetailById.mockResolvedValue(manifest);
+
+      expect(await service.findDetailById(mockContext, 'man-1')).toEqual(
+        manifest,
+      );
+      expect(repository.findDetailById).toHaveBeenCalledWith('org-1', 'man-1');
     });
   });
 

@@ -45,7 +45,7 @@ export class CustomsManifestsController {
     @CurrentCommandContext() ctx: CommandContext,
     @Param('id') id: string,
   ) {
-    return this.customsManifestsService.findById(ctx, id);
+    return this.customsManifestsService.findDetailById(ctx, id);
   }
 
   @Patch(':id')
