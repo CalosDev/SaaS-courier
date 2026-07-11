@@ -1,11 +1,12 @@
 "use client";
 
+import { useState } from "react";
+import Link from "next/link";
 import useSWR from "swr";
+import { CustomsManifestStatusBadge } from "@/components/customs-manifests/CustomsManifestStatusBadge";
+import { Button } from "@/components/ui/button";
 import { backofficeApi } from "@/lib/api/backoffice";
 import type { CustomsManifest } from "@/lib/api/contracts";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
 
 function formatArrivalDate(arrivalDate: CustomsManifest["arrivalDate"]) {
   return arrivalDate ? new Date(arrivalDate).toLocaleDateString() : "Sin fecha";
@@ -14,7 +15,7 @@ function formatArrivalDate(arrivalDate: CustomsManifest["arrivalDate"]) {
 export default function CustomsManifestsPage() {
   const { data: manifests, error, isLoading, mutate } = useSWR<CustomsManifest[]>(
     "/customs-manifests",
-    () => backofficeApi.listCustomsManifests()
+    () => backofficeApi.listCustomsManifests(),
   );
 
   const [transmitting, setTransmitting] = useState<string | null>(null);
@@ -32,21 +33,6 @@ export default function CustomsManifestsPage() {
     }
   };
 
-  const getStatusBadge = (status: CustomsManifest["status"]) => {
-    switch (status) {
-      case "DRAFT":
-        return <Badge tone="neutral">Borrador</Badge>;
-      case "SUBMITTED":
-        return <Badge tone="warning">Enviado</Badge>;
-      case "APPROVED":
-        return <Badge tone="success">Aprobado</Badge>;
-      case "REJECTED":
-        return <Badge tone="danger">Rechazado</Badge>;
-      default:
-        return <Badge tone="neutral">{status}</Badge>;
-    }
-  };
-
   return (
     <div className="page-stack">
       <div className="page-header">
@@ -54,13 +40,18 @@ export default function CustomsManifestsPage() {
           <h1>Manifiestos Aduaneros</h1>
           <p>Gestión de manifiestos y declaración de aduanas.</p>
         </div>
+        <Link href="/customs-manifests/new">
+          <Button>Crear manifiesto</Button>
+        </Link>
       </div>
 
       <div className="ui-card">
         {isLoading ? (
           <div className="ui-state">Cargando manifiestos...</div>
         ) : error ? (
-          <div className="ui-state ui-state--error">Error al cargar los manifiestos.</div>
+          <div className="ui-state ui-state--error">
+            Error al cargar los manifiestos.
+          </div>
         ) : !manifests || manifests.length === 0 ? (
           <div className="ui-state">
             No se encontraron manifiestos aduaneros.
@@ -83,25 +74,31 @@ export default function CustomsManifestsPage() {
                     <td>
                       <span className="inline-code">{manifest.code}</span>
                     </td>
+                    <td>{manifest.flightNumber}</td>
+                    <td>{formatArrivalDate(manifest.arrivalDate)}</td>
                     <td>
-                      {manifest.flightNumber}
+                      <CustomsManifestStatusBadge status={manifest.status} />
                     </td>
                     <td>
-                      {formatArrivalDate(manifest.arrivalDate)}
-                    </td>
-                    <td>
-                      {getStatusBadge(manifest.status)}
-                    </td>
-                    <td>
-                      {manifest.status === "DRAFT" && (
-                        <Button
-                          variant="primary"
-                          disabled={transmitting === manifest.id}
-                          onClick={() => handleTransmit(manifest.id)}
+                      <div className="flex flex-wrap items-center gap-3">
+                        <Link
+                          href={`/customs-manifests/${manifest.id}`}
+                          className="text-blue-600 hover:text-blue-800 hover:underline"
                         >
-                          {transmitting === manifest.id ? "Transmitiendo..." : "Transmitir a SIGA"}
-                        </Button>
-                      )}
+                          Ver detalle
+                        </Link>
+                        {manifest.status === "DRAFT" ? (
+                          <Button
+                            variant="primary"
+                            disabled={transmitting === manifest.id}
+                            onClick={() => handleTransmit(manifest.id)}
+                          >
+                            {transmitting === manifest.id
+                              ? "Transmitiendo..."
+                              : "Transmitir a SIGA"}
+                          </Button>
+                        ) : null}
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -45,6 +45,10 @@ describe("CustomsManifestsPage", () => {
 
     expect(screen.getByText("CM-20260711-00001")).toBeVisible();
     expect(screen.getByText("Sin fecha")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Ver detalle" })).toHaveAttribute(
+      "href",
+      "/customs-manifests/manifest-1",
+    );
     expect(screen.queryByText(/1969|1970|Invalid Date/i)).not.toBeInTheDocument();
   });
 });
