@@ -126,4 +126,54 @@ describe("AppShell", () => {
 
     expect(screen.getByText("Paquetes")).toBeInTheDocument();
   });
+
+  it("shows the shipments entry only when the session has shipments.read", () => {
+    usePathnameMock.mockReturnValue("/dashboard");
+    useAuthMock.mockReturnValue({
+      state: {
+        status: "authenticated",
+        session: {
+          organizationName: "Courier Uno",
+          firstName: "Ada",
+          lastName: "Lovelace",
+          email: "ada@courier.test",
+        },
+        permissionCodes: ["organizations.read"],
+      },
+      logout: vi.fn(),
+    });
+
+    const { rerender } = render(
+      <AppShell>
+        <div>Contenido</div>
+      </AppShell>,
+    );
+
+    expect(screen.queryByText("Embarques")).not.toBeInTheDocument();
+
+    useAuthMock.mockReturnValue({
+      state: {
+        status: "authenticated",
+        session: {
+          organizationName: "Courier Uno",
+          firstName: "Ada",
+          lastName: "Lovelace",
+          email: "ada@courier.test",
+        },
+        permissionCodes: ["organizations.read", "shipments.read"],
+      },
+      logout: vi.fn(),
+    });
+
+    rerender(
+      <AppShell>
+        <div>Contenido</div>
+      </AppShell>,
+    );
+
+    expect(screen.getByRole("link", { name: /Embarques/ })).toHaveAttribute(
+      "href",
+      "/shipments",
+    );
+  });
 });

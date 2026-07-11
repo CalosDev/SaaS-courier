@@ -7,15 +7,25 @@ import { DispatchStatusBadge } from "./DispatchStatusBadge";
 
 interface DispatchListProps {
   dispatches: Dispatch[];
+  detailBasePath?: string;
+  createHref?: string;
+  emptyMessage?: string;
+  emptyActionLabel?: string;
 }
 
-export function DispatchList({ dispatches }: DispatchListProps) {
+export function DispatchList({
+  dispatches,
+  detailBasePath = "/dispatches",
+  createHref = "/dispatches/new",
+  emptyMessage = "No hay despachos registrados",
+  emptyActionLabel = "Crear el primer despacho",
+}: DispatchListProps) {
   if (dispatches.length === 0) {
     return (
       <div className="text-center py-12">
-        <p className="text-gray-500 mb-4">No hay despachos registrados</p>
-        <Link href="/dispatches/new" className="text-blue-600 hover:underline">
-          Crear el primer despacho
+        <p className="text-gray-500 mb-4">{emptyMessage}</p>
+        <Link href={createHref} className="text-blue-600 hover:underline">
+          {emptyActionLabel}
         </Link>
       </div>
     );
@@ -38,7 +48,7 @@ export function DispatchList({ dispatches }: DispatchListProps) {
     <div key="carrier">{dispatch.carrier || "-"}</div>,
     <Link
       key="actions"
-      href={`/dispatches/${dispatch.id}`}
+      href={`${detailBasePath}/${dispatch.id}`}
       className="text-blue-600 hover:text-blue-800 hover:underline"
     >
       Ver Detalle

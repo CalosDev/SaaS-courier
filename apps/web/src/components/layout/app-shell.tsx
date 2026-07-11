@@ -109,6 +109,12 @@ const NAV_ITEMS: NavItem[] = [
     requiredPermissions: ["corrections.read"],
   },
   {
+    href: "/shipments",
+    label: "Embarques",
+    icon: Plane,
+    requiredPermissions: ["shipments.read"],
+  },
+  {
     href: "/house-shipments",
     label: "Envíos",
     icon: Truck,

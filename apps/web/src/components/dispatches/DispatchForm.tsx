@@ -9,9 +9,16 @@ import { CreateDispatchDto } from "@/lib/api/contracts";
 interface DispatchFormProps {
   onSubmit: (data: CreateDispatchDto) => Promise<void>;
   isLoading?: boolean;
+  submitLabel?: string;
+  loadingLabel?: string;
 }
 
-export function DispatchForm({ onSubmit, isLoading }: DispatchFormProps) {
+export function DispatchForm({
+  onSubmit,
+  isLoading,
+  submitLabel = "Crear Despacho",
+  loadingLabel = "Guardando...",
+}: DispatchFormProps) {
   const [formData, setFormData] = useState<CreateDispatchDto>({
     origin: "",
     destination: "",
@@ -106,7 +113,7 @@ export function DispatchForm({ onSubmit, isLoading }: DispatchFormProps) {
 
       <div className="flex justify-end pt-4 border-t">
         <Button type="submit" disabled={isLoading} className="bg-blue-600 hover:bg-blue-700 text-white">
-          {isLoading ? "Guardando..." : "Crear Despacho"}
+          {isLoading ? loadingLabel : submitLabel}
         </Button>
       </div>
     </form>
