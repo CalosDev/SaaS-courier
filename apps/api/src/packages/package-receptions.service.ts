@@ -1,5 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 
+import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import type { CommandContext } from '../request-context/request-context.types';
 import { InvalidPackageInputError } from './package.errors';
 import { PackageReceptionNotFoundError } from './package-reception.errors';
@@ -20,6 +21,8 @@ export class PackageReceptionsService {
   constructor(
     @Inject(PackageReceptionsRepository)
     private readonly repository: PackageReceptionsRepository,
+    @Optional()
+    private readonly operationalHoldGuard?: OperationalHoldGuard,
   ) {}
 
   async receive(
@@ -36,11 +39,18 @@ export class PackageReceptionsService {
       context,
       normalizedOrganizationId,
     );
+    const normalizedPackageId = this.requiredText(packageId, 'packageId');
+
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      normalizedOrganizationId,
+      normalizedPackageId,
+      { operation: 'package reception' },
+    );
 
     return this.repository.receive(
       {
         organizationId: normalizedOrganizationId,
-        packageId: this.requiredText(packageId, 'packageId'),
+        packageId: normalizedPackageId,
         facilityId: this.requiredText(input.facilityId, 'facilityId'),
         receivedByEmployeeId: this.requiredText(
           context?.actorEmployeeId,

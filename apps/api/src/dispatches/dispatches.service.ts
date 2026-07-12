@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaDispatchesRepository } from './prisma-dispatches.repository';
 
@@ -11,6 +12,7 @@ import { AddPackagesDto } from './dto/add-packages.dto';
 import { DispatchStatus } from '../generated/prisma/client';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import type { AuditActionCode } from '../audit/audit.catalog';
+import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CommandContext } from '../request-context/request-context.types';
 import { randomUUID } from 'crypto';
@@ -30,6 +32,8 @@ export class DispatchesService {
   constructor(
     private readonly repository: PrismaDispatchesRepository,
     private readonly prisma: PrismaService,
+    @Optional()
+    private readonly operationalHoldGuard?: OperationalHoldGuard,
   ) {}
 
   private generateCode(): string {
@@ -248,6 +252,17 @@ export class DispatchesService {
         );
       }
 
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        ctx.organizationId,
+        [
+          ...packageIds,
+          ...(
+            (existing as { packages?: Array<{ id: string }> }).packages ?? []
+          ).map((pkg) => pkg.id),
+        ],
+        { operation: 'master shipment package replacement', tx },
+      );
+
       await tx.package.updateMany({
         where: {
           organizationId: ctx.organizationId,
@@ -400,6 +415,14 @@ export class DispatchesService {
         );
       }
 
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        ctx.organizationId,
+        ((existing as { packages?: Array<{ id: string }> }).packages ?? []).map(
+          (pkg) => pkg.id,
+        ),
+        { operation: transition.action, tx },
+      );
+
       const timestamp = new Date();
       const data =
         transition.timestampField === undefined
@@ -463,6 +486,12 @@ export class DispatchesService {
         );
       }
 
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        ctx.organizationId,
+        dto.packageIds,
+        { operation: 'dispatch package addition', tx },
+      );
+
       const updated = await this.repository.updatePackageAssociation(
         ctx.organizationId,
         dispatchId,
@@ -505,6 +534,12 @@ export class DispatchesService {
           'Can only remove packages from a DRAFT dispatch',
         );
       }
+
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        ctx.organizationId,
+        dto.packageIds,
+        { operation: 'dispatch package removal', tx },
+      );
 
       const updated = await this.repository.updatePackageAssociation(
         ctx.organizationId,

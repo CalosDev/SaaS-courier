@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 
 import {
   ExternalTrackingNormalizationError,
@@ -6,6 +6,7 @@ import {
 } from '../common/tracking/external-tracking-normalizer';
 import { CustomerNotFoundError } from '../customers/customer.errors';
 import { CustomersRepository } from '../customers/customers.repository';
+import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import type { CustomerRecord } from '../customers/customer.types';
 import type { CommandContext } from '../request-context/request-context.types';
 import {
@@ -40,6 +41,8 @@ export class PackagesService {
     @Inject(CustomersRepository)
     private readonly customersRepository: CustomersRepository,
     private readonly trackingNormalizer: ExternalTrackingNormalizer = new ExternalTrackingNormalizer(),
+    @Optional()
+    private readonly operationalHoldGuard?: OperationalHoldGuard,
   ) {}
 
   async create(
@@ -242,6 +245,12 @@ export class PackagesService {
       );
     }
 
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      record.organizationId,
+      record.packageId,
+      { operation: 'package update' },
+    );
+
     const updated = await this.packagesRepository.update(record, context);
 
     if (!updated) {
@@ -258,9 +267,23 @@ export class PackagesService {
     context?: CommandContext,
   ): Promise<PackageRecord> {
     const reason = this.normalizeReason(input.reason);
+    const normalizedOrganizationId = this.normalizeRequiredField(
+      organizationId,
+      'organizationId',
+    );
+    const normalizedPackageId = this.normalizeRequiredField(
+      packageId,
+      'packageId',
+    );
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      normalizedOrganizationId,
+      normalizedPackageId,
+      { operation: 'package cancellation' },
+    );
+
     const cancelled = await this.packagesRepository.cancel(
-      this.normalizeRequiredField(organizationId, 'organizationId'),
-      this.normalizeRequiredField(packageId, 'packageId'),
+      normalizedOrganizationId,
+      normalizedPackageId,
       reason,
       context,
     );

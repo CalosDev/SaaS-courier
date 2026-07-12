@@ -45,7 +45,13 @@ describe('PackageReceptionsService', () => {
     receive: jest.fn(),
     findByPackageId: jest.fn(),
   };
-  const service = new PackageReceptionsService(repository);
+  const operationalHoldGuard = {
+    assertNoActivePackageHolds: jest.fn(),
+  };
+  const service = new PackageReceptionsService(
+    repository,
+    operationalHoldGuard as any,
+  );
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -86,6 +92,36 @@ describe('PackageReceptionsService', () => {
       },
       context,
     );
+    expect(
+      operationalHoldGuard.assertNoActivePackageHolds,
+    ).toHaveBeenCalledWith('org-1', 'package-1', {
+      operation: 'package reception',
+    });
+  });
+
+  it('does not receive a package while it has an active operational hold', async () => {
+    operationalHoldGuard.assertNoActivePackageHolds.mockRejectedValueOnce(
+      new Error('held package'),
+    );
+
+    await expect(
+      service.receive(
+        'org-1',
+        'package-1',
+        {
+          facilityId: 'facility-1',
+          weight: 12.5,
+          length: 10,
+          width: 8,
+          height: 6,
+          pieceCount: 1,
+          condition: 'SEALED',
+        },
+        context,
+      ),
+    ).rejects.toThrow('held package');
+
+    expect(repository.receive).not.toHaveBeenCalled();
   });
 
   it.each([

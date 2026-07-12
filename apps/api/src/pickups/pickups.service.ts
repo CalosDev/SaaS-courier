@@ -2,8 +2,10 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import type { CommandContext } from '../request-context/request-context.types';
 import { CreatePickupRequestDto } from './dto/create-pickup-request.dto';
@@ -22,7 +24,11 @@ function generatePickupNumber(): string {
 
 @Injectable()
 export class PickupRequestsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly operationalHoldGuard?: OperationalHoldGuard,
+  ) {}
 
   private readonly auditWriter = new PrismaAuditOutboxWriter();
 
@@ -69,6 +75,12 @@ export class PickupRequestsService {
           'Some packages are already assigned to an active pickup request',
         );
       }
+
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        context.organizationId,
+        dto.packageIds,
+        { operation: 'pickup request creation', tx },
+      );
 
       const id = randomUUID();
       const pickupNumber = `PU-${generatePickupNumber()}`;
@@ -186,6 +198,12 @@ export class PickupRequestsService {
             'Some packages are already in other active pickups',
           );
         }
+
+        await this.operationalHoldGuard?.assertNoActivePackageHolds(
+          context.organizationId,
+          dto.packageIds,
+          { operation: 'pickup request update', tx },
+        );
       }
 
       // Update items
@@ -238,6 +256,12 @@ export class PickupRequestsService {
       if (existing.status !== 'DRAFT')
         throw new ConflictException('Pickup request must be in DRAFT state');
 
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        context.organizationId,
+        existing.items.map((item) => item.packageId),
+        { operation: 'pickup request readiness', tx },
+      );
+
       const updated = await tx.pickupRequest.update({
         where: {
           organizationId_id: { organizationId: context.organizationId, id },
@@ -272,6 +296,12 @@ export class PickupRequestsService {
         throw new ConflictException(
           'Pickup request must be READY to be completed',
         );
+
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        context.organizationId,
+        existing.items.map((item) => item.packageId),
+        { operation: 'pickup request completion', tx },
+      );
 
       const updated = await tx.pickupRequest.update({
         where: {

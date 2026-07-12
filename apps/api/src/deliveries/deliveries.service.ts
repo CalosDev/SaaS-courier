@@ -2,8 +2,10 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import { CreateDeliveryDto } from './dto/create-delivery.dto';
 import { UpdateDeliveryDto } from './dto/update-delivery.dto';
@@ -19,7 +21,11 @@ import type { CommandContext } from '../request-context/request-context.types';
 export class DeliveriesService {
   private readonly auditWriter = new PrismaAuditOutboxWriter();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly operationalHoldGuard?: OperationalHoldGuard,
+  ) {}
 
   async findAll(ctx: CommandContext) {
     return this.prisma.deliveryOrder.findMany({
@@ -83,6 +89,12 @@ export class DeliveriesService {
         'Packages must belong to customer and be in ARRIVED_AT_DESTINATION status.',
       );
     }
+
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      organizationId,
+      dto.packageIds,
+      { operation: 'delivery creation' },
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const delivery = await tx.deliveryOrder.create({
@@ -157,6 +169,12 @@ export class DeliveriesService {
     if (delivery.status !== DeliveryStatus.DRAFT)
       throw new ConflictException('Delivery must be in DRAFT status.');
 
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      organizationId,
+      delivery.items.map((item) => item.packageId),
+      { operation: 'delivery readiness' },
+    );
+
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.deliveryOrder.update({
         where: { organizationId_id: { organizationId, id } },
@@ -182,6 +200,13 @@ export class DeliveriesService {
     if (delivery.status !== DeliveryStatus.READY)
       throw new ConflictException('Delivery must be in READY status.');
 
+    const packageIds = delivery.items.map((item) => item.packageId);
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      organizationId,
+      packageIds,
+      { operation: 'delivery dispatch' },
+    );
+
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.deliveryOrder.update({
         where: { organizationId_id: { organizationId, id } },
@@ -191,7 +216,6 @@ export class DeliveriesService {
         },
       });
 
-      const packageIds = delivery.items.map((item) => item.packageId);
       await tx.package.updateMany({
         where: { organizationId, id: { in: packageIds } },
         data: { status: PackageStatus.OUT_FOR_DELIVERY },
@@ -224,6 +248,12 @@ export class DeliveriesService {
         'receiverName is required when delivery is successful.',
       );
     }
+
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      organizationId,
+      delivery.items.map((item) => item.packageId),
+      { operation: 'delivery attempt' },
+    );
 
     return this.prisma.$transaction(async (tx) => {
       await tx.deliveryAttempt.create({

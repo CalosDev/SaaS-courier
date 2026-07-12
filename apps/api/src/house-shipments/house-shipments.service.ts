@@ -3,8 +3,10 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import { HouseShipmentsRepository } from './house-shipments.repository';
 import { CreateHouseShipmentDto } from './dto/create-house-shipment.dto';
 import { UpdateHouseShipmentDto } from './dto/update-house-shipment.dto';
@@ -20,6 +22,8 @@ export class HouseShipmentsService {
   constructor(
     private readonly repository: HouseShipmentsRepository,
     private readonly prisma: PrismaService,
+    @Optional()
+    private readonly operationalHoldGuard?: OperationalHoldGuard,
   ) {}
 
   async create(
@@ -157,6 +161,12 @@ export class HouseShipmentsService {
       );
     }
 
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      ctx.organizationId,
+      dto.packageIds,
+      { operation: 'house shipment package addition' },
+    );
+
     await this.repository.addPackages(ctx.organizationId, id, dto.packageIds);
 
     await this.auditOutbox.write(this.prisma, {
@@ -175,6 +185,12 @@ export class HouseShipmentsService {
     if (shipment.status !== 'DRAFT') {
       throw new ConflictException('House shipment is not in DRAFT status');
     }
+
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      ctx.organizationId,
+      shipment.packages.map((item) => item.packageId),
+      { operation: 'house shipment close' },
+    );
 
     // Use transaction for closing
     await this.prisma.$transaction(async (tx) => {

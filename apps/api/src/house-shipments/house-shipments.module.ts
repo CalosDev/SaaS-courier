@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
+import { HoldsModule } from '../holds/holds.module';
 import { HouseShipmentsService } from './house-shipments.service';
 import { HouseShipmentsRepository } from './house-shipments.repository';
 import { PrismaHouseShipmentsRepository } from './prisma-house-shipments.repository';
@@ -10,7 +11,7 @@ import {
 } from './house-shipments.controller';
 
 @Module({
-  imports: [PrismaModule, AuditModule],
+  imports: [PrismaModule, AuditModule, HoldsModule],
   controllers: [
     HouseShipmentsController,
     MasterShipmentsHouseShipmentsController,

@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
   ConflictException,
+  Optional,
 } from '@nestjs/common';
 import { CreateCustomsManifestDto } from './dto/create-customs-manifest.dto';
 import { UpdateCustomsManifestDto } from './dto/update-customs-manifest.dto';
@@ -16,6 +17,7 @@ import {
   CustomsManifestRecord,
 } from './customs-manifest.types';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
+import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import type { CommandContext } from '../request-context/request-context.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { SigaApiService } from '../siga-integration/siga-api.service';
@@ -29,6 +31,8 @@ export class CustomsManifestsService {
     private readonly repository: CustomsManifestsRepository,
     private readonly prisma: PrismaService,
     private readonly sigaApi: SigaApiService,
+    @Optional()
+    private readonly operationalHoldGuard?: OperationalHoldGuard,
   ) {}
 
   async list(ctx: CommandContext): Promise<CustomsManifestRecord[]> {
@@ -163,6 +167,12 @@ export class CustomsManifestsService {
         );
       }
 
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        ctx.organizationId,
+        dto.packageIds,
+        { operation: 'customs manifest package addition', tx },
+      );
+
       await this.repository.addPackages(
         ctx.organizationId,
         id,
@@ -202,6 +212,12 @@ export class CustomsManifestsService {
         );
       }
 
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        ctx.organizationId,
+        dto.packageIds,
+        { operation: 'customs manifest package removal', tx },
+      );
+
       await this.repository.removePackages(
         ctx.organizationId,
         id,
@@ -229,6 +245,16 @@ export class CustomsManifestsService {
     if (manifest.status !== CustomsManifestStatus.DRAFT) {
       throw new ConflictException(CustomsManifestErrors.InvalidStatus.message);
     }
+
+    const manifestDetail = await this.repository.findDetailById(
+      ctx.organizationId,
+      id,
+    );
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      ctx.organizationId,
+      manifestDetail?.packages.map((pkg) => pkg.id) ?? [],
+      { operation: 'customs manifest transmission' },
+    );
 
     // Call Siga API
     const response = await this.sigaApi.transmitManifest(

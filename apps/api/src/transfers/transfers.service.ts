@@ -2,8 +2,10 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import type { CommandContext } from '../request-context/request-context.types';
 import { CreateTransferDto } from './dto/create-transfer.dto';
@@ -20,7 +22,11 @@ import { randomBytes } from 'node:crypto';
 export class TransfersService {
   private readonly auditWriter = new PrismaAuditOutboxWriter();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Optional()
+    private readonly operationalHoldGuard?: OperationalHoldGuard,
+  ) {}
 
   private generateTransferNumber(): string {
     // Basic short random ID logic for TRF
@@ -143,6 +149,12 @@ export class TransfersService {
 
     if (!pkg) throw new NotFoundException('Package not found');
 
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      ctx.organizationId,
+      dto.packageId,
+      { operation: 'facility transfer item addition' },
+    );
+
     return this.prisma.$transaction(async (tx) => {
       const item = await tx.facilityTransferItem.create({
         data: {
@@ -210,6 +222,12 @@ export class TransfersService {
       throw new BadRequestException('Cannot dispatch an empty transfer');
     }
 
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      ctx.organizationId,
+      transfer.items.map((item) => item.packageId),
+      { operation: 'facility transfer dispatch' },
+    );
+
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.facilityTransfer.update({
         where: {
@@ -267,6 +285,12 @@ export class TransfersService {
 
     const item = transfer.items.find((i) => i.id === itemId);
     if (!item) throw new NotFoundException('Item not found in transfer');
+
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      ctx.organizationId,
+      item.packageId,
+      { operation: 'facility transfer item receipt' },
+    );
 
     return this.prisma.$transaction(async (tx) => {
       const updatedItem = await tx.facilityTransferItem.update({

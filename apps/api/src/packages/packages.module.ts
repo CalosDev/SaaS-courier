@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { ExternalTrackingNormalizer } from '../common/tracking/external-tracking-normalizer';
 import { CustomersModule } from '../customers/customers.module';
+import { HoldsModule } from '../holds/holds.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { PackageCodeService } from './package-code.service';
@@ -19,7 +20,7 @@ import { PrismaPackageReceptionsRepository } from './prisma-package-receptions.r
 import { PrismaPackagesRepository } from './prisma-packages.repository';
 
 @Module({
-  imports: [PrismaModule, CustomersModule, StorageModule],
+  imports: [PrismaModule, CustomersModule, StorageModule, HoldsModule],
   controllers: [
     PackagesController,
     PackageReceptionsController,

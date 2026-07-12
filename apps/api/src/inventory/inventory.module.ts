@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { HoldsModule } from '../holds/holds.module';
 import { PackagesModule } from '../packages/packages.module';
 import { PrismaModule } from '../prisma/prisma.module';
 import { InventoryController } from './inventory.controller';
@@ -8,7 +9,7 @@ import { InventoryService } from './inventory.service';
 import { PrismaInventoryRepository } from './prisma-inventory.repository';
 
 @Module({
-  imports: [PrismaModule, PackagesModule],
+  imports: [PrismaModule, PackagesModule, HoldsModule],
   controllers: [InventoryController],
   providers: [
     InventoryService,

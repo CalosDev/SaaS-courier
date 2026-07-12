@@ -5,10 +5,11 @@ import { CustomsManifestsRepositoryToken } from './customs-manifests.repository'
 import { PrismaCustomsManifestsRepository } from './prisma-customs-manifests.repository';
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
+import { HoldsModule } from '../holds/holds.module';
 import { SigaIntegrationModule } from '../siga-integration/siga-integration.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, SigaIntegrationModule],
+  imports: [PrismaModule, AuditModule, HoldsModule, SigaIntegrationModule],
   controllers: [CustomsManifestsController],
   providers: [
     CustomsManifestsService,

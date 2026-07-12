@@ -1,5 +1,6 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 
+import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import { PackageNotFoundError } from '../packages/package.errors';
 import { PackagesService } from '../packages/packages.service';
 import type { CommandContext } from '../request-context/request-context.types';
@@ -37,6 +38,8 @@ export class InventoryService {
     @Inject(InventoryRepository)
     private readonly inventoryRepository: InventoryRepository,
     private readonly packagesService: PackagesService,
+    @Optional()
+    private readonly operationalHoldGuard?: OperationalHoldGuard,
   ) {}
 
   listLocations(
@@ -160,6 +163,11 @@ export class InventoryService {
     await this.packagesService.getById(
       normalizedOrganizationId,
       normalizedPackageId,
+    );
+    await this.operationalHoldGuard?.assertNoActivePackageHolds(
+      normalizedOrganizationId,
+      normalizedPackageId,
+      { operation: 'inventory movement' },
     );
 
     const moved = await this.inventoryRepository.movePackage(
