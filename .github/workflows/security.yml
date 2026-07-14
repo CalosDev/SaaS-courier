@@ -43,7 +43,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7.0.0
       - name: Scan repository
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -52,7 +52,7 @@ jobs:
           ignore-unfixed: true
           exit-code: 1
       - name: Generate CycloneDX SBOM
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs
           scan-ref: .
@@ -78,7 +78,7 @@ jobs:
       - name: Build image
         run: docker build --build-arg STORAGE_PUBLIC_ORIGIN=https://objects.example --file "${{ matrix.dockerfile }}" --tag "courier-${{ matrix.name }}:scan" .
       - name: Scan image
-        uses: aquasecurity/trivy-action@0.36.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: courier-${{ matrix.name }}:scan
           severity: HIGH,CRITICAL
