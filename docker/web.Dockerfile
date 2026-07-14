@@ -24,6 +24,7 @@ RUN pnpm --filter @courier/web build
 FROM node:22-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
+RUN npm uninstall --global npm
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app/apps/web/.next/standalone ./
 COPY --from=build --chown=app:app /app/apps/web/.next/static ./apps/web/.next/static
