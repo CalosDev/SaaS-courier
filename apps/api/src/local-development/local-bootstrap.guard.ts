@@ -6,8 +6,8 @@ export type LocalBootstrapConfig = {
 export function getLocalBootstrapConfig(
   environment: NodeJS.ProcessEnv,
 ): LocalBootstrapConfig {
-  if (environment.NODE_ENV === 'production') {
-    throw new Error('Local bootstrap is disabled in production');
+  if (environment.APP_ENV !== 'local') {
+    throw new Error('Local bootstrap requires APP_ENV=local');
   }
 
   if (environment.ALLOW_LOCAL_BOOTSTRAP !== 'true') {
@@ -15,6 +15,8 @@ export function getLocalBootstrapConfig(
       'Set ALLOW_LOCAL_BOOTSTRAP=true to authorize local bootstrap',
     );
   }
+
+  assertLocalDatabase(environment.DATABASE_URL);
 
   const email = environment.LOCAL_BOOTSTRAP_EMAIL?.trim().toLowerCase();
   const password = environment.LOCAL_BOOTSTRAP_PASSWORD;
@@ -30,4 +32,31 @@ export function getLocalBootstrapConfig(
   }
 
   return { email, password };
+}
+
+function assertLocalDatabase(value: string | undefined): void {
+  if (!value) {
+    throw new Error('DATABASE_URL is required for local bootstrap');
+  }
+
+  let databaseUrl: URL;
+  try {
+    databaseUrl = new URL(value);
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL URL');
+  }
+
+  const localHosts = new Set([
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    'postgres',
+    'host.docker.internal',
+  ]);
+  if (
+    !['postgres:', 'postgresql:'].includes(databaseUrl.protocol) ||
+    !localHosts.has(databaseUrl.hostname.toLowerCase())
+  ) {
+    throw new Error('Local bootstrap requires a local PostgreSQL database');
+  }
 }

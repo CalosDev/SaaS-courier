@@ -51,7 +51,20 @@ function loadStorageConfig(
       configService.get<string>('S3_FORCE_PATH_STYLE'),
       true,
     ),
+    serverSideEncryption: parseEncryption(
+      configService.get<string>('S3_SERVER_SIDE_ENCRYPTION'),
+    ),
+    kmsKeyId: text(configService.get<string>('S3_KMS_KEY_ID')) ?? undefined,
   };
+}
+
+function parseEncryption(
+  value: string | undefined,
+): 'AES256' | 'aws:kms' | undefined {
+  const normalized = value?.trim();
+  return normalized === 'AES256' || normalized === 'aws:kms'
+    ? normalized
+    : undefined;
 }
 
 function text(value: string | undefined): string | null {

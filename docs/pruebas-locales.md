@@ -22,8 +22,9 @@ pnpm dev
 ```
 
 El bootstrap es idempotente, solo administra la organizacion `courier-local` y
-se niega a ejecutar en produccion. La contrasena se recibe por entorno y no se
-guarda en Git.
+requiere `APP_ENV=local`, autorizacion explicita y una base PostgreSQL local o
+del Compose de desarrollo. La contrasena se recibe por entorno y no se guarda
+en Git.
 
 ## Accesos
 

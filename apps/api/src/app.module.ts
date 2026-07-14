@@ -36,10 +36,12 @@ import { OutboxModule } from './outbox/outbox.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
+import { validateEnvironment } from './config/environment.validation';
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
+      validate: validateEnvironment,
       envFilePath: [
         resolve(process.cwd(), '.env'),
         resolve(process.cwd(), '../../.env'),

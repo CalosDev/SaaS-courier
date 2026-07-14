@@ -3,6 +3,7 @@ import { Public } from '../auth/http/public.decorator';
 import { SmtpEmailSender } from '../notifications/smtp-email.sender';
 import { PrismaService } from '../prisma/prisma.service';
 import { ObjectStorageService } from '../storage/object-storage.service';
+import { RequirePermissions } from '../rbac/http/require-permissions.decorator';
 
 export interface HealthResponse {
   status: 'ok';
@@ -10,7 +11,6 @@ export interface HealthResponse {
   timestamp: string;
 }
 
-@Public()
 @Controller('health')
 export class HealthController {
   private readinessSnapshot:
@@ -27,6 +27,7 @@ export class HealthController {
   ) {}
 
   @Get()
+  @Public()
   getHealth(): HealthResponse {
     return {
       status: 'ok',
@@ -36,29 +37,52 @@ export class HealthController {
   }
 
   @Get('live')
+  @Public()
   getLiveness(): HealthResponse {
     return this.getHealth();
   }
 
   @Get('ready')
+  @Public()
   async getReadiness() {
+    const readiness = await this.resolveReadiness();
+    const body = {
+      status: readiness.ready ? ('ready' as const) : ('not_ready' as const),
+      service: 'courier-api' as const,
+      timestamp: new Date().toISOString(),
+    };
+    if (!readiness.ready) throw new ServiceUnavailableException(body);
+    return body;
+  }
+
+  @Get('dependencies')
+  @RequirePermissions('organizations.read')
+  async getDependencies() {
+    const readiness = await this.resolveReadiness();
+    const body = {
+      status: readiness.ready ? ('ready' as const) : ('not_ready' as const),
+      service: 'courier-api' as const,
+      checks: readiness.checks,
+      timestamp: new Date().toISOString(),
+    };
+    if (!readiness.ready) throw new ServiceUnavailableException(body);
+    return body;
+  }
+
+  private async resolveReadiness() {
     const [database, storage, smtp] = await this.dependencyReadiness();
     const storageRequired = process.env.READINESS_REQUIRE_S3 === 'true';
     const smtpRequired = process.env.READINESS_REQUIRE_SMTP === 'true';
     const ready =
       database && (!storageRequired || storage) && (!smtpRequired || smtp);
-    const body = {
-      status: ready ? ('ready' as const) : ('not_ready' as const),
-      service: 'courier-api' as const,
+    return {
+      ready,
       checks: {
         database: database ? 'up' : 'down',
         objectStorage: storage ? 'up' : storageRequired ? 'down' : 'optional',
         smtp: smtp ? 'up' : smtpRequired ? 'down' : 'optional',
       },
-      timestamp: new Date().toISOString(),
     };
-    if (!ready) throw new ServiceUnavailableException(body);
-    return body;
   }
 
   private dependencyReadiness(): Promise<[boolean, boolean, boolean]> {

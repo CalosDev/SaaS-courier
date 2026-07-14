@@ -69,7 +69,10 @@ export class CarrierConnectionsService {
         });
         return row;
       });
-      return this.serialize(created);
+      return {
+        ...this.serialize(created),
+        connectionKey: created.connectionKey,
+      };
     } catch (error) {
       if (this.isUniqueConflict(error)) {
         throw new ConflictException('Carrier connection already exists');
@@ -177,7 +180,10 @@ export class CarrierConnectionsService {
       });
       return row;
     });
-    return { ...this.serialize(updated), test: { success, errorCode } };
+    return {
+      ...this.serialize(updated),
+      test: { success, errorCode },
+    };
   }
 
   async listPackageEvents(organizationId: string, packageId: string) {
@@ -349,7 +355,6 @@ export class CarrierConnectionsService {
       id: row.id,
       carrierCode: row.carrierCode,
       displayName: row.displayName,
-      connectionKey: row.connectionKey,
       status: row.status,
       credentialConfigured: Boolean(
         this.secrets.getSecret(row.secretReference),

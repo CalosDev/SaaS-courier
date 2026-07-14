@@ -114,102 +114,112 @@ test("renders the packages list with navigation and mocked data", async ({
   await expect(
     page.getByRole("navigation", { name: "Navegación principal" }),
   ).toContainText("Paquetes");
-  await expect(page.getByText(PACKAGE_SUMMARY.internalTrackingNumber)).toBeVisible();
-  await expect(page.getByText(PACKAGE_SUMMARY.externalTrackingNumber)).toBeVisible();
+  await expect(
+    page.getByText(PACKAGE_SUMMARY.internalTrackingNumber),
+  ).toBeVisible();
+  await expect(
+    page.getByText(PACKAGE_SUMMARY.externalTrackingNumber),
+  ).toBeVisible();
   await expect(page.getByRole("link", { name: "Ver detalle" })).toBeVisible();
 });
 
 test("submits the manual package form without tenant or internal tracking fields", async ({
   page,
 }) => {
-    let createPayload: Record<string, unknown> | null = null;
+  let createPayload: Record<string, unknown> | null = null;
 
-    await page.route("**/backend/packages", async (route) => {
-      if (route.request().method() !== "POST") {
-        await route.fallback();
-        return;
-      }
+  await page.route("**/backend/packages", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.fallback();
+      return;
+    }
 
-      createPayload = (await route.request().postDataJSON()) as Record<
-        string,
-        unknown
-      >;
+    createPayload = (await route.request().postDataJSON()) as Record<
+      string,
+      unknown
+    >;
 
-      await route.fulfill({
-        status: 201,
-        contentType: "application/json",
-        body: JSON.stringify(PACKAGE_SUMMARY),
-      });
+    await route.fulfill({
+      status: 201,
+      contentType: "application/json",
+      body: JSON.stringify(PACKAGE_SUMMARY),
     });
+  });
 
-    await page.goto("/packages/new");
+  await page.goto("/packages/new");
 
-    await expect(
-      page
-        .getByText(
-          "Este registro inicia la identificacion del paquete. La recepcion todavia no esta completada.",
-        )
-        .first(),
-    ).toBeVisible();
+  await expect(
+    page
+      .getByText(
+        "Este registro inicia la identificacion del paquete. La recepcion todavia no esta completada.",
+      )
+      .first(),
+  ).toBeVisible();
 
-    await page.getByRole("button", { name: "Registrar manualmente" }).click();
-    await page.getByRole("combobox", { name: "Cliente" }).selectOption(
-      CUSTOMER.id,
-    );
-    await page
-      .getByLabel("Tracking externo")
-      .fill(` ${PACKAGE_SUMMARY.externalTrackingNumber} `);
-    await page.getByLabel("Notas (opcional)").fill("  Validar etiqueta externa  ");
+  await page.getByRole("button", { name: "Registrar manualmente" }).click();
+  await page
+    .getByRole("combobox", { name: "Cliente" })
+    .selectOption(CUSTOMER.id);
+  await page
+    .getByLabel("Tracking externo")
+    .fill(` ${PACKAGE_SUMMARY.externalTrackingNumber} `);
+  await page
+    .getByLabel("Notas (opcional)")
+    .fill("  Validar etiqueta externa  ");
 
-    await expect(
-      page.getByLabel("Tracking externo").locator(".."),
-    ).toBeVisible();
-    await expect(page.getByText("Tracking interno")).toHaveCount(0);
+  await expect(page.getByLabel("Tracking externo").locator("..")).toBeVisible();
+  await expect(page.getByText("Tracking interno")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Registrar paquete" }).click();
-    await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}`, {
-      timeout: 15_000,
-    });
+  await page.getByRole("button", { name: "Registrar paquete" }).click();
+  await page.waitForURL(`**/packages/${PACKAGE_SUMMARY.id}`, {
+    timeout: 15_000,
+  });
 
-    expect(createPayload).toEqual({
-      customerId: CUSTOMER.id,
-      externalTrackingNumber: PACKAGE_SUMMARY.externalTrackingNumber,
-      notes: "Validar etiqueta externa",
-    });
-    expect(createPayload).not.toHaveProperty("organizationId");
-    expect(createPayload).not.toHaveProperty("internalTrackingNumber");
-    await expect(
-      page.getByRole("heading", {
-        name: PACKAGE_DETAIL.internalTrackingNumber,
-      }),
-    ).toBeVisible();
-  },
-);
+  expect(createPayload).toEqual({
+    customerId: CUSTOMER.id,
+    externalTrackingNumber: PACKAGE_SUMMARY.externalTrackingNumber,
+    notes: "Validar etiqueta externa",
+  });
+  expect(createPayload).not.toHaveProperty("organizationId");
+  expect(createPayload).not.toHaveProperty("internalTrackingNumber");
+  await expect(
+    page.getByRole("heading", {
+      name: PACKAGE_DETAIL.internalTrackingNumber,
+    }),
+  ).toBeVisible();
+});
 
 test("records package reception with assigned facility and configured units", async ({
   page,
 }) => {
   let receivePayload: Record<string, unknown> | null = null;
 
-  await page.route(`**/backend/packages/${PACKAGE_SUMMARY.id}/receive`, async (route) => {
-    receivePayload = (await route.request().postDataJSON()) as Record<
-      string,
-      unknown
-    >;
-    await fulfillJson(route, 200, {
-      id: "reception-1",
-      packageId: PACKAGE_SUMMARY.id,
-    });
-  });
+  await page.route(
+    `**/backend/packages/${PACKAGE_SUMMARY.id}/receive`,
+    async (route) => {
+      receivePayload = (await route.request().postDataJSON()) as Record<
+        string,
+        unknown
+      >;
+      await fulfillJson(route, 200, {
+        id: "reception-1",
+        packageId: PACKAGE_SUMMARY.id,
+      });
+    },
+  );
 
   await page.goto(`/packages/${PACKAGE_SUMMARY.id}`);
-  await expect(page.getByRole("link", { name: "Recibir paquete" })).toHaveAttribute(
-    "href",
-    RECEPTION_URL,
-  );
+  await expect(
+    page.getByRole("link", { name: "Recibir paquete" }),
+  ).toHaveAttribute("href", RECEPTION_URL);
   await page.goto(RECEPTION_URL);
 
-  if (await page.getByRole("heading", { name: "404" }).isVisible().catch(() => false)) {
+  if (
+    await page
+      .getByRole("heading", { name: "404" })
+      .isVisible()
+      .catch(() => false)
+  ) {
     await page.goto(RECEPTION_URL);
   }
 
@@ -250,27 +260,30 @@ test("uploads package documents from the detail view", async ({ page }) => {
   let uploadIntentPayload: Record<string, unknown> | null = null;
   let completeCalls = 0;
 
-  await page.route(`**/backend/packages/${PACKAGE_SUMMARY.id}/documents/upload-intent`, async (route) => {
-    uploadIntentPayload = (await route.request().postDataJSON()) as Record<
-      string,
-      unknown
-    >;
-    await fulfillJson(route, 201, {
-      document: {
-        id: "document-1",
-      },
-      upload: {
-        method: "PUT",
-        url: "https://storage.example/upload/document-1",
-        headers: {
-          "Content-Type": "application/pdf",
+  await page.route(
+    `**/backend/packages/${PACKAGE_SUMMARY.id}/documents/upload-intent`,
+    async (route) => {
+      uploadIntentPayload = (await route.request().postDataJSON()) as Record<
+        string,
+        unknown
+      >;
+      await fulfillJson(route, 201, {
+        document: {
+          id: "document-1",
         },
-        expiresAt: "2026-07-07T12:00:00.000Z",
-      },
-    });
-  });
+        upload: {
+          method: "PUT",
+          url: "http://localhost:3000/storage-upload/document-1",
+          headers: {
+            "Content-Type": "application/pdf",
+          },
+          expiresAt: "2026-07-07T12:00:00.000Z",
+        },
+      });
+    },
+  );
 
-  await page.route("https://storage.example/**", async (route) => {
+  await page.route("**/storage-upload/**", async (route) => {
     if (route.request().method() === "OPTIONS") {
       await route.fulfill({
         status: 204,
@@ -328,9 +341,7 @@ test("uploads package documents from the detail view", async ({ page }) => {
       message: "La carga debe confirmar el documento una vez",
     })
     .toBe(1);
-  await expect(
-    page.getByText("Documento cargado y confirmado."),
-  ).toBeVisible();
+  await expect(page.getByText("Documento cargado y confirmado.")).toBeVisible();
 
   expect(uploadIntentPayload).toEqual({
     documentType: "INVOICE",
@@ -391,7 +402,10 @@ async function fulfillBackofficeRoute(route: Route): Promise<void> {
     return;
   }
 
-  if (method === "GET" && path === `/backend/packages/${PACKAGE_SUMMARY.id}/documents`) {
+  if (
+    method === "GET" &&
+    path === `/backend/packages/${PACKAGE_SUMMARY.id}/documents`
+  ) {
     await fulfillJson(route, 200, {
       items: [],
     });

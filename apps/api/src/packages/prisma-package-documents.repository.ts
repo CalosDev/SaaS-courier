@@ -234,23 +234,45 @@ export class PrismaPackageDocumentsRepository implements PackageDocumentsReposit
     organizationId: string,
     packageId: string,
     documentId: string,
+    context: CommandContext,
   ): Promise<void> {
-    await this.prismaService.storedObject.updateMany({
-      where: {
-        organizationId,
-        packageDocument: {
-          is: {
-            organizationId,
-            packageId,
-            id: documentId,
-          },
+    await this.prismaService.$transaction(async (tx) => {
+      const current = await tx.packageDocument.findFirst({
+        where: { organizationId, packageId, id: documentId },
+        include: { storedObject: true },
+      });
+      if (!current || current.storedObject.status !== 'PENDING_UPLOAD') {
+        return;
+      }
+
+      const update = await tx.storedObject.updateMany({
+        where: {
+          organizationId,
+          id: current.storedObjectId,
+          status: 'PENDING_UPLOAD',
+          deletedAt: null,
         },
-        status: 'PENDING_UPLOAD',
-        deletedAt: null,
-      },
-      data: {
-        status: 'QUARANTINED',
-      },
+        data: {
+          status: 'QUARANTINED',
+        },
+      });
+      if (update.count !== 1) {
+        throw new PackageDocumentStateConflictError(
+          'Package document changed during quarantine',
+        );
+      }
+
+      await this.auditWriter.write(tx, {
+        context,
+        action: 'package.document.quarantined',
+        entityType: 'PACKAGE_DOCUMENT',
+        entityId: documentId,
+        changedFields: ['status'],
+        beforeData: { status: 'PENDING_UPLOAD' },
+        afterData: { status: 'QUARANTINED' },
+        payload: { packageId, documentId },
+        emitOutbox: false,
+      });
     });
   }
 

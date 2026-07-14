@@ -38,3 +38,11 @@ export class PackageDocumentStorageUnavailableError extends PackageDocumentError
     super('Package document storage is unavailable');
   }
 }
+
+export class PackageDocumentScanUnavailableError extends PackageDocumentError {
+  readonly code = 'PACKAGE_DOCUMENT_SCAN_UNAVAILABLE';
+
+  constructor() {
+    super('Package document security scan is unavailable');
+  }
+}

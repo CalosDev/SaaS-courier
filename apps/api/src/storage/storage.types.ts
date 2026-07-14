@@ -31,6 +31,11 @@ export interface GetStoredObjectInput {
   objectKey: string;
 }
 
+export interface DeleteStoredObjectInput {
+  bucketName: string;
+  objectKey: string;
+}
+
 export interface StoredObjectDownload {
   stream: Readable;
   contentType: string | null;

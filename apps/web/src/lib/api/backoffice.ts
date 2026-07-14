@@ -259,7 +259,7 @@ export const backofficeApi = {
     );
   },
   getSystemReadiness() {
-    return apiClient.get<SystemReadiness>("/health/ready");
+    return apiClient.get<SystemReadiness>("/health/dependencies");
   },
   createInventoryLocation(body: Record<string, unknown>) {
     return apiClient.post<WarehouseLocation>("/inventory/locations", body);

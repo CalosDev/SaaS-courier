@@ -1,0 +1,86 @@
+name: Security baseline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "43 5 * * 2"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependencies-and-repository:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.0
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6.0.9
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod --audit-level high
+      - name: Reject forbidden tracked artifacts
+        shell: bash
+        run: |
+          forbidden="$(git ls-files | grep -E '(^|/)\.env$|\.(pem|key|p12|pfx|dump|backup|bak)$' || true)"
+          if [ -n "$forbidden" ]; then
+            printf 'Forbidden tracked files:\n%s\n' "$forbidden"
+            exit 1
+          fi
+      - uses: gitleaks/gitleaks-action@v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  filesystem-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.0
+      - name: Scan repository
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1
+      - name: Generate CycloneDX SBOM
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: cyclonedx
+          output: courier-sbom.cdx.json
+      - uses: actions/upload-artifact@v7.0.1
+        with:
+          name: courier-sbom
+          path: courier-sbom.cdx.json
+          if-no-files-found: error
+
+  image-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: api
+            dockerfile: docker/api.Dockerfile
+          - name: web
+            dockerfile: docker/web.Dockerfile
+    steps:
+      - uses: actions/checkout@v7.0.0
+      - name: Build image
+        run: docker build --build-arg STORAGE_PUBLIC_ORIGIN=https://objects.example --file "${{ matrix.dockerfile }}" --tag "courier-${{ matrix.name }}:scan" .
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.36.0
+        with:
+          image-ref: courier-${{ matrix.name }}:scan
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: 1

@@ -1,5 +1,6 @@
 import type {
   CreateSignedUploadInput,
+  DeleteStoredObjectInput,
   GetStoredObjectInput,
   HeadStoredObjectInput,
   SignedUploadTarget,
@@ -21,4 +22,6 @@ export abstract class ObjectStorageService {
   abstract getObject(
     input: GetStoredObjectInput,
   ): Promise<StoredObjectDownload>;
+
+  abstract deleteObject(input: DeleteStoredObjectInput): Promise<void>;
 }

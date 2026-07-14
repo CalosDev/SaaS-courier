@@ -15,7 +15,10 @@ COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile
 
 FROM dependencies AS build
+ARG STORAGE_PUBLIC_ORIGIN
+ENV STORAGE_PUBLIC_ORIGIN=$STORAGE_PUBLIC_ORIGIN
 COPY . .
+RUN test -n "$STORAGE_PUBLIC_ORIGIN"
 RUN pnpm --filter @courier/web build
 
 FROM node:22-alpine AS production

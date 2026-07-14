@@ -1354,7 +1354,7 @@ export interface CarrierConnection {
   id: string;
   carrierCode: "UPS" | "FEDEX" | "DHL";
   displayName: string;
-  connectionKey: string;
+  connectionKey?: string;
   status: "ACTIVE" | "DISABLED" | "ERROR";
   credentialConfigured: boolean;
   lastTestedAt: string | null;

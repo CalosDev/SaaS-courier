@@ -33,6 +33,7 @@ export const AUDIT_ACTIONS = [
   'package.received',
   'package.document.created',
   'package.document.available',
+  'package.document.quarantined',
   'package.document.deleted',
   'inventory.location.created',
   'inventory.location.updated',

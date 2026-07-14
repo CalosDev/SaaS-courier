@@ -4,6 +4,7 @@ import { ObjectStorageUnavailableError } from './storage.errors';
 import { ObjectStorageService } from './object-storage.service';
 import type {
   CreateSignedUploadInput,
+  DeleteStoredObjectInput,
   GetStoredObjectInput,
   HeadStoredObjectInput,
   SignedUploadTarget,
@@ -34,6 +35,11 @@ export class UnconfiguredObjectStorageService implements ObjectStorageService {
   }
 
   getObject(input: GetStoredObjectInput): Promise<StoredObjectDownload> {
+    void input;
+    throw new ObjectStorageUnavailableError();
+  }
+
+  deleteObject(input: DeleteStoredObjectInput): Promise<void> {
     void input;
     throw new ObjectStorageUnavailableError();
   }

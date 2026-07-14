@@ -1,3 +1,7 @@
+-- HISTORICO - NO EJECUTAR.
+-- La fuente vigente es apps/api/prisma/schema.prisma y prisma/migrations.
+-- Este archivo se conserva unicamente para trazabilidad del modelo v0.2.
+
 -- ============================================================================
 -- COURIER SaaS - MODELO A+ (MVP v0.2)
 -- Frontend: Next.js + React + TypeScript

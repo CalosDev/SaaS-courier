@@ -31,10 +31,14 @@ describe('HealthController', () => {
     process.env.READINESS_REQUIRE_S3 = 'true';
     process.env.READINESS_REQUIRE_SMTP = 'false';
 
-    await expect(controller.getReadiness()).resolves.toMatchObject({
+    await expect(controller.getDependencies()).resolves.toMatchObject({
       status: 'ready',
       checks: { database: 'up', objectStorage: 'up' },
     });
+
+    await expect(controller.getReadiness()).resolves.not.toHaveProperty(
+      'checks',
+    );
   });
 
   it('checks independent readiness dependencies concurrently', async () => {

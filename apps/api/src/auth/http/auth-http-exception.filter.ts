@@ -86,6 +86,7 @@ import {
 import {
   InvalidPackageDocumentInputError,
   PackageDocumentNotFoundError,
+  PackageDocumentScanUnavailableError,
   PackageDocumentStateConflictError,
   PackageDocumentStorageUnavailableError,
 } from '../../packages/package-document.errors';
@@ -308,7 +309,10 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       };
     }
 
-    if (exception instanceof PackageDocumentStorageUnavailableError) {
+    if (
+      exception instanceof PackageDocumentStorageUnavailableError ||
+      exception instanceof PackageDocumentScanUnavailableError
+    ) {
       return {
         status: 503,
         code: exception.code,

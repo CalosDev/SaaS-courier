@@ -18,6 +18,17 @@ docker compose -f compose.prod.yml up -d api web
 No ejecutar migraciones desde cada replica. `DATABASE_URL`, credenciales S3,
 SMTP y carriers se inyectan en runtime desde el gestor de secretos.
 
+La API valida la configuracion al arrancar. Produccion requiere `APP_ENV=production`,
+cookies seguras, CORS HTTPS, PostgreSQL con `sslmode=require` o superior, S3 por
+HTTPS, SMTP obligatorio y `FILE_SCAN_MODE=clamav` con `CLAMAV_HOST` accesible.
+S3 requiere `S3_SERVER_SIDE_ENCRYPTION=AES256` o `aws:kms`; KMS requiere
+`S3_KMS_KEY_ID`.
+Una configuracion incompleta detiene el proceso antes de aceptar trafico.
+
+La imagen web se construye con
+`--build-arg STORAGE_PUBLIC_ORIGIN=https://objetos.example`. Ese origen se
+incorpora a la CSP y debe coincidir con el host de las URLs firmadas de carga.
+
 ## Rollback
 
 - Conservar las imagenes anteriores de web y API.
@@ -32,3 +43,12 @@ SMTP y carriers se inyectan en runtime desde el gestor de secretos.
 PostgreSQL y S3 deben ser administrados. TLS termina en el ingress o proxy;
 cookies usan `Secure`, `HttpOnly` y `SameSite`. El ingress solo envia trafico a
 replicas con readiness exitoso.
+
+`/health/live` y `/health/ready` son publicos, limitados y no revelan nombres de
+dependencias. `/health/dependencies` requiere sesion y `organizations.read`.
+Configurar una politica de ciclo de vida del bucket para abortar cargas
+incompletas y expirar objetos eliminados como defensa adicional.
+
+El despliegue del piloto mantiene una sola replica API. Antes de escalar a varias
+replicas, el ingress o WAF debe aplicar rate limiting distribuido; el limite en
+memoria de NestJS no se considera suficiente para un despliegue horizontal.

@@ -33,6 +33,7 @@ export abstract class PackageDocumentsRepository {
     organizationId: string,
     packageId: string,
     documentId: string,
+    context: CommandContext,
   ): Promise<void>;
 
   abstract markDeleted(

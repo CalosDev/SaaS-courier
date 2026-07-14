@@ -19,6 +19,7 @@ COPY . .
 RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm --filter @courier/api prisma:generate
 RUN pnpm --filter @courier/api build
 RUN pnpm --filter @courier/api deploy --legacy --prod /prod/api
+RUN rm -f /prod/api/dist/scripts/bootstrap-local.js
 
 FROM node:22-alpine AS production
 ENV NODE_ENV=production

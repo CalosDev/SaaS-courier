@@ -9,6 +9,7 @@ import { PackageCodeService } from './package-code.service';
 import { PackageDocumentsController } from './package-documents.controller';
 import { PackageDocumentsRepository } from './package-documents.repository';
 import { PackageDocumentsService } from './package-documents.service';
+import { PackageDocumentScanner } from './package-document-scanner';
 import { PackageReceptionsController } from './package-receptions.controller';
 import { PackageReceptionsRepository } from './package-receptions.repository';
 import { PackageReceptionsService } from './package-receptions.service';
@@ -30,6 +31,7 @@ import { PrismaPackagesRepository } from './prisma-packages.repository';
     ExternalTrackingNormalizer,
     PackageCodeService,
     PackageDocumentsService,
+    PackageDocumentScanner,
     PackageReceptionsService,
     PrismaPackageDocumentsRepository,
     PrismaPackageReceptionsRepository,

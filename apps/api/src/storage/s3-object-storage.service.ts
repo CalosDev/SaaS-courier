@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
   HeadObjectCommand,
@@ -19,6 +20,7 @@ import {
 import { ObjectStorageService } from './object-storage.service';
 import type {
   CreateSignedUploadInput,
+  DeleteStoredObjectInput,
   GetStoredObjectInput,
   HeadStoredObjectInput,
   SignedUploadTarget,
@@ -33,6 +35,8 @@ export interface S3ObjectStorageConfig {
   secretAccessKey: string;
   bucketName: string;
   forcePathStyle: boolean;
+  serverSideEncryption?: 'AES256' | 'aws:kms';
+  kmsKeyId?: string;
 }
 
 @Injectable()
@@ -85,17 +89,29 @@ export class S3ObjectStorageService implements ObjectStorageService {
       Key: input.objectKey,
       ContentType: input.contentType,
       ContentLength: input.contentLength,
+      ServerSideEncryption: this.config.serverSideEncryption,
+      SSEKMSKeyId: this.config.kmsKeyId,
     });
     const url = await getSignedUrl(this.client, command, {
       expiresIn: expiresInSeconds,
     });
 
+    const headers: Record<string, string> = {
+      'Content-Type': input.contentType,
+    };
+    if (this.config.serverSideEncryption) {
+      headers['x-amz-server-side-encryption'] =
+        this.config.serverSideEncryption;
+    }
+    if (this.config.kmsKeyId) {
+      headers['x-amz-server-side-encryption-aws-kms-key-id'] =
+        this.config.kmsKeyId;
+    }
+
     return {
       method: 'PUT',
       url,
-      headers: {
-        'Content-Type': input.contentType,
-      },
+      headers,
       expiresAt: new Date(Date.now() + expiresInSeconds * 1000),
     };
   }
@@ -141,6 +157,19 @@ export class S3ObjectStorageService implements ObjectStorageService {
             : null,
         etag: normalizeEtag(response.ETag),
       };
+    } catch (error) {
+      throw mapStorageError(error);
+    }
+  }
+
+  async deleteObject(input: DeleteStoredObjectInput): Promise<void> {
+    try {
+      await this.client.send(
+        new DeleteObjectCommand({
+          Bucket: input.bucketName,
+          Key: input.objectKey,
+        }),
+      );
     } catch (error) {
       throw mapStorageError(error);
     }

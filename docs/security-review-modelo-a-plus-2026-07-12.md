@@ -1,7 +1,7 @@
 # Revision de seguridad Modelo A+
 
 Fecha: 2026-07-12
-Alcance: NestJS, Next.js, autenticacion, permisos, multi-tenancy, logs e integraciones del repositorio `D:\Cursos\Courier-pruebas`.
+Alcance: NestJS, Next.js, autenticacion, permisos, multi-tenancy, logs e integraciones del monorepo Courier SaaS.
 
 ## Resumen ejecutivo
 

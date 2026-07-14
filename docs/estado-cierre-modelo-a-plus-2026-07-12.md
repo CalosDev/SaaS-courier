@@ -1,8 +1,8 @@
 # Estado de cierre contra Documento Maestro Modelo A+
 
 Fecha de corte: 2026-07-14
-Documento fuente: `D:\Documents\Kuninin\Documentos necesarios\Documento_Maestro_Enfoque_Courier_SaaS_Modelo_A_Plus (2).docx`
-Repositorio revisado: `D:\Cursos\Courier-pruebas`
+Documento fuente: documento maestro Modelo A+ provisto por producto.
+Repositorio revisado: raiz del monorepo Courier SaaS.
 
 ## Criterio de lectura
 

@@ -181,7 +181,7 @@ test("creates a carrier connection using only an environment secret reference", 
 
 test("shows live readiness dependency results", async ({ page }) => {
   await setupAuth(page);
-  await page.route("**/backend/health/ready", (route) =>
+  await page.route("**/backend/health/dependencies", (route) =>
     route.fulfill({
       json: {
         status: "ready",

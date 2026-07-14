@@ -5,6 +5,7 @@ import { basename } from 'node:path';
 import {
   ObjectStorageUnavailableError,
   StoredObjectNotFoundInStorageError,
+  StoredObjectReadFailedError,
 } from '../storage/storage.errors';
 import { ObjectStorageService } from '../storage/object-storage.service';
 import type { CommandContext } from '../request-context/request-context.types';
@@ -16,6 +17,7 @@ import {
   PackageDocumentStorageUnavailableError,
 } from './package-document.errors';
 import { PackageDocumentsRepository } from './package-documents.repository';
+import { PackageDocumentScanner } from './package-document-scanner';
 import {
   PACKAGE_DOCUMENT_TYPE_VALUES,
   type CreatePackageDocumentUploadIntentInput,
@@ -43,6 +45,7 @@ export class PackageDocumentsService {
     private readonly repository: PackageDocumentsRepository,
     @Inject(ObjectStorageService)
     private readonly storageService: ObjectStorageService,
+    private readonly scanner: PackageDocumentScanner,
   ) {}
 
   async createUploadIntent(
@@ -160,7 +163,28 @@ export class PackageDocumentsService {
         objectKey: reference.objectKey,
       });
 
-      await this.assertCompletedObject(reference, objectHead);
+      await this.assertCompletedObject(reference, objectHead, commandContext);
+      const object = await this.storageService.getObject({
+        bucketName: reference.bucketName,
+        objectKey: reference.objectKey,
+      });
+      const scanResult = await this.scanner.scan({
+        contentType: reference.contentType,
+        contentLength: reference.contentLength,
+        stream: object.stream,
+      });
+      if (!scanResult.safe) {
+        await this.repository.markQuarantined(
+          reference.organizationId,
+          reference.packageId,
+          reference.id,
+          commandContext,
+        );
+        throw new PackageDocumentStateConflictError(
+          'Package document failed security validation',
+        );
+      }
+
       const completed = await this.repository.completeUpload(
         {
           organizationId: normalizedOrganizationId,
@@ -185,6 +209,10 @@ export class PackageDocumentsService {
       }
 
       if (error instanceof ObjectStorageUnavailableError) {
+        throw new PackageDocumentStorageUnavailableError();
+      }
+
+      if (error instanceof StoredObjectReadFailedError) {
         throw new PackageDocumentStorageUnavailableError();
       }
 
@@ -291,6 +319,27 @@ export class PackageDocumentsService {
       normalizedPackageId,
     );
 
+    const reference = await this.loadReference(
+      normalizedOrganizationId,
+      normalizedPackageId,
+      normalizedDocumentId,
+    );
+
+    try {
+      await this.storageService.deleteObject({
+        bucketName: reference.bucketName,
+        objectKey: reference.objectKey,
+      });
+    } catch (error) {
+      if (
+        error instanceof ObjectStorageUnavailableError ||
+        error instanceof StoredObjectReadFailedError
+      ) {
+        throw new PackageDocumentStorageUnavailableError();
+      }
+      throw error;
+    }
+
     const deleted = await this.repository.markDeleted(
       {
         organizationId: normalizedOrganizationId,
@@ -332,6 +381,7 @@ export class PackageDocumentsService {
   private async assertCompletedObject(
     reference: PackageDocumentStorageReference,
     head: { contentType: string | null; contentLength: number | null },
+    commandContext: CommandContext,
   ): Promise<void> {
     if (
       head.contentType !== reference.contentType ||
@@ -341,6 +391,7 @@ export class PackageDocumentsService {
         reference.organizationId,
         reference.packageId,
         reference.id,
+        commandContext,
       );
       throw new PackageDocumentStateConflictError(
         'Uploaded object metadata did not match the signed upload intent',

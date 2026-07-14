@@ -11,9 +11,12 @@ Mailpit captura correo sin entregarlo a Internet.
 - `courier-web`: Next.js con `output: standalone`.
 - `courier-api`: NestJS compilado y Prisma Client generado.
 - Imagenes multi-stage y proceso final no root.
-- `/health/live` indica proceso vivo; `/health/ready` valida dependencias.
+- `/health/live` indica proceso vivo; `/health/ready` valida dependencias sin
+  revelar su identidad. El detalle autenticado vive en `/health/dependencies`.
 - `migrate` es un job de despliegue unico, no una replica permanente.
 - PostgreSQL y object storage son servicios administrados.
+- El escaneo ClamAV se despliega como dependencia interna separada y nunca se
+  expone directamente a Internet.
 
 ## Reglas
 

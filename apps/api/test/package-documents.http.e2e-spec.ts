@@ -15,6 +15,7 @@ import { StoredObjectNotFoundInStorageError } from '../src/storage/storage.error
 import { ObjectStorageService } from '../src/storage/object-storage.service';
 import type {
   CreateSignedUploadInput,
+  DeleteStoredObjectInput,
   GetStoredObjectInput,
   HeadStoredObjectInput,
   SignedUploadTarget,
@@ -105,6 +106,15 @@ class FakeObjectStorageService implements ObjectStorageService {
       contentLength: object.contentLength,
       etag: object.etag,
     });
+  }
+
+  deleteObject(input: DeleteStoredObjectInput): Promise<void> {
+    this.objects.delete(this.mapKey(input.bucketName, input.objectKey));
+    return Promise.resolve();
+  }
+
+  hasObject(bucketName: string, objectKey: string): boolean {
+    return this.objects.has(this.mapKey(bucketName, objectKey));
   }
 
   putObject(
@@ -418,7 +428,7 @@ describe('Package documents HTTP', () => {
           documentType: 'INVOICE',
           fileName: 'invoice.pdf',
           contentType: 'application/pdf',
-          contentLength: 11,
+          contentLength: 14,
         })
         .expect(201);
       const uploadIntentBody = uploadIntentResponse.body as {
@@ -460,7 +470,7 @@ describe('Package documents HTTP', () => {
         createdDocument.storedObject.bucketName,
         createdDocument.storedObject.objectKey,
         createdDocument.storedObject.contentType,
-        Buffer.from('hello world'),
+        Buffer.from('%PDF-1.7\n%%EOF'),
       );
 
       await request(app.getHttpServer())
@@ -481,6 +491,66 @@ describe('Package documents HTTP', () => {
           expect(responseBody.originalFilename).toBe('invoice.pdf');
         });
 
+      const unsafeIntent = await request(app.getHttpServer())
+        .post(`/packages/${packageRecord.id}/documents/upload-intent`)
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send({
+          documentType: 'PACKAGE_PHOTO',
+          fileName: 'package.png',
+          contentType: 'image/png',
+          contentLength: 12,
+        })
+        .expect(201);
+      const unsafeDocument = await prisma.packageDocument.findUniqueOrThrow({
+        where: {
+          organizationId_id: {
+            organizationId: organization.id,
+            id: (unsafeIntent.body as { document: { id: string } }).document.id,
+          },
+        },
+        include: { storedObject: true },
+      });
+      cleanup.documentIds.push(unsafeDocument.id);
+      cleanup.storedObjectIds.push(unsafeDocument.storedObjectId);
+      storageService.putObject(
+        unsafeDocument.storedObject.bucketName,
+        unsafeDocument.storedObject.objectKey,
+        unsafeDocument.storedObject.contentType,
+        Buffer.from('not-an-image'),
+      );
+
+      await request(app.getHttpServer())
+        .post(
+          `/packages/${packageRecord.id}/documents/${unsafeDocument.id}/complete`,
+        )
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send({})
+        .expect(409);
+
+      await expect(
+        prisma.storedObject.findUniqueOrThrow({
+          where: {
+            organizationId_id: {
+              organizationId: organization.id,
+              id: unsafeDocument.storedObjectId,
+            },
+          },
+        }),
+      ).resolves.toMatchObject({ status: 'QUARANTINED' });
+      await expect(
+        prisma.auditLog.findFirst({
+          where: {
+            organizationId: organization.id,
+            action: 'package.document.quarantined',
+            entityId: unsafeDocument.id,
+          },
+        }),
+      ).resolves.not.toBeNull();
+
       await request(app.getHttpServer())
         .get(`/packages/${packageRecord.id}/documents`)
         .set('Origin', ALLOWED_ORIGIN)
@@ -490,8 +560,11 @@ describe('Package documents HTTP', () => {
           const responseBody = body as {
             items: Array<{ status: string }>;
           };
-          expect(responseBody.items).toHaveLength(1);
-          expect(responseBody.items[0]?.status).toBe('AVAILABLE');
+          expect(responseBody.items).toHaveLength(2);
+          expect(responseBody.items.map((item) => item.status).sort()).toEqual([
+            'AVAILABLE',
+            'QUARANTINED',
+          ]);
         });
 
       await request(app.getHttpServer())
@@ -516,7 +589,7 @@ describe('Package documents HTTP', () => {
           );
           expect(Buffer.isBuffer(response.body)).toBe(true);
           expect((response.body as Buffer).toString('utf8')).toBe(
-            'hello world',
+            '%PDF-1.7\n%%EOF',
           );
         });
 
@@ -530,6 +603,13 @@ describe('Package documents HTTP', () => {
           const responseBody = body as { status: string };
           expect(responseBody.status).toBe('DELETED');
         });
+
+      expect(
+        storageService.hasObject(
+          createdDocument.storedObject.bucketName,
+          createdDocument.storedObject.objectKey,
+        ),
+      ).toBe(false);
 
       await request(app.getHttpServer())
         .delete(`/packages/${packageRecord.id}/documents/${createdDocument.id}`)

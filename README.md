@@ -13,21 +13,18 @@ Monorepo de una plataforma SaaS B2B multi-tenant para digitalizar la operación 
 
 ## Documentos principales
 
-- `docs/estado-cierre-modelo-a-plus-2026-07-12.md`
-- `ingenieria_inversa_courier_modelo_a_plus_mvp_v0_2.md`
-- `courier_saas_modelo_a_plus_mvp_v0_2.sql`
-- `AGENTS.md`
-- `docs/implementation-plan.md`
 - `docs/development.md`
 - `docs/docker.md`
 - `docs/deployment.md`
 - `docs/database.md`
 
+El esquema ejecutable se mantiene exclusivamente mediante Prisma y migraciones
+versionadas. El SQL v0.2 de referencia vive en `docs/archive/` y no debe
+ejecutarse.
+
 ## Estado actual
 
 El alcance funcional aprobado llega hasta el Ticket 45. Durante el cierre del Modelo A+ no se agregan nuevos módulos: la prioridad es completar la línea base técnica, el hardening, los flujos E2E y la aceptación operativa.
-
-La matriz oficial de avance, evidencia y pendientes es `docs/estado-cierre-modelo-a-plus-2026-07-12.md`.
 
 ## Comandos raiz
 
@@ -157,7 +154,9 @@ COOKIE_SECURE=false
 
 El frontend debe pedir primero `GET /auth/csrf`, enviar el token devuelto en `X-CSRF-Token` y usar `credentials: include` en cada `fetch` autenticado.
 
-El throttling actual usa almacenamiento en memoria por proceso. En produccion con multiples instancias se necesitara almacenamiento compartido.
+El throttling de NestJS usa almacenamiento en memoria por proceso. El piloto se
+despliega con una sola replica API; cualquier escalado horizontal requiere rate
+limiting distribuido en el ingress o WAF.
 
 ## Base de datos local
 

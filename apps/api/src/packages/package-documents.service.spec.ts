@@ -13,6 +13,7 @@ import {
 } from './package-document.errors';
 import { PackageDocumentsRepository } from './package-documents.repository';
 import { PackageDocumentsService } from './package-documents.service';
+import { PackageDocumentScanner } from './package-document-scanner';
 
 function buildReference(
   status: 'PENDING_UPLOAD' | 'AVAILABLE' | 'QUARANTINED' | 'DELETED',
@@ -53,6 +54,8 @@ describe('PackageDocumentsService', () => {
   const createSignedUploadTargetMock = jest.fn();
   const headObjectMock = jest.fn();
   const getObjectMock = jest.fn();
+  const deleteObjectMock = jest.fn();
+  const scanMock = jest.fn();
 
   const packagesService = {
     getById: getByIdMock,
@@ -70,12 +73,15 @@ describe('PackageDocumentsService', () => {
     createSignedUploadTarget: createSignedUploadTargetMock,
     headObject: headObjectMock,
     getObject: getObjectMock,
+    deleteObject: deleteObjectMock,
   } as unknown as ObjectStorageService;
+  const scanner = { scan: scanMock } as unknown as PackageDocumentScanner;
 
   const service = new PackageDocumentsService(
     packagesService,
     repository,
     storageService,
+    scanner,
   );
 
   const context = {
@@ -118,6 +124,14 @@ describe('PackageDocumentsService', () => {
     });
     markQuarantinedMock.mockResolvedValue(undefined);
     listByPackageMock.mockResolvedValue([]);
+    getObjectMock.mockResolvedValue({
+      stream: Readable.from(Buffer.alloc(1024)),
+      contentType: 'application/pdf',
+      contentLength: 1024,
+      etag: 'etag-1',
+    });
+    scanMock.mockResolvedValue({ safe: true });
+    deleteObjectMock.mockResolvedValue(undefined);
   });
 
   it('creates upload intents with sanitized payload and signed upload target', async () => {
@@ -214,7 +228,31 @@ describe('PackageDocumentsService', () => {
       'org-1',
       'package-1',
       'document-1',
+      context,
     );
+  });
+
+  it('quarantines files rejected by content scanning', async () => {
+    findStorageReferenceMock.mockResolvedValue(
+      buildReference('PENDING_UPLOAD'),
+    );
+    headObjectMock.mockResolvedValue({
+      contentType: 'application/pdf',
+      contentLength: 1024,
+      etag: 'etag-1',
+    });
+    scanMock.mockResolvedValue({ safe: false, reason: 'INVALID_SIGNATURE' });
+
+    await expect(
+      service.complete('org-1', 'package-1', 'document-1', context),
+    ).rejects.toBeInstanceOf(PackageDocumentStateConflictError);
+    expect(markQuarantinedMock).toHaveBeenCalledWith(
+      'org-1',
+      'package-1',
+      'document-1',
+      context,
+    );
+    expect(completeUploadMock).not.toHaveBeenCalled();
   });
 
   it('maps missing uploads to a retryable conflict', async () => {
@@ -261,5 +299,20 @@ describe('PackageDocumentsService', () => {
 
     expect(result.contentType).toBe('application/pdf');
     expect(result.document.id).toBe('document-1');
+  });
+
+  it('physically deletes the object before marking the record deleted', async () => {
+    findStorageReferenceMock.mockResolvedValue(buildReference('AVAILABLE'));
+    markDeletedMock.mockResolvedValue(buildReference('DELETED'));
+
+    await service.delete('org-1', 'package-1', 'document-1', context);
+
+    expect(deleteObjectMock).toHaveBeenCalledWith({
+      bucketName: 'documents',
+      objectKey: 'package-documents/opaque-org/opaque-package/object-1',
+    });
+    expect(deleteObjectMock.mock.invocationCallOrder[0]).toBeLessThan(
+      markDeletedMock.mock.invocationCallOrder[0],
+    );
   });
 });
