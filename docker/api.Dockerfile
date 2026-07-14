@@ -1,5 +1,5 @@
 # Plantilla: ajustar rutas después de crear el monorepo.
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable
 WORKDIR /app
 
@@ -21,7 +21,7 @@ RUN pnpm --filter @courier/api build
 RUN pnpm --filter @courier/api deploy --legacy --prod /prod/api
 RUN rm -f /prod/api/dist/scripts/bootstrap-local.js
 
-FROM node:22-alpine AS production
+FROM node:26-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
 RUN npm uninstall --global npm

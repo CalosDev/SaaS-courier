@@ -1,5 +1,5 @@
 # Requiere output: "standalone" en next.config.ts.
-FROM node:22-alpine AS base
+FROM node:26-alpine AS base
 RUN corepack enable
 WORKDIR /app
 
@@ -21,7 +21,7 @@ COPY . .
 RUN test -n "$STORAGE_PUBLIC_ORIGIN"
 RUN pnpm --filter @courier/web build
 
-FROM node:22-alpine AS production
+FROM node:26-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /app
 RUN npm uninstall --global npm
