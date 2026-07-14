@@ -41,6 +41,12 @@ async function main(): Promise<void> {
         },
       });
 
+      await tx.organizationSettings.upsert({
+        where: { organizationId: organization.id },
+        create: { organizationId: organization.id },
+        update: {},
+      });
+
       const facility = await tx.facility.upsert({
         where: {
           organizationId_code: {
@@ -176,12 +182,13 @@ async function main(): Promise<void> {
       return {
         organization: organization.slug,
         facility: facility.code,
+        settings: true,
         permissions: permissions.length,
       };
     });
 
     console.log(
-      `Local bootstrap ready organization=${result.organization} facility=${result.facility} permissions=${result.permissions} email=${config.email}`,
+      `Local bootstrap ready organization=${result.organization} facility=${result.facility} settings=${result.settings} permissions=${result.permissions} email=${config.email}`,
     );
   } finally {
     await applicationContext.close();

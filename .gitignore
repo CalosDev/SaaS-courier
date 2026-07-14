@@ -15,3 +15,4 @@ output/
 .DS_Store
 .vscode/settings.json
 .codex/
+.playwright-cli/

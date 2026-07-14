@@ -345,11 +345,16 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const status = exception.getStatus();
 
-      if (status >= 400 && status < 500) {
+      if (status >= 400 && status < 600) {
         return {
           status,
           code: `HTTP_${status}`,
-          message: this.messageForStatus(status),
+          message:
+            status >= 500
+              ? status === 503
+                ? 'Service unavailable.'
+                : 'Internal server error.'
+              : this.messageForStatus(status),
         };
       }
     }
