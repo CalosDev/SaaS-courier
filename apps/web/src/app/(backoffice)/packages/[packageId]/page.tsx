@@ -6,6 +6,7 @@ import Link from "next/link";
 import { PermissionBoundary } from "@/components/auth/permission-boundary";
 import { PackageDocumentsSection } from "@/components/packages/package-documents-section";
 import { PackageCustomerSelector } from "@/components/packages/package-customer-selector";
+import { CarrierEventsSection } from "@/components/packages/carrier-events-section";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -54,6 +55,9 @@ export default function PackageDetailPage({
   const canManageDocuments =
     state.status === "authenticated" &&
     hasPermission(state.permissionCodes, "package_documents.manage");
+  const canReadCarrierEvents =
+    state.status === "authenticated" &&
+    hasPermission(state.permissionCodes, "carriers.read");
   const canOpenReception =
     state.status === "authenticated" &&
     hasEveryPermission(state.permissionCodes, [
@@ -252,6 +256,13 @@ export default function PackageDetailPage({
               packageId={packageId}
               canManage={canManageDocuments}
             />
+          </Card>
+        ) : null}
+
+        {canReadCarrierEvents ? (
+          <Card>
+            <h2>Eventos del carrier</h2>
+            <CarrierEventsSection packageId={packageId} />
           </Card>
         ) : null}
 

@@ -41,7 +41,8 @@ export default function RateCardsPage() {
 
   async function submitCard(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     setMessage(null);
     setError(null);
 
@@ -56,7 +57,7 @@ export default function RateCardsPage() {
     try {
       await backofficeApi.createRateCard(payload);
       setMessage("Tarifario creado. Búscalo en la tabla para configurarlo.");
-      event.currentTarget.reset();
+      form.reset();
       await resource.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No fue posible guardar.");
@@ -114,8 +115,12 @@ export default function RateCardsPage() {
             card.segmentKey,
             card.calculationType,
             card.status,
-            <Link key={card.id} href={`/rates/cards/${card.id}`}>
-              <Button variant="secondary">Configurar</Button>
+            <Link
+              key={card.id}
+              href={`/rates/cards/${card.id}`}
+              className="inline-flex min-h-[42px] items-center justify-center gap-2 rounded-lg bg-[#dde6ed] px-4 font-medium text-[#17242d] transition-colors hover:bg-[#c8d6e0] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            >
+              Configurar
             </Link>,
           ])}
         />

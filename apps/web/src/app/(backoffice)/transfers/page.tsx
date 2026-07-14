@@ -8,10 +8,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function TransfersPage() {
-  const { data, error, isLoading } = useSWR<{ items: FacilityTransfer[], pagination: any }>(
+  const { data, error, isLoading } = useSWR<FacilityTransfer[] | { items: FacilityTransfer[] }>(
     "/transfers",
     () => backofficeApi.listTransfers()
   );
+  const transfers = Array.isArray(data) ? data : (data?.items ?? []);
 
   const getStatusBadge = (status: FacilityTransfer["status"]) => {
     switch (status) {
@@ -47,7 +48,7 @@ export default function TransfersPage() {
           <div className="ui-state">Cargando transferencias...</div>
         ) : error ? (
           <div className="ui-state ui-state--error">Error al cargar las transferencias.</div>
-        ) : !data || data.items.length === 0 ? (
+        ) : transfers.length === 0 ? (
           <div className="ui-state">
             No se encontraron transferencias.
           </div>
@@ -65,7 +66,7 @@ export default function TransfersPage() {
                 </tr>
               </thead>
               <tbody>
-                {data.items.map((transfer) => (
+                {transfers.map((transfer) => (
                   <tr key={transfer.id}>
                     <td>
                       <span className="inline-code">{transfer.transferNumber}</span>

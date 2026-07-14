@@ -11,6 +11,9 @@ import type { CommandContext } from '../request-context/request-context.types';
 import { CreatePickupRequestDto } from './dto/create-pickup-request.dto';
 import { UpdatePickupRequestDto } from './dto/update-pickup-request.dto';
 import { randomUUID, randomBytes } from 'node:crypto';
+import type { Prisma } from '../generated/prisma/client';
+
+const PICKUP_ELIGIBLE_PACKAGE_STATUS = 'ARRIVED_AT_DESTINATION';
 
 function generatePickupNumber(): string {
   const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -32,6 +35,39 @@ export class PickupRequestsService {
 
   private readonly auditWriter = new PrismaAuditOutboxWriter();
 
+  private async lockPackages(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    packageIds: string[],
+  ) {
+    for (const packageId of [...packageIds].sort()) {
+      await tx.$queryRawUnsafe(
+        'SELECT 1 AS locked FROM (SELECT pg_advisory_xact_lock(hashtextextended($1, 0))) AS package_lock',
+        `${organizationId}:${packageId}`,
+      );
+    }
+  }
+
+  private async assertFinanciallyEligible(
+    tx: Prisma.TransactionClient,
+    organizationId: string,
+    customerId: string,
+  ) {
+    const unpaidInvoices = await tx.customerInvoice.count({
+      where: {
+        organizationId,
+        customerId,
+        status: { in: ['ISSUED', 'PARTIALLY_PAID'] },
+        balanceDueMinor: { gt: 0 },
+      },
+    });
+    if (unpaidInvoices > 0) {
+      throw new ConflictException(
+        'Customer has an outstanding balance and is not eligible for pickup',
+      );
+    }
+  }
+
   async create(context: CommandContext, dto: CreatePickupRequestDto) {
     return this.prisma.$transaction(async (tx) => {
       // Validate customer
@@ -45,6 +81,15 @@ export class PickupRequestsService {
         where: { id: dto.facilityId, organizationId: context.organizationId },
       });
       if (!facility) throw new NotFoundException('Facility not found');
+      if (
+        !facility.isActive ||
+        facility.deletedAt ||
+        !facility.isCustomerFacing
+      ) {
+        throw new ConflictException('Facility does not allow customer pickup');
+      }
+
+      await this.lockPackages(tx, context.organizationId, dto.packageIds);
 
       // Validate packages
       const packages = await tx.package.findMany({
@@ -52,11 +97,13 @@ export class PickupRequestsService {
           id: { in: dto.packageIds },
           organizationId: context.organizationId,
           customerId: dto.customerId,
+          status: PICKUP_ELIGIBLE_PACKAGE_STATUS,
+          deletedAt: null,
         },
       });
       if (packages.length !== dto.packageIds.length) {
         throw new ConflictException(
-          'Some packages were not found or do not belong to the customer',
+          'Some packages are not eligible or do not belong to the customer',
         );
       }
 
@@ -85,7 +132,7 @@ export class PickupRequestsService {
       const id = randomUUID();
       const pickupNumber = `PU-${generatePickupNumber()}`;
 
-      const pickupRequest = await tx.pickupRequest.create({
+      await tx.pickupRequest.create({
         data: {
           id,
           organizationId: context.organizationId,
@@ -94,17 +141,21 @@ export class PickupRequestsService {
           customerId: dto.customerId,
           status: 'DRAFT',
           requestedByEmployeeId: context.actorEmployeeId!,
-          items: {
-            create: dto.packageIds.map((pkgId) => ({
-              id: randomUUID(),
-              packageId: pkgId,
-              organizationId: context.organizationId,
-            })),
-          },
         },
-        include: {
-          items: true,
+      });
+      await tx.pickupRequestItem.createMany({
+        data: dto.packageIds.map((packageId) => ({
+          id: randomUUID(),
+          organizationId: context.organizationId,
+          pickupRequestId: id,
+          packageId,
+        })),
+      });
+      const pickupRequest = await tx.pickupRequest.findUniqueOrThrow({
+        where: {
+          organizationId_id: { organizationId: context.organizationId, id },
         },
+        include: { items: true },
       });
 
       await this.auditWriter.write(tx, {
@@ -170,12 +221,15 @@ export class PickupRequestsService {
       }
 
       if (dto.packageIds) {
+        await this.lockPackages(tx, context.organizationId, dto.packageIds);
         // validate packages
         const packages = await tx.package.findMany({
           where: {
             id: { in: dto.packageIds },
             organizationId: context.organizationId,
             customerId: existing.customerId,
+            status: PICKUP_ELIGIBLE_PACKAGE_STATUS,
+            deletedAt: null,
           },
         });
         if (packages.length !== dto.packageIds.length) {
@@ -206,24 +260,26 @@ export class PickupRequestsService {
         );
       }
 
-      // Update items
-      await tx.pickupRequestItem.deleteMany({
-        where: { organizationId: context.organizationId, pickupRequestId: id },
-      });
+      if (dto.packageIds) {
+        await tx.pickupRequestItem.deleteMany({
+          where: {
+            organizationId: context.organizationId,
+            pickupRequestId: id,
+          },
+        });
+        await tx.pickupRequestItem.createMany({
+          data: dto.packageIds.map((packageId) => ({
+            id: randomUUID(),
+            organizationId: context.organizationId,
+            pickupRequestId: id,
+            packageId,
+          })),
+        });
+      }
 
       const updated = await tx.pickupRequest.update({
         where: { id, organizationId: context.organizationId },
-        data: {
-          items: dto.packageIds
-            ? {
-                create: dto.packageIds.map((pkgId) => ({
-                  id: randomUUID(),
-                  packageId: pkgId,
-                  organizationId: context.organizationId,
-                })),
-              }
-            : undefined,
-        },
+        data: {},
         include: { items: true },
       });
 
@@ -253,8 +309,20 @@ export class PickupRequestsService {
         include: { items: true },
       });
       if (!existing) throw new NotFoundException('Pickup request not found');
+      if (existing.status === 'READY') return existing;
       if (existing.status !== 'DRAFT')
         throw new ConflictException('Pickup request must be in DRAFT state');
+
+      await this.lockPackages(
+        tx,
+        context.organizationId,
+        existing.items.map((item) => item.packageId),
+      );
+      await this.assertFinanciallyEligible(
+        tx,
+        context.organizationId,
+        existing.customerId,
+      );
 
       await this.operationalHoldGuard?.assertNoActivePackageHolds(
         context.organizationId,
@@ -292,10 +360,22 @@ export class PickupRequestsService {
         include: { items: true },
       });
       if (!existing) throw new NotFoundException('Pickup request not found');
+      if (existing.status === 'COMPLETED') return existing;
       if (existing.status !== 'READY')
         throw new ConflictException(
           'Pickup request must be READY to be completed',
         );
+
+      await this.lockPackages(
+        tx,
+        context.organizationId,
+        existing.items.map((item) => item.packageId),
+      );
+      await this.assertFinanciallyEligible(
+        tx,
+        context.organizationId,
+        existing.customerId,
+      );
 
       await this.operationalHoldGuard?.assertNoActivePackageHolds(
         context.organizationId,
@@ -340,7 +420,8 @@ export class PickupRequestsService {
         where: { id, organizationId: context.organizationId },
       });
       if (!existing) throw new NotFoundException('Pickup request not found');
-      if (existing.status === 'COMPLETED' || existing.status === 'CANCELLED') {
+      if (existing.status === 'CANCELLED') return existing;
+      if (existing.status === 'COMPLETED') {
         throw new ConflictException(
           `Cannot cancel a ${existing.status} pickup request`,
         );

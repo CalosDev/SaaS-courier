@@ -131,51 +131,69 @@ export class HouseShipmentsService {
     id: string,
     dto: AddPackagesToHouseShipmentDto,
   ): Promise<void> {
-    const shipment = await this.findById(ctx, id);
+    await this.prisma.$transaction(async (tx) => {
+      const shipment = await tx.houseShipment.findUnique({
+        where: {
+          organizationId_id: { organizationId: ctx.organizationId, id },
+        },
+      });
+      if (!shipment) {
+        throw new NotFoundException('House shipment not found');
+      }
+      if (shipment.status !== 'DRAFT') {
+        throw new ConflictException(
+          'Cannot replace packages on a closed or cancelled house shipment',
+        );
+      }
 
-    if (shipment.status !== 'DRAFT') {
-      throw new ConflictException(
-        'Cannot add packages to a closed or cancelled house shipment',
+      const packages = await tx.package.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          id: { in: dto.packageIds },
+        },
+        select: { id: true, dispatchId: true },
+      });
+      if (packages.length !== dto.packageIds.length) {
+        throw new NotFoundException('One or more packages not found');
+      }
+      const invalidDispatch = packages.find(
+        (pkg) => pkg.dispatchId !== shipment.dispatchId,
       );
-    }
+      if (invalidDispatch) {
+        throw new BadRequestException(
+          `Package ${invalidDispatch.id} does not belong to the Master Shipment ${shipment.dispatchId}`,
+        );
+      }
 
-    // Verify packages
-    const packages = await this.prisma.package.findMany({
-      where: {
-        organizationId: ctx.organizationId,
-        id: { in: dto.packageIds },
-      },
-    });
-
-    if (packages.length !== dto.packageIds.length) {
-      throw new NotFoundException('One or more packages not found');
-    }
-
-    // Check if packages belong to the master shipment
-    const invalidDispatch = packages.find(
-      (pkg) => pkg.dispatchId !== shipment.dispatchId,
-    );
-    if (invalidDispatch) {
-      throw new BadRequestException(
-        `Package ${invalidDispatch.id} does not belong to the Master Shipment ${shipment.dispatchId}`,
+      await this.operationalHoldGuard?.assertNoActivePackageHolds(
+        ctx.organizationId,
+        dto.packageIds,
+        { operation: 'house shipment package replacement', tx },
       );
-    }
+      await tx.houseShipmentPackage.deleteMany({
+        where: {
+          organizationId: ctx.organizationId,
+          houseShipmentId: id,
+          packageId: { notIn: dto.packageIds },
+        },
+      });
+      await tx.houseShipmentPackage.createMany({
+        data: dto.packageIds.map((packageId) => ({
+          organizationId: ctx.organizationId,
+          houseShipmentId: id,
+          packageId,
+        })),
+        skipDuplicates: true,
+      });
 
-    await this.operationalHoldGuard?.assertNoActivePackageHolds(
-      ctx.organizationId,
-      dto.packageIds,
-      { operation: 'house shipment package addition' },
-    );
-
-    await this.repository.addPackages(ctx.organizationId, id, dto.packageIds);
-
-    await this.auditOutbox.write(this.prisma, {
-      context: ctx,
-      action: 'house_shipment.packages.replaced',
-      entityType: 'HOUSE_SHIPMENT',
-      entityId: id,
-      changedFields: ['packages'],
-      payload: { addedPackages: dto.packageIds },
+      await this.auditOutbox.write(tx, {
+        context: ctx,
+        action: 'house_shipment.packages.replaced',
+        entityType: 'HOUSE_SHIPMENT',
+        entityId: id,
+        changedFields: ['packages'],
+        payload: { packageIds: dto.packageIds },
+      });
     });
   }
 
@@ -184,6 +202,12 @@ export class HouseShipmentsService {
 
     if (shipment.status !== 'DRAFT') {
       throw new ConflictException('House shipment is not in DRAFT status');
+    }
+
+    if (shipment.packages.length === 0) {
+      throw new ConflictException(
+        'A house shipment must contain at least one package before closing',
+      );
     }
 
     await this.operationalHoldGuard?.assertNoActivePackageHolds(
@@ -220,8 +244,10 @@ export class HouseShipmentsService {
   async cancel(ctx: CommandContext, id: string): Promise<void> {
     const shipment = await this.findById(ctx, id);
 
-    if (shipment.status === 'CANCELLED') {
-      throw new ConflictException('House shipment is already cancelled');
+    if (shipment.status !== 'DRAFT') {
+      throw new ConflictException(
+        'Only a DRAFT house shipment can be cancelled',
+      );
     }
 
     await this.prisma.$transaction(async (tx) => {

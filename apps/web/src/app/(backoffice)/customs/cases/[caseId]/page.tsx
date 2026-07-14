@@ -34,6 +34,7 @@ export default function CustomsCaseDetailPage({
   const [eventSource, setEventSource] = useState<CustomsEventSource | "">("");
   const [eventDate, setEventDate] = useState("");
   const [eventDescription, setEventDescription] = useState("");
+  const [evidenceReference, setEvidenceReference] = useState("");
 
   const caseResource = useAsyncState(
     useCallback(() => backofficeApi.getCustomsCase(caseId), [caseId]),
@@ -62,7 +63,12 @@ export default function CustomsCaseDetailPage({
 
   const handleRecordEvent = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!eventSource || !eventDate || !eventDescription.trim()) {
+    if (
+      !eventSource ||
+      !eventDate ||
+      !eventDescription.trim() ||
+      (eventSource === "OFFICIAL_PORTAL" && !evidenceReference.trim())
+    ) {
       return;
     }
 
@@ -72,11 +78,15 @@ export default function CustomsCaseDetailPage({
         source: eventSource,
         eventDate: new Date(eventDate).toISOString(),
         description: eventDescription.trim(),
+        ...(evidenceReference.trim()
+          ? { evidenceReference: evidenceReference.trim() }
+          : {}),
       });
       pushToast("Evento registrado exitosamente");
       setEventSource("");
       setEventDate("");
       setEventDescription("");
+      setEvidenceReference("");
       await caseResource.refresh();
     } catch (error) {
       pushToast(error instanceof Error ? error.message : "Error desconocido");
@@ -144,7 +154,9 @@ export default function CustomsCaseDetailPage({
                         disabled={isSubmitting}
                       >
                         <option value="">Seleccione...</option>
-                        {Object.entries(CUSTOMS_EVENT_SOURCE_LABELS).map(
+                        {Object.entries(CUSTOMS_EVENT_SOURCE_LABELS).filter(
+                          ([value]) => value !== "AUTHORIZED_INTEGRATION",
+                        ).map(
                           ([value, label]) => (
                             <option key={value} value={value}>
                               {label}
@@ -170,6 +182,18 @@ export default function CustomsCaseDetailPage({
                         disabled={isSubmitting}
                       />
                     </FormField>
+                    {eventSource === "OFFICIAL_PORTAL" ? (
+                      <FormField label="Referencia oficial *">
+                        <Input
+                          value={evidenceReference}
+                          onChange={(event) =>
+                            setEvidenceReference(event.target.value)
+                          }
+                          disabled={isSubmitting}
+                          placeholder="Número de consulta o expediente"
+                        />
+                      </FormField>
+                    ) : null}
                   </div>
                   <div className="ui-form__actions">
                     <Button
@@ -178,7 +202,9 @@ export default function CustomsCaseDetailPage({
                         isSubmitting ||
                         !eventSource ||
                         !eventDate ||
-                        !eventDescription.trim()
+                        !eventDescription.trim() ||
+                        (eventSource === "OFFICIAL_PORTAL" &&
+                          !evidenceReference.trim())
                       }
                     >
                       Registrar evento
@@ -197,11 +223,12 @@ export default function CustomsCaseDetailPage({
                   </p>
                 ) : (
                   <Table
-                    columns={["Fecha", "Fuente", "Descripción"]}
+                    columns={["Fecha", "Fuente", "Descripción", "Evidencia"]}
                     rows={customsCase.events.map((event) => [
                       new Date(event.eventDate).toLocaleString(),
                       CUSTOMS_EVENT_SOURCE_LABELS[event.source] || event.source,
                       event.description,
+                      event.evidenceReference || "—",
                     ])}
                   />
                 )}

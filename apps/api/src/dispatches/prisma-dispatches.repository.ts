@@ -30,6 +30,12 @@ export class PrismaDispatchesRepository {
       where: { organizationId_id: { organizationId, id } },
       include: {
         packages: true,
+        originFacility: {
+          select: { id: true, code: true, name: true },
+        },
+        destinationFacility: {
+          select: { id: true, code: true, name: true },
+        },
       },
     });
   }

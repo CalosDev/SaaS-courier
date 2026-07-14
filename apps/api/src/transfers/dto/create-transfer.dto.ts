@@ -19,9 +19,4 @@ export class CreateTransferDto {
   @IsOptional()
   @MaxLength(1000)
   notes?: string;
-
-  @IsString()
-  @IsOptional()
-  @MaxLength(200)
-  vehicleInfo?: string;
 }

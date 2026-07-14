@@ -4,6 +4,14 @@ node_modules
 **/.next
 **/dist
 coverage
+.artifacts
+.agents
+.codacy
+.codex
+.codex-tmp
+.turbo
+output
+**/test-results
 .env
 .env.*
 !.env.example

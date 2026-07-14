@@ -48,6 +48,10 @@ describe('HouseShipmentsService', () => {
             package: {
               findMany: jest.fn(),
             },
+            houseShipmentPackage: {
+              deleteMany: jest.fn(),
+              createMany: jest.fn(),
+            },
             outboxEvent: {
               create: jest.fn(),
             },
@@ -102,17 +106,19 @@ describe('HouseShipmentsService', () => {
 
   describe('addPackages', () => {
     it('should throw ConflictException if not DRAFT', async () => {
-      repository.findById.mockResolvedValue({ status: 'CLOSED' } as any);
+      prisma.houseShipment.findUnique.mockResolvedValue({
+        status: 'CLOSED',
+      });
       await expect(
         service.addPackages(mockContext, 'hs-1', { packageIds: ['pkg-1'] }),
       ).rejects.toThrow(ConflictException);
     });
 
     it('should throw NotFoundException if packages length mismatch', async () => {
-      repository.findById.mockResolvedValue({
+      prisma.houseShipment.findUnique.mockResolvedValue({
         status: 'DRAFT',
         dispatchId: 'disp-1',
-      } as any);
+      });
       prisma.package.findMany.mockResolvedValue([]);
       await expect(
         service.addPackages(mockContext, 'hs-1', { packageIds: ['pkg-1'] }),
@@ -120,10 +126,10 @@ describe('HouseShipmentsService', () => {
     });
 
     it('should throw BadRequestException if package has different dispatchId', async () => {
-      repository.findById.mockResolvedValue({
+      prisma.houseShipment.findUnique.mockResolvedValue({
         status: 'DRAFT',
         dispatchId: 'disp-1',
-      } as any);
+      });
       prisma.package.findMany.mockResolvedValue([
         { id: 'pkg-1', dispatchId: 'disp-2' },
       ]);
@@ -133,18 +139,26 @@ describe('HouseShipmentsService', () => {
     });
 
     it('should add packages and write audit', async () => {
-      repository.findById.mockResolvedValue({
+      prisma.houseShipment.findUnique.mockResolvedValue({
         status: 'DRAFT',
         dispatchId: 'disp-1',
-      } as any);
+      });
       prisma.package.findMany.mockResolvedValue([
         { id: 'pkg-1', dispatchId: 'disp-1' },
       ]);
 
       await service.addPackages(mockContext, 'hs-1', { packageIds: ['pkg-1'] });
-      expect(repository.addPackages).toHaveBeenCalledWith('org-1', 'hs-1', [
-        'pkg-1',
-      ]);
+      expect(prisma.houseShipmentPackage.deleteMany).toHaveBeenCalled();
+      expect(prisma.houseShipmentPackage.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            organizationId: 'org-1',
+            houseShipmentId: 'hs-1',
+            packageId: 'pkg-1',
+          },
+        ],
+        skipDuplicates: true,
+      });
       expect(prisma.outboxEvent.create).toHaveBeenCalled();
     });
   });
@@ -161,6 +175,7 @@ describe('HouseShipmentsService', () => {
       repository.findById.mockResolvedValue({
         id: 'hs-1',
         status: 'DRAFT',
+        packages: [{ packageId: 'pkg-1' }],
       } as any);
 
       await service.close(mockContext, 'hs-1');

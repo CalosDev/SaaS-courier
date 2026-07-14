@@ -14,6 +14,7 @@ import {
   DeliveryStatus,
   DeliveryAttemptResult,
   PackageStatus,
+  Prisma,
 } from '../generated/prisma/client';
 import type { CommandContext } from '../request-context/request-context.types';
 
@@ -63,17 +64,60 @@ export class DeliveriesService {
   }
 
   async create(ctx: CommandContext, dto: CreateDeliveryDto) {
-    if (!ctx.actorEmployeeId) {
+    const actorEmployeeId = ctx.actorEmployeeId;
+    if (!actorEmployeeId) {
       throw new ConflictException('Employee ID is required');
     }
     const organizationId = ctx.organizationId;
 
-    const packages = await this.prisma.package.findMany({
-      where: {
-        organizationId,
-        id: { in: dto.packageIds },
-      },
-    });
+    const [customer, assignedEmployee, packages] = await Promise.all([
+      this.prisma.customer.findUnique({
+        where: {
+          organizationId_id: { organizationId, id: dto.customerId },
+        },
+        select: { id: true },
+      }),
+      dto.assignedToId
+        ? this.prisma.employee.findUnique({
+            where: {
+              organizationId_id: {
+                organizationId,
+                id: dto.assignedToId,
+              },
+            },
+            select: { id: true, status: true },
+          })
+        : Promise.resolve(null),
+      this.prisma.package.findMany({
+        where: {
+          organizationId,
+          id: { in: dto.packageIds },
+        },
+        include: {
+          deliveryOrderItems: {
+            where: {
+              delivery: {
+                status: {
+                  in: [
+                    DeliveryStatus.DRAFT,
+                    DeliveryStatus.READY,
+                    DeliveryStatus.OUT_FOR_DELIVERY,
+                  ],
+                },
+              },
+            },
+            select: { id: true },
+          },
+        },
+      }),
+    ]);
+
+    if (!customer) {
+      throw new NotFoundException('Customer not found.');
+    }
+    if (dto.assignedToId && assignedEmployee?.status !== 'ACTIVE') {
+      throw new NotFoundException('Assigned employee not found.');
+    }
 
     if (packages.length !== dto.packageIds.length) {
       throw new NotFoundException('One or more packages not found.');
@@ -82,7 +126,8 @@ export class DeliveriesService {
     const invalidPackages = packages.filter(
       (p) =>
         p.customerId !== dto.customerId ||
-        p.status !== PackageStatus.ARRIVED_AT_DESTINATION,
+        p.status !== PackageStatus.ARRIVED_AT_DESTINATION ||
+        p.deliveryOrderItems.length > 0,
     );
     if (invalidPackages.length > 0) {
       throw new ConflictException(
@@ -99,19 +144,50 @@ export class DeliveriesService {
     return this.prisma.$transaction(async (tx) => {
       const delivery = await tx.deliveryOrder.create({
         data: {
-          organizationId,
           deliveryNumber: dto.deliveryNumber,
-          customerId: dto.customerId,
           method: dto.method,
-          deliveryAddressSnap: dto.deliveryAddressSnap ?? {},
+          deliveryAddressSnap: (dto.deliveryAddressSnap ??
+            {}) as Prisma.InputJsonObject,
           notes: dto.notes,
-          assignedToId: dto.assignedToId,
-          createdById: ctx.actorEmployeeId!,
           status: DeliveryStatus.DRAFT,
+          organization: { connect: { id: organizationId } },
+          customer: {
+            connect: {
+              organizationId_id: {
+                organizationId,
+                id: dto.customerId,
+              },
+            },
+          },
+          createdBy: {
+            connect: {
+              organizationId_id: {
+                organizationId,
+                id: actorEmployeeId,
+              },
+            },
+          },
+          assignedTo: dto.assignedToId
+            ? {
+                connect: {
+                  organizationId_id: {
+                    organizationId,
+                    id: dto.assignedToId,
+                  },
+                },
+              }
+            : undefined,
           items: {
             create: dto.packageIds.map((pkgId) => ({
-              organizationId,
-              packageId: pkgId,
+              organization: { connect: { id: organizationId } },
+              package: {
+                connect: {
+                  organizationId_id: {
+                    organizationId,
+                    id: pkgId,
+                  },
+                },
+              },
             })),
           },
         },
@@ -146,7 +222,9 @@ export class DeliveriesService {
         where: { organizationId_id: { organizationId, id } },
         data: {
           ...dto,
-          deliveryAddressSnap: dto.deliveryAddressSnap ?? undefined,
+          deliveryAddressSnap: dto.deliveryAddressSnap
+            ? (dto.deliveryAddressSnap as Prisma.InputJsonObject)
+            : undefined,
         },
       });
 
@@ -243,7 +321,10 @@ export class DeliveriesService {
     if (delivery.status !== DeliveryStatus.OUT_FOR_DELIVERY)
       throw new ConflictException('Delivery must be OUT_FOR_DELIVERY.');
 
-    if (dto.result === DeliveryAttemptResult.DELIVERED && !dto.receiverName) {
+    if (
+      dto.result === DeliveryAttemptResult.DELIVERED &&
+      !dto.receiverName?.trim()
+    ) {
       throw new ConflictException(
         'receiverName is required when delivery is successful.',
       );
@@ -263,7 +344,9 @@ export class DeliveriesService {
           attemptedAt: new Date(),
           result: dto.result,
           notes: dto.notes,
-          receiverName: dto.receiverName,
+          receiverName: dto.receiverName
+            ? this.maskReceiverName(dto.receiverName)
+            : undefined,
           recordedById: ctx.actorEmployeeId!,
         },
       });
@@ -349,5 +432,16 @@ export class DeliveriesService {
 
       return updated;
     });
+  }
+
+  private maskReceiverName(value: string): string {
+    return value
+      .trim()
+      .split(/\s+/)
+      .map(
+        (part) =>
+          `${part.slice(0, 1)}${'*'.repeat(Math.max(2, part.length - 1))}`,
+      )
+      .join(' ');
   }
 }

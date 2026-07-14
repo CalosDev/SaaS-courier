@@ -26,6 +26,7 @@ describe('MasterShipmentsController', () => {
           provide: DispatchesService,
           useValue: {
             createDispatch: jest.fn(),
+            createMasterShipment: jest.fn(),
             getDispatches: jest.fn(),
             getDispatchById: jest.fn(),
             updateDispatch: jest.fn(),
@@ -141,14 +142,18 @@ describe('MasterShipmentsController', () => {
   });
 
   it('createMasterShipment should delegate to dispatch creation', async () => {
-    const dto = { origin: 'MIA', destination: 'SDQ' };
+    const dto = {
+      originFacilityId: '00000000-0000-4000-8000-000000000001',
+      destinationFacilityId: '00000000-0000-4000-8000-000000000002',
+      transportMode: 'AIR' as const,
+    };
     const res = { id: 'dispatch-1' } as any;
-    service.createDispatch.mockResolvedValue(res);
+    service.createMasterShipment.mockResolvedValue(res);
 
     await expect(
       controller.createMasterShipment(mockContext, dto),
     ).resolves.toEqual(res);
-    expect(service.createDispatch).toHaveBeenCalledWith(mockContext, dto);
+    expect(service.createMasterShipment).toHaveBeenCalledWith(mockContext, dto);
   });
 
   it('updateMasterShipment should delegate to dispatch updates', async () => {

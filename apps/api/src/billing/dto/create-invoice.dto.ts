@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsArray,
+  ArrayNotEmpty,
   IsEnum,
   IsInt,
   IsISO8601,
@@ -9,6 +10,8 @@ import {
   IsString,
   IsUUID,
   Min,
+  Matches,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { InvoiceLineType } from '../../generated/prisma/client';
@@ -19,6 +22,7 @@ export class CreateInvoiceLineDto {
 
   @IsString()
   @IsNotEmpty()
+  @MaxLength(255)
   description: string;
 
   @IsInt()
@@ -27,6 +31,7 @@ export class CreateInvoiceLineDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^(0|[1-9]\d*)$/)
   unitPriceMinor: string;
 }
 
@@ -36,6 +41,7 @@ export class CreateInvoiceDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[A-Z]{3}$/)
   currencyCode: string;
 
   @IsOptional()
@@ -44,9 +50,11 @@ export class CreateInvoiceDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   notes?: string;
 
   @IsArray()
+  @ArrayNotEmpty()
   @ValidateNested({ each: true })
   @Type(() => CreateInvoiceLineDto)
   lines: CreateInvoiceLineDto[];

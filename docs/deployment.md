@@ -1,23 +1,34 @@
-# Despliegue
+# Despliegue del piloto
 
-## Flujo
+## Orden obligatorio
 
-1. Ejecutar CI: lint, typecheck, tests y builds.
-2. Crear imágenes inmutables para web y API.
-3. Desplegar a staging.
-4. Crear backup o snapshot.
-5. Ejecutar `prisma migrate deploy` como job único.
-6. Desplegar API.
-7. Desplegar web.
-8. Verificar healthchecks y smoke tests.
-9. Monitorear errores, latencia y conexiones.
+1. Ejecutar CI: lint, typecheck, pruebas, E2E y builds.
+2. Publicar imagenes inmutables de API y web.
+3. Crear snapshot o backup de PostgreSQL.
+4. Ejecutar una sola vez el perfil de migracion.
+5. Desplegar API y esperar `/health/ready`.
+6. Desplegar web y ejecutar smoke tests.
+7. Observar errores, latencia, outbox y entregas de email.
+
+```powershell
+docker compose -f compose.prod.yml --profile migration run --rm migrate
+docker compose -f compose.prod.yml up -d api web
+```
+
+No ejecutar migraciones desde cada replica. `DATABASE_URL`, credenciales S3,
+SMTP y carriers se inyectan en runtime desde el gestor de secretos.
 
 ## Rollback
 
-- Conservar imagen anterior.
-- Las migraciones destructivas requieren estrategia expand/contract.
-- Restaurar backup solo cuando rollback de aplicación no sea suficiente.
+- Conservar las imagenes anteriores de web y API.
+- Detener el rollout si readiness falla o la tasa de errores supera el umbral.
+- Revertir primero la aplicacion. Las migraciones usan expand/contract y no se
+  revierten con SQL destructivo durante una incidencia.
+- Restaurar PostgreSQL solo ante corrupcion o incompatibilidad confirmada, con
+  autorizacion y ventana de perdida de datos conocida.
 
-## Producción
+## Produccion
 
-PostgreSQL debe ser administrado. El despliegue puede realizarse en un PaaS, máquinas virtuales o plataforma de contenedores, manteniendo las mismas imágenes OCI.
+PostgreSQL y S3 deben ser administrados. TLS termina en el ingress o proxy;
+cookies usan `Secure`, `HttpOnly` y `SameSite`. El ingress solo envia trafico a
+replicas con readiness exitoso.

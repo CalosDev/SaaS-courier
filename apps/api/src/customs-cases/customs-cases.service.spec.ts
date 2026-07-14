@@ -36,8 +36,10 @@ describe('CustomsCasesService', () => {
 
     prisma = {
       $transaction: jest.fn((callback) => callback(prisma)),
+      $queryRawUnsafe: jest.fn(),
       customsCase: {
         create: jest.fn(),
+        findUnique: jest.fn(),
         update: jest.fn(),
       },
       customsCaseEvent: {
@@ -112,7 +114,7 @@ describe('CustomsCasesService', () => {
   });
 
   it('recordEvent should create an event', async () => {
-    repository.findById.mockResolvedValue({ id: 'case-1' });
+    prisma.customsCase.findUnique.mockResolvedValue({ id: 'case-1' });
     prisma.customsCaseEvent.create.mockResolvedValue({ id: 'event-1' });
 
     const result = await service.recordEvent(mockContext, 'case-1', {
@@ -126,7 +128,7 @@ describe('CustomsCasesService', () => {
   });
 
   it('changeStatus should update status if different', async () => {
-    repository.findById.mockResolvedValue({
+    prisma.customsCase.findUnique.mockResolvedValue({
       id: 'case-1',
       status: CustomsCaseStatus.PENDING_REVIEW,
     });
@@ -146,7 +148,7 @@ describe('CustomsCasesService', () => {
   });
 
   it('changeStatus should do nothing if status is same', async () => {
-    repository.findById.mockResolvedValue({
+    prisma.customsCase.findUnique.mockResolvedValue({
       id: 'case-1',
       status: CustomsCaseStatus.PENDING_REVIEW,
     });

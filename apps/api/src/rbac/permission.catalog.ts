@@ -268,6 +268,42 @@ const permissionCatalog = [
     description:
       'Allows creating, updating and dispatching final deliveries within the current tenant.',
   },
+  {
+    code: 'reports.read',
+    name: 'Read operational reports',
+    description:
+      'Allows reading limited operational reports within the current tenant.',
+  },
+  {
+    code: 'reports.export',
+    name: 'Export operational reports',
+    description:
+      'Allows requesting and downloading report exports within the current tenant.',
+  },
+  {
+    code: 'notifications.read',
+    name: 'Read transactional notifications',
+    description:
+      'Allows reading notification templates and delivery status within the current tenant.',
+  },
+  {
+    code: 'notifications.manage',
+    name: 'Manage transactional notifications',
+    description:
+      'Allows managing email templates and retrying failed deliveries within the current tenant.',
+  },
+  {
+    code: 'carriers.read',
+    name: 'Read carrier integrations',
+    description:
+      'Allows reading carrier connections and sanitized tracking snapshots within the current tenant.',
+  },
+  {
+    code: 'carriers.manage',
+    name: 'Manage carrier integrations',
+    description:
+      'Allows managing and testing authorized carrier connections within the current tenant.',
+  },
 ] as const satisfies readonly PermissionDefinition[];
 
 export type PermissionCode = (typeof permissionCatalog)[number]['code'];

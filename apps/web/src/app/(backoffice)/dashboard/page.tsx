@@ -5,7 +5,6 @@ import { backofficeApi } from "@/lib/api/backoffice";
 import { Card } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
-import { Button } from "@/components/ui/button";
 
 export default function DashboardPage() {
   const { data, error, isLoading } = useSWR(
@@ -20,26 +19,6 @@ export default function DashboardPage() {
       return { organization, capabilities, onboarding, metrics: metricsResponse };
     }
   );
-
-  const handleExportCsv = async () => {
-    try {
-      const response = await fetch('/backend/reports/packages-export.csv');
-      if (!response.ok) throw new Error("Error fetching CSV");
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'paquetes_activos.csv';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      a.remove();
-    } catch (err) {
-      alert("No se pudo descargar el reporte.");
-      console.error(err);
-    }
-  };
 
   if (isLoading) {
     return <LoadingState label="Cargando dashboard..." />;
@@ -62,11 +41,6 @@ export default function DashboardPage() {
         <div>
           <h1>Dashboard</h1>
           <p>{organization.commercialName}</p>
-        </div>
-        <div className="actions-row">
-          <Button onClick={handleExportCsv} variant="primary">
-            Exportar Paquetes (CSV)
-          </Button>
         </div>
       </section>
 

@@ -40,10 +40,24 @@ export class InvoicesService {
     const invoiceNumber = `INV-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     return this.prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({
+        where: {
+          organizationId_id: {
+            organizationId,
+            id: input.customerId,
+          },
+        },
+        select: { id: true },
+      });
+      if (!customer) throw new NotFoundException('Customer not found');
       const dbInvoice = await this.billingRepository.createInvoice(
         {
           organization: { connect: { id: organizationId } },
-          customer: { connect: { id: input.customerId } },
+          customer: {
+            connect: {
+              organizationId_id: { organizationId, id: input.customerId },
+            },
+          },
           invoiceNumber,
           currencyCode: input.currencyCode,
           subtotalMinor,
@@ -200,6 +214,11 @@ export class InvoicesService {
       if (!invoice) throw new NotFoundException('Invoice not found');
       if (invoice.status !== 'DRAFT')
         throw new BadRequestException('Only DRAFT invoices can be issued');
+      if (invoice.lines.length === 0 || invoice.totalMinor <= 0n) {
+        throw new BadRequestException(
+          'Invoice must contain a positive total before issue',
+        );
+      }
 
       const updated = await this.billingRepository.updateInvoice(
         organizationId,
@@ -246,10 +265,59 @@ export class InvoicesService {
       if (invoice.status === 'VOID')
         throw new BadRequestException('Invoice is already voided');
 
+      const activeAllocations = invoice.allocations.filter(
+        (allocation) => allocation.reversedAt === null,
+      );
+      const paymentIds = [
+        ...new Set(activeAllocations.map((allocation) => allocation.paymentId)),
+      ].sort();
+      for (const paymentId of paymentIds) {
+        await tx.$queryRaw`
+          SELECT "id" FROM "payments"
+          WHERE "organization_id" = ${organizationId}::uuid
+            AND "id" = ${paymentId}::uuid
+          FOR UPDATE
+        `;
+      }
+      if (activeAllocations.length > 0) {
+        await tx.paymentAllocation.updateMany({
+          where: {
+            organizationId,
+            invoiceId,
+            reversedAt: null,
+          },
+          data: { reversedAt: new Date(), reversalReason: input.reason },
+        });
+      }
+      for (const paymentId of paymentIds) {
+        const payment = await tx.payment.findUniqueOrThrow({
+          where: {
+            organizationId_id: { organizationId, id: paymentId },
+          },
+          include: { allocations: true },
+        });
+        const applied = payment.allocations
+          .filter((allocation) => allocation.reversedAt === null)
+          .reduce((sum, allocation) => sum + allocation.amountMinor, 0n);
+        await tx.payment.update({
+          where: {
+            organizationId_id: { organizationId, id: paymentId },
+          },
+          data: {
+            status: applied === payment.amountMinor ? 'APPLIED' : 'RECORDED',
+          },
+        });
+      }
+
       const updated = await this.billingRepository.updateInvoice(
         organizationId,
         invoiceId,
-        { status: 'VOID', voidedAt: new Date(), balanceDueMinor: 0n },
+        {
+          status: 'VOID',
+          voidedAt: new Date(),
+          voidReason: input.reason,
+          balanceDueMinor: 0n,
+        },
         tx,
       );
 
@@ -287,6 +355,7 @@ export class InvoicesService {
       issuedAt: invoice.issuedAt,
       dueDate: invoice.dueDate,
       voidedAt: invoice.voidedAt,
+      voidReason: invoice.voidReason,
       notes: invoice.notes,
       createdAt: invoice.createdAt,
       updatedAt: invoice.updatedAt,

@@ -22,14 +22,21 @@ describe('PickupRequestsService', () => {
           provide: PrismaService,
           useValue: {
             $transaction: jest.fn((cb) => cb(prisma)),
+            $queryRawUnsafe: jest.fn(),
             customer: { findUnique: jest.fn() },
             facility: { findUnique: jest.fn() },
             package: { findMany: jest.fn() },
-            pickupRequestItem: { findMany: jest.fn(), deleteMany: jest.fn() },
+            customerInvoice: { count: jest.fn().mockResolvedValue(0) },
+            pickupRequestItem: {
+              findMany: jest.fn(),
+              deleteMany: jest.fn(),
+              createMany: jest.fn(),
+            },
             pickupRequest: {
               create: jest.fn(),
               findMany: jest.fn(),
               findUnique: jest.fn(),
+              findUniqueOrThrow: jest.fn(),
               update: jest.fn(),
             },
           },
@@ -48,8 +55,13 @@ describe('PickupRequestsService', () => {
   describe('create', () => {
     it('should create a pickup request', async () => {
       const mockCustomer = { id: 'cust-1' };
-      const mockFacility = { id: 'fac-1' };
-      const mockPackages = [{ id: 'pkg-1' }];
+      const mockFacility = {
+        id: 'fac-1',
+        isActive: true,
+        isCustomerFacing: true,
+        deletedAt: null,
+      };
+      const mockPackages = [{ id: 'pkg-1', status: 'ARRIVED_AT_DESTINATION' }];
       const mockCreated = { id: 'pu-1' };
 
       (prisma.customer.findUnique as jest.Mock).mockResolvedValue(
@@ -63,6 +75,9 @@ describe('PickupRequestsService', () => {
       );
       (prisma.pickupRequestItem.findMany as jest.Mock).mockResolvedValue([]);
       (prisma.pickupRequest.create as jest.Mock).mockResolvedValue(
+        mockCreated as any,
+      );
+      (prisma.pickupRequest.findUniqueOrThrow as jest.Mock).mockResolvedValue(
         mockCreated as any,
       );
 
@@ -101,6 +116,8 @@ describe('PickupRequestsService', () => {
     it('markAsReady should update status to READY', async () => {
       (prisma.pickupRequest.findUnique as jest.Mock).mockResolvedValue({
         status: 'DRAFT',
+        customerId: 'cust-1',
+        items: [],
       } as any);
       const updated = { status: 'READY' };
       (prisma.pickupRequest.update as jest.Mock).mockResolvedValue(
@@ -117,6 +134,8 @@ describe('PickupRequestsService', () => {
     it('complete should update status to COMPLETED', async () => {
       (prisma.pickupRequest.findUnique as jest.Mock).mockResolvedValue({
         status: 'READY',
+        customerId: 'cust-1',
+        items: [],
       } as any);
       const updated = { status: 'COMPLETED' };
       (prisma.pickupRequest.update as jest.Mock).mockResolvedValue(

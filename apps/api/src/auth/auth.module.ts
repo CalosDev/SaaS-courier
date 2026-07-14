@@ -38,19 +38,6 @@ import { PrismaAuthRepository } from './prisma-auth.repository';
         },
       ],
       getTracker: (request: Record<string, unknown>) => {
-        const headers =
-          request['headers'] && typeof request['headers'] === 'object'
-            ? (request['headers'] as Record<string, unknown>)
-            : null;
-        const forwardedFor = headers?.['x-forwarded-for'];
-
-        if (
-          typeof forwardedFor === 'string' &&
-          forwardedFor.trim().length > 0
-        ) {
-          return forwardedFor.split(',')[0].trim();
-        }
-
         return typeof request['ip'] === 'string' ? request['ip'] : 'unknown';
       },
     }),

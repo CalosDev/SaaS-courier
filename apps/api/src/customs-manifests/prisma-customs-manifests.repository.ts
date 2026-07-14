@@ -33,6 +33,7 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
     return tx.customsManifest.create({
       data: {
         organizationId,
+        dispatchId: dto.masterShipmentId,
         code,
         flightNumber: dto.flightNumber,
         arrivalDate,
@@ -67,7 +68,14 @@ export class PrismaCustomsManifestsRepository implements CustomsManifestsReposit
         },
       },
       include: {
-        packages: true,
+        dispatch: {
+          include: { originFacility: true, destinationFacility: true },
+        },
+        versions: {
+          include: { items: true },
+          orderBy: { versionNumber: 'desc' },
+        },
+        finalizedVersion: { include: { items: true } },
       },
     });
   }

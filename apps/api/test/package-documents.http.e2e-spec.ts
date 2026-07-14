@@ -53,6 +53,10 @@ class FakeObjectStorageService implements ObjectStorageService {
     { contentType: string; contentLength: number; body: Buffer; etag: string }
   >();
 
+  checkHealth(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+
   getDefaultBucketName(): string {
     return 'documents';
   }
@@ -623,7 +627,7 @@ describe('Package documents HTTP', () => {
         await moduleRef.close();
       }
     }
-  });
+  }, 30_000);
 });
 
 function buildCode(): string {

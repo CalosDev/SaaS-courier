@@ -47,6 +47,12 @@ export const PERMISSION_CODES = [
   "transfers.manage",
   "deliveries.read",
   "deliveries.manage",
+  "reports.read",
+  "reports.export",
+  "notifications.read",
+  "notifications.manage",
+  "carriers.read",
+  "carriers.manage",
 ] as const;
 
 export type PermissionCode = (typeof PERMISSION_CODES)[number];

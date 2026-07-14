@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import useSWR from "swr";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { ApiError } from "@/lib/api/api-error";
 import { backofficeApi } from "@/lib/api/backoffice";
 import type { CreateCustomsManifestDto } from "@/lib/api/contracts";
@@ -13,11 +15,15 @@ import type { CreateCustomsManifestDto } from "@/lib/api/contracts";
 export default function NewCustomsManifestPage() {
   const router = useRouter();
   const [formData, setFormData] = useState<CreateCustomsManifestDto>({
+    masterShipmentId: "",
     flightNumber: "",
     arrivalDate: "",
   });
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { data: shipments } = useSWR("/master-shipments", () =>
+    backofficeApi.listMasterShipments(),
+  );
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -26,6 +32,7 @@ export default function NewCustomsManifestPage() {
 
     try {
       const created = await backofficeApi.createCustomsManifest({
+        masterShipmentId: formData.masterShipmentId,
         flightNumber: formData.flightNumber.trim(),
         arrivalDate: formData.arrivalDate || undefined,
       });
@@ -47,7 +54,7 @@ export default function NewCustomsManifestPage() {
           Crear manifiesto aduanero
         </h1>
         <p className="text-gray-500 mt-1">
-          Registra el manifiesto para declaracion y transmision aduanal.
+          Construye snapshots aduaneros internos sin transmisión externa.
         </p>
       </div>
 
@@ -59,6 +66,27 @@ export default function NewCustomsManifestPage() {
 
       <Card className="p-5">
         <form onSubmit={(event) => void submit(event)} className="space-y-4">
+          <FormField label="Embarque maestro">
+            <Select
+              value={formData.masterShipmentId}
+              onChange={(event) =>
+                setFormData((current) => ({
+                  ...current,
+                  masterShipmentId: event.target.value,
+                }))
+              }
+              required
+            >
+              <option value="">Selecciona un embarque</option>
+              {shipments
+                ?.filter((shipment) => shipment.status === "ARRIVED")
+                .map((shipment) => (
+                  <option key={shipment.id} value={shipment.id}>
+                    {shipment.dispatchCode}
+                  </option>
+                ))}
+            </Select>
+          </FormField>
           <FormField label="Vuelo">
             <Input
               value={formData.flightNumber}
@@ -86,7 +114,11 @@ export default function NewCustomsManifestPage() {
           </FormField>
           <Button
             type="submit"
-            disabled={isSubmitting || !formData.flightNumber.trim()}
+            disabled={
+              isSubmitting ||
+              !formData.masterShipmentId ||
+              !formData.flightNumber.trim()
+            }
           >
             {isSubmitting ? "Creando..." : "Crear manifiesto"}
           </Button>

@@ -43,10 +43,11 @@
 - Pagos pending/confirm/allocate.
 - Bloqueos y pruebas concurrentes.
 
-## Fase 5 · Portal y piloto
+## Fase 5 · Backoffice y piloto
 
-- Portal de cliente.
 - Backoffice.
 - Etiquetas e impresión.
 - Importación inicial.
 - Métricas y capacitación.
+
+El portal de cliente queda fuera de la fase actual. El Documento Maestro Modelo A+ versión 1.1 establece que el piloto inicial se realiza sobre el backoffice administrativo y operativo.

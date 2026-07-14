@@ -37,6 +37,13 @@ export const AUDIT_ACTIONS = [
   'inventory.location.created',
   'inventory.location.updated',
   'inventory.package.moved',
+  'warehouse.batch_putaway.completed',
+  'notification_template.created',
+  'notification_template.updated',
+  'notification_delivery.retried',
+  'carrier_connection.created',
+  'carrier_connection.updated',
+  'carrier_connection.tested',
   'service.created',
   'service.updated',
   'rate_card.created',
@@ -66,6 +73,9 @@ export const AUDIT_ACTIONS = [
   'master_shipment.arrived',
   'master_shipment.cancelled',
   'customs_manifest.created',
+  'customs_manifest.version.created',
+  'customs_manifest.validated',
+  'customs_manifest.finalized',
   'customs_manifest.updated',
   'customs_manifest.status_changed',
   'customs_manifest.deleted',
@@ -101,6 +111,9 @@ export const AUDIT_ACTIONS = [
   'delivery.delivered',
   'delivery.failed',
   'delivery.cancelled',
+  'report_export.requested',
+  'report_export.completed',
+  'report_export.downloaded',
 ] as const;
 
 export type AuditActionCode = (typeof AUDIT_ACTIONS)[number];
@@ -135,6 +148,10 @@ export const AUDIT_ENTITY_TYPES = [
   'CORRECTION_REQUEST',
   'FACILITY_TRANSFER',
   'DELIVERY_ORDER',
+  'REPORT_EXPORT',
+  'NOTIFICATION_TEMPLATE',
+  'NOTIFICATION_DELIVERY',
+  'CARRIER_CONNECTION',
 ] as const;
 
 export type AuditEntityType = (typeof AUDIT_ENTITY_TYPES)[number];

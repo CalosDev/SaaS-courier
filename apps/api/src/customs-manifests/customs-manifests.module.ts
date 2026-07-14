@@ -6,10 +6,9 @@ import { PrismaCustomsManifestsRepository } from './prisma-customs-manifests.rep
 import { PrismaModule } from '../prisma/prisma.module';
 import { AuditModule } from '../audit/audit.module';
 import { HoldsModule } from '../holds/holds.module';
-import { SigaIntegrationModule } from '../siga-integration/siga-integration.module';
 
 @Module({
-  imports: [PrismaModule, AuditModule, HoldsModule, SigaIntegrationModule],
+  imports: [PrismaModule, AuditModule, HoldsModule],
   controllers: [CustomsManifestsController],
   providers: [
     CustomsManifestsService,

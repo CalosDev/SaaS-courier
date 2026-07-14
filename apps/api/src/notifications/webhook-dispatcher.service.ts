@@ -47,7 +47,7 @@ export class WebhookDispatcherService {
       }
     } else {
       this.logger.debug(
-        `[SIMULATED WEBHOOK] Event ${payload.event_type} for Org ${payload.organization_id} - payload: ${JSON.stringify(payload.payload)}`,
+        `[SIMULATED WEBHOOK] Event ${payload.event_type} (${payload.id}) for Org ${payload.organization_id}`,
       );
     }
   }

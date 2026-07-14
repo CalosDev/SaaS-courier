@@ -73,6 +73,15 @@ export class TransfersController {
     return this.transfersService.dispatchTransfer(ctx, transferId);
   }
 
+  @Post(':id/cancel')
+  @RequirePermissions(TRANSFER_PERMISSIONS.MANAGE)
+  cancelTransfer(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') transferId: string,
+  ) {
+    return this.transfersService.cancelTransfer(ctx, transferId);
+  }
+
   @Put(':id/items/:itemId/receive')
   @RequirePermissions(TRANSFER_PERMISSIONS.MANAGE)
   receiveItem(

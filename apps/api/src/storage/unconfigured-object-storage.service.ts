@@ -13,6 +13,10 @@ import type {
 
 @Injectable()
 export class UnconfiguredObjectStorageService implements ObjectStorageService {
+  checkHealth(): Promise<boolean> {
+    return Promise.resolve(false);
+  }
+
   getDefaultBucketName(): string {
     throw new ObjectStorageUnavailableError();
   }

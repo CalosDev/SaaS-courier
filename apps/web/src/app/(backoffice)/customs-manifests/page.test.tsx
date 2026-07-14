@@ -12,7 +12,6 @@ vi.mock("swr", () => ({
 vi.mock("@/lib/api/backoffice", () => ({
   backofficeApi: {
     listCustomsManifests: vi.fn(),
-    transmitCustomsManifest: vi.fn(),
   },
 }));
 
@@ -49,6 +48,9 @@ describe("CustomsManifestsPage", () => {
       "href",
       "/customs-manifests/manifest-1",
     );
+    expect(
+      screen.queryByRole("button", { name: /Transmitir a SIGA/i }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/1969|1970|Invalid Date/i)).not.toBeInTheDocument();
   });
 });

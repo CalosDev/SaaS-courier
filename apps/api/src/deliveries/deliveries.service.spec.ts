@@ -41,6 +41,12 @@ describe('DeliveriesService', () => {
         findMany: jest.fn(),
         update: jest.fn(),
       },
+      customer: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'cust-1' }),
+      },
+      employee: {
+        findUnique: jest.fn(),
+      },
       deliveryAttempt: {
         create: jest.fn(),
       },
@@ -118,7 +124,12 @@ describe('DeliveriesService', () => {
 
     it('should throw ConflictException if packages have wrong status', async () => {
       prisma.package.findMany.mockResolvedValue([
-        { id: 'pkg-1', customerId: 'cust-1', status: PackageStatus.IN_TRANSIT },
+        {
+          id: 'pkg-1',
+          customerId: 'cust-1',
+          status: PackageStatus.IN_TRANSIT,
+          deliveryOrderItems: [],
+        },
       ]);
       await expect(
         service.create(mockContext, {
@@ -136,6 +147,7 @@ describe('DeliveriesService', () => {
           id: 'pkg-1',
           customerId: 'cust-1',
           status: PackageStatus.ARRIVED_AT_DESTINATION,
+          deliveryOrderItems: [],
         },
       ]);
       prisma.deliveryOrder.create.mockResolvedValue(mockDelivery);

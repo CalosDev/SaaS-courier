@@ -1,94 +1,205 @@
-import { Metadata } from 'next';
-import { backofficeApi } from '@/lib/api/backoffice';
-import { notFound } from 'next/navigation';
+"use client";
 
-export const metadata: Metadata = {
-  title: 'Detalle de Entrega | Courier SaaS',
-};
+import { use, useState } from "react";
+import useSWR from "swr";
 
-async function getDelivery(id: string) {
-  try {
-    const res = await backofficeApi.getDelivery(id);
-    return res.data;
-  } catch (error) {
-    console.error('Failed to fetch delivery:', error);
-    return null;
-  }
-}
+import { Alert } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { FormField } from "@/components/ui/form-field";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { ApiError } from "@/lib/api/api-error";
+import { backofficeApi } from "@/lib/api/backoffice";
+import type { DeliveryAttemptResult, DeliveryOrder } from "@/lib/api/contracts";
 
-export default async function DeliveryDetailPage({
+export default function DeliveryDetailPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const delivery = await getDelivery(params.id);
+  const { id } = use(params);
+  const {
+    data: delivery,
+    error: loadError,
+    isLoading,
+    mutate,
+  } = useSWR<DeliveryOrder>(`/deliveries/${id}`, () =>
+    backofficeApi.getDelivery(id),
+  );
+  const [attemptResult, setAttemptResult] =
+    useState<DeliveryAttemptResult>("NOT_HOME");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  if (!delivery) {
-    notFound();
+  async function run(action: () => Promise<DeliveryOrder>) {
+    try {
+      setSubmitting(true);
+      setSubmitError(null);
+      await action();
+      await mutate();
+    } catch (caught) {
+      setSubmitError(
+        caught instanceof ApiError
+          ? caught.message
+          : "No fue posible completar la acción.",
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function recordAttempt(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    const receiverName = String(data.get("receiverName") ?? "").trim();
+    if (attemptResult === "DELIVERED" && !receiverName) {
+      setSubmitError(
+        "Indica el nombre del receptor para confirmar la entrega.",
+      );
+      return;
+    }
+    await run(() =>
+      backofficeApi.recordDeliveryAttempt(id, {
+        result: attemptResult,
+        receiverName: receiverName || undefined,
+        notes: String(data.get("notes") ?? "").trim() || undefined,
+      }),
+    );
+  }
+
+  if (isLoading) return <div className="page-stack">Cargando entrega...</div>;
+  if (loadError || !delivery) {
+    return (
+      <div className="page-stack">
+        <Alert tone="error">Error al cargar la entrega.</Alert>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6 p-6">
-      <div>
-        <h1 className="text-2xl font-bold">Entrega: {delivery.deliveryNumber}</h1>
-        <p className="text-gray-500">Detalle de entrega final o handoff</p>
-      </div>
-
-      <div className="bg-white rounded shadow p-6 border border-gray-200">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm text-gray-500">Estado</p>
-            <span className="inline-block bg-gray-100 border text-xs px-2 py-1 rounded mt-1">
-              {delivery.status}
-            </span>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Cliente</p>
-            <p className="font-medium mt-1">
-              {delivery.customer?.firstName} {delivery.customer?.lastName}
-            </p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Método</p>
-            <p className="font-medium mt-1">{delivery.method}</p>
-          </div>
-          <div>
-            <p className="text-sm text-gray-500">Notas</p>
-            <p className="font-medium mt-1">{delivery.notes || 'N/A'}</p>
-          </div>
+    <div className="page-stack">
+      <div className="page-header">
+        <div>
+          <h1>Entrega {delivery.deliveryNumber}</h1>
+          <p>Entrega final o retiro de paquetes.</p>
         </div>
+        <Badge
+          tone={
+            delivery.status === "DELIVERED"
+              ? "success"
+              : delivery.status === "FAILED" || delivery.status === "CANCELLED"
+                ? "danger"
+                : "neutral"
+          }
+        >
+          {delivery.status}
+        </Badge>
       </div>
-
-      <div className="bg-white rounded shadow p-6 border border-gray-200">
-        <h3 className="font-medium mb-4">Paquetes Asignados</h3>
-        {delivery.items?.length > 0 ? (
-          <ul className="space-y-2">
-            {delivery.items.map((item: any) => (
-              <li key={item.id} className="border p-2 rounded text-sm text-gray-700">
-                {item.package?.externalTrackingNumber || item.packageId}
-              </li>
-            ))}
-          </ul>
+      {submitError ? <Alert tone="error">{submitError}</Alert> : null}
+      <div className="flex flex-wrap gap-2">
+        {delivery.status === "DRAFT" ? (
+          <Button
+            onClick={() => void run(() => backofficeApi.markDeliveryReady(id))}
+            disabled={submitting}
+          >
+            Marcar lista
+          </Button>
+        ) : null}
+        {delivery.status === "READY" ? (
+          <Button
+            onClick={() => void run(() => backofficeApi.dispatchDelivery(id))}
+            disabled={submitting}
+          >
+            Despachar
+          </Button>
+        ) : null}
+        {delivery.status === "DRAFT" || delivery.status === "READY" ? (
+          <Button
+            variant="danger"
+            onClick={() => void run(() => backofficeApi.cancelDelivery(id))}
+            disabled={submitting}
+          >
+            Cancelar
+          </Button>
+        ) : null}
+      </div>
+      <div className="content-grid">
+        <Card>
+          <h2>Datos de entrega</h2>
+          <p>
+            <strong>Cliente:</strong>{" "}
+            {delivery.customer?.displayName ?? delivery.customerId}
+          </p>
+          <p>
+            <strong>Método:</strong> {delivery.method}
+          </p>
+          <p>
+            <strong>Notas:</strong> {delivery.notes || "N/A"}
+          </p>
+        </Card>
+        <Card>
+          <h2>Paquetes</h2>
+          {delivery.items.map((item) => (
+            <p key={item.id} className="inline-code">
+              {item.package?.internalTrackingNumber ?? item.packageId}
+            </p>
+          ))}
+        </Card>
+      </div>
+      {delivery.status === "OUT_FOR_DELIVERY" ? (
+        <Card>
+          <h2>Registrar intento</h2>
+          <form className="form-grid" onSubmit={recordAttempt}>
+            <FormField label="Resultado">
+              <Select
+                value={attemptResult}
+                onChange={(event) =>
+                  setAttemptResult(event.target.value as DeliveryAttemptResult)
+                }
+              >
+                <option value="DELIVERED">Entregado</option>
+                <option value="NOT_HOME">Cliente ausente</option>
+                <option value="REJECTED">Rechazado</option>
+                <option value="ADDRESS_ISSUE">Problema de dirección</option>
+                <option value="OTHER">Otro</option>
+              </Select>
+            </FormField>
+            {attemptResult === "DELIVERED" ? (
+              <FormField label="Receptor">
+                <Input name="receiverName" maxLength={120} required />
+              </FormField>
+            ) : null}
+            <FormField label="Notas">
+              <Textarea name="notes" maxLength={1000} />
+            </FormField>
+            <div style={{ gridColumn: "1 / -1" }}>
+              <Button type="submit" disabled={submitting}>
+                Registrar intento
+              </Button>
+            </div>
+          </form>
+        </Card>
+      ) : null}
+      <Card>
+        <h2>Intentos</h2>
+        {delivery.attempts?.length ? (
+          delivery.attempts.map((attempt) => (
+            <div key={attempt.id} className="py-2 border-b">
+              <strong>{attempt.result}</strong>
+              <span> {attempt.receiverName || "Sin receptor"}</span>
+              <span>
+                {" "}
+                {new Date(attempt.attemptedAt).toLocaleString("es-DO")}
+              </span>
+            </div>
+          ))
         ) : (
-          <p className="text-gray-500 text-sm">No hay paquetes asociados.</p>
+          <p>No hay intentos registrados.</p>
         )}
-      </div>
-
-      <div className="bg-white rounded shadow p-6 border border-gray-200">
-        <h3 className="font-medium mb-4">Intentos de Entrega</h3>
-        {delivery.attempts?.length > 0 ? (
-          <ul className="space-y-2">
-            {delivery.attempts.map((attempt: any) => (
-              <li key={attempt.id} className="border p-2 rounded flex justify-between text-sm text-gray-700">
-                <span>{attempt.result} - {attempt.receiverName || 'Sin receptor'}</span>
-                <span className="text-gray-500">{new Date(attempt.attemptedAt).toLocaleString('es-DO')}</span>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-gray-500 text-sm">No hay intentos registrados.</p>
-        )}
-      </div>
+      </Card>
     </div>
   );
 }

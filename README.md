@@ -1,6 +1,6 @@
-# Courier SaaS · Modelo A+ v0.2
+# Courier SaaS · Modelo A+
 
-Paquete de documentación para iniciar el desarrollo de una plataforma SaaS multi-tenant destinada a empresas de courier en República Dominicana.
+Monorepo de una plataforma SaaS B2B multi-tenant para digitalizar la operación de empresas courier existentes en República Dominicana.
 
 ## Stack
 
@@ -13,6 +13,7 @@ Paquete de documentación para iniciar el desarrollo de una plataforma SaaS mult
 
 ## Documentos principales
 
+- `docs/estado-cierre-modelo-a-plus-2026-07-12.md`
 - `ingenieria_inversa_courier_modelo_a_plus_mvp_v0_2.md`
 - `courier_saas_modelo_a_plus_mvp_v0_2.sql`
 - `AGENTS.md`
@@ -22,20 +23,15 @@ Paquete de documentación para iniciar el desarrollo de una plataforma SaaS mult
 - `docs/deployment.md`
 - `docs/database.md`
 
-## Inicio recomendado
+## Estado actual
 
-1. Crear el monorepo.
-2. Copiar `AGENTS.md` y la carpeta `docs/` al repositorio.
-3. Levantar PostgreSQL con `compose.dev.yml`.
-4. Implementar `/health` en NestJS.
-5. Conectar una página Next.js al healthcheck.
-6. Continuar por las fases del plan de implementación.
+El alcance funcional aprobado llega hasta el Ticket 45. Durante el cierre del Modelo A+ no se agregan nuevos módulos: la prioridad es completar la línea base técnica, el hardening, los flujos E2E y la aceptación operativa.
 
-Esta carpeta contiene documentación y plantillas; no es todavía la aplicación ejecutable.
+La matriz oficial de avance, evidencia y pendientes es `docs/estado-cierre-modelo-a-plus-2026-07-12.md`.
 
 ## Comandos raiz
 
-El repositorio usa pnpm workspaces y Turborepo desde la raiz. Por ahora las carpetas `apps/` y `packages/` solo reservan la estructura del monorepo.
+El repositorio usa pnpm workspaces y Turborepo desde la raíz. `apps/web` contiene el backoffice Next.js y `apps/api` contiene el monolito modular NestJS.
 
 ```bash
 pnpm dev

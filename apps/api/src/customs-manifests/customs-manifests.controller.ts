@@ -80,13 +80,39 @@ export class CustomsManifestsController {
     return this.customsManifestsService.removePackages(ctx, id, dto);
   }
 
-  @Post(':id/transmit')
+  @Post(':id/build-version')
   @RequirePermissions(CUSTOMS_MANIFEST_PERMISSIONS.MANAGE)
-  @HttpCode(HttpStatus.OK)
-  transmit(
+  buildVersion(
     @CurrentCommandContext() ctx: CommandContext,
     @Param('id') id: string,
   ) {
-    return this.customsManifestsService.transmit(ctx, id);
+    return this.customsManifestsService.buildVersion(ctx, id);
+  }
+
+  @Post(':id/validate')
+  @RequirePermissions(CUSTOMS_MANIFEST_PERMISSIONS.MANAGE)
+  validate(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+  ) {
+    return this.customsManifestsService.validateVersion(ctx, id);
+  }
+
+  @Post(':id/finalize')
+  @RequirePermissions(CUSTOMS_MANIFEST_PERMISSIONS.MANAGE)
+  finalize(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+  ) {
+    return this.customsManifestsService.finalize(ctx, id);
+  }
+
+  @Post(':id/cancel')
+  @RequirePermissions(CUSTOMS_MANIFEST_PERMISSIONS.MANAGE)
+  cancel(
+    @CurrentCommandContext() ctx: CommandContext,
+    @Param('id') id: string,
+  ) {
+    return this.customsManifestsService.cancel(ctx, id);
   }
 }

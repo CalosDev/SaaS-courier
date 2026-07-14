@@ -6,6 +6,7 @@ import {
   Building2,
   ClipboardCheck,
   LayoutDashboard,
+  BarChart3,
   LogOut,
   MapPinned,
   Package,
@@ -21,6 +22,10 @@ import {
   Receipt,
   CreditCard,
   MapPin,
+  ScanLine,
+  Bell,
+  PlugZap,
+  Activity,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -41,6 +46,12 @@ const NAV_ITEMS: NavItem[] = [
     label: "Dashboard",
     icon: LayoutDashboard,
     requiredPermissions: ["organizations.read"],
+  },
+  {
+    href: "/reports",
+    label: "Reportes",
+    icon: BarChart3,
+    requiredPermissions: ["reports.read"],
   },
   {
     href: "/organization",
@@ -139,13 +150,37 @@ const NAV_ITEMS: NavItem[] = [
     requiredPermissions: ["inventory.read"],
   },
   {
+    href: "/warehouse/putaway",
+    label: "Almacén",
+    icon: ScanLine,
+    requiredPermissions: ["inventory.read"],
+  },
+  {
+    href: "/notifications/deliveries",
+    label: "Notificaciones",
+    icon: Bell,
+    requiredPermissions: ["notifications.read"],
+  },
+  {
+    href: "/integrations/carriers",
+    label: "Carriers",
+    icon: PlugZap,
+    requiredPermissions: ["carriers.read"],
+  },
+  {
+    href: "/system/status",
+    label: "Estado del sistema",
+    icon: Activity,
+    requiredPermissions: ["organizations.read"],
+  },
+  {
     href: "/dispatches",
     label: "Despachos",
     icon: Plane,
     requiredPermissions: ["dispatches.read"],
   },
   {
-    href: "/pickups",
+    href: "/pickup-requests",
     label: "Recolecciones",
     icon: MapPin,
     requiredPermissions: ["pickups.read"],

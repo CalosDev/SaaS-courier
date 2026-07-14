@@ -3,13 +3,17 @@
 import useSWR from "swr";
 import { use, useState } from "react";
 import { backofficeApi } from "@/lib/api/backoffice";
-import type { FacilityTransfer, FacilityTransferItem } from "@/lib/api/contracts";
+import type {
+  FacilityTransfer,
+  WarehouseLocationListResponse,
+} from "@/lib/api/contracts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { Input } from "@/components/ui/input";
 import { FormField } from "@/components/ui/form-field";
+import { Select } from "@/components/ui/select";
 
 export default function TransferDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -22,6 +26,19 @@ export default function TransferDetailPage({ params }: { params: Promise<{ id: s
 
   // States for adding package
   const [newPackageId, setNewPackageId] = useState("");
+  const [destinationLocationId, setDestinationLocationId] = useState("");
+
+  const { data: destinationLocationsData } = useSWR<WarehouseLocationListResponse>(
+    transfer?.status === "IN_TRANSIT"
+      ? `/inventory/locations?facilityId=${transfer.destinationFacilityId}&isActive=true`
+      : null,
+    () =>
+      backofficeApi.listInventoryLocations({
+        facilityId: transfer!.destinationFacilityId,
+        isActive: true,
+        pageSize: 100,
+      }),
+  );
 
   const handleAddPackage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -59,7 +76,7 @@ export default function TransferDetailPage({ params }: { params: Promise<{ id: s
     try {
       setIsSubmitting(true);
       setSubmitError(null);
-      await backofficeApi.dispatchTransfer(id, { vehicleInfo: "Default" });
+      await backofficeApi.dispatchTransfer(id);
       await mutate();
     } catch (err: any) {
       setSubmitError(err.message || "Error al despachar");
@@ -68,11 +85,33 @@ export default function TransferDetailPage({ params }: { params: Promise<{ id: s
     }
   };
 
-  const handleReceiveItem = async (itemId: string, status: "RECEIVED" | "MISSING" | "DAMAGED") => {
+  const handleCancel = async () => {
+    if (!confirm("¿Cancelar esta transferencia en borrador?")) return;
     try {
       setIsSubmitting(true);
       setSubmitError(null);
-      await backofficeApi.receiveTransferItem(id, itemId, { status });
+      await backofficeApi.cancelTransfer(id);
+      await mutate();
+    } catch (err: any) {
+      setSubmitError(err.message || "Error al cancelar la transferencia");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleReceiveItem = async (itemId: string, status: "RECEIVED" | "MISSING" | "DAMAGED") => {
+    if (status !== "MISSING" && !destinationLocationId) {
+      setSubmitError("Selecciona una ubicación activa en la instalación destino.");
+      return;
+    }
+    try {
+      setIsSubmitting(true);
+      setSubmitError(null);
+      await backofficeApi.receiveTransferItem(id, itemId, {
+        status,
+        destinationLocationId:
+          status === "MISSING" ? undefined : destinationLocationId,
+      });
       await mutate();
     } catch (err: any) {
       setSubmitError(err.message || "Error al procesar recepción del paquete");
@@ -86,6 +125,7 @@ export default function TransferDetailPage({ params }: { params: Promise<{ id: s
 
   const isDraft = transfer.status === "DRAFT";
   const isInTransit = transfer.status === "IN_TRANSIT";
+  const destinationLocations = destinationLocationsData?.items ?? [];
 
   return (
     <div className="page-stack">
@@ -120,15 +160,36 @@ export default function TransferDetailPage({ params }: { params: Promise<{ id: s
 
           <div style={{ marginTop: "1.5rem", display: "flex", gap: "1rem" }}>
             {isDraft && (
-              <Button onClick={handleDispatch} disabled={isSubmitting || (transfer.items?.length || 0) === 0}>
-                Despachar
-              </Button>
+              <>
+                <Button onClick={handleDispatch} disabled={isSubmitting || (transfer.items?.length || 0) === 0}>
+                  Despachar
+                </Button>
+                <Button variant="danger" onClick={handleCancel} disabled={isSubmitting}>
+                  Cancelar
+                </Button>
+              </>
             )}
           </div>
         </Card>
 
         <Card>
           <h2>Paquetes ({transfer.items?.length || 0})</h2>
+
+          {isInTransit ? (
+            <FormField label="Ubicación de recepción en destino">
+              <Select
+                value={destinationLocationId}
+                onChange={(event) => setDestinationLocationId(event.target.value)}
+              >
+                <option value="">Selecciona una ubicación</option>
+                {destinationLocations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.code} - {location.name}
+                  </option>
+                ))}
+              </Select>
+            </FormField>
+          ) : null}
 
           {isDraft && (
             <form onSubmit={handleAddPackage} style={{ display: "flex", gap: "0.5rem", marginTop: "1rem", marginBottom: "1rem" }}>
@@ -173,6 +234,7 @@ export default function TransferDetailPage({ params }: { params: Promise<{ id: s
                         {isInTransit && item.status === "PENDING" && (
                           <div style={{ display: "flex", gap: "0.5rem" }}>
                             <Button variant="secondary" onClick={() => handleReceiveItem(item.id, "RECEIVED")} disabled={isSubmitting}>Recibir</Button>
+                            <Button variant="secondary" onClick={() => handleReceiveItem(item.id, "DAMAGED")} disabled={isSubmitting}>Dañado</Button>
                             <Button variant="danger" onClick={() => handleReceiveItem(item.id, "MISSING")} disabled={isSubmitting}>Faltante</Button>
                           </div>
                         )}

@@ -2,7 +2,6 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CustomsManifestsService } from './customs-manifests.service';
 import { CustomsManifestsRepositoryToken } from './customs-manifests.repository';
 import { PrismaService } from '../prisma/prisma.service';
-import { SigaApiService } from '../siga-integration/siga-api.service';
 import { ConflictException, NotFoundException } from '@nestjs/common';
 import { CustomsManifestStatus } from '../generated/prisma/client';
 
@@ -41,6 +40,9 @@ describe('CustomsManifestsService', () => {
         {
           provide: PrismaService,
           useValue: {
+            dispatch: {
+              findUnique: jest.fn(),
+            },
             $transaction: jest.fn((callback) => callback(prisma)),
             outboxEvent: {
               create: jest.fn(),
@@ -48,16 +50,6 @@ describe('CustomsManifestsService', () => {
             auditLog: {
               create: jest.fn(),
             },
-          },
-        },
-        {
-          provide: SigaApiService,
-          useValue: {
-            transmitManifest: jest.fn().mockResolvedValue({
-              success: true,
-              sigaReferenceCode: 'SIGA-2026-000001',
-              transmittedAt: new Date().toISOString(),
-            }),
           },
         },
       ],
@@ -79,8 +71,13 @@ describe('CustomsManifestsService', () => {
         arrivalDate: new Date(),
       };
       repository.create.mockResolvedValue(manifest);
+      prisma.dispatch.findUnique.mockResolvedValue({
+        id: 'dispatch-1',
+        status: 'ARRIVED',
+      });
 
       const res = await service.create(mockContext, {
+        masterShipmentId: '00000000-0000-4000-8000-000000000001',
         flightNumber: 'FL123',
         arrivalDate: new Date().toISOString(),
       });

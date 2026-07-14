@@ -23,7 +23,12 @@ import { Table } from "@/components/ui/table";
 import { useToast } from "@/components/ui/toast";
 import { ApiError } from "@/lib/api/api-error";
 
-const PAYMENT_METHODS: PaymentMethod[] = ["CASH", "CARD", "BANK_TRANSFER", "OTHER"];
+const PAYMENT_METHODS: PaymentMethod[] = [
+  "CASH",
+  "CARD",
+  "BANK_TRANSFER",
+  "OTHER",
+];
 
 const METHOD_LABEL: Record<PaymentMethod, string> = {
   CASH: "Efectivo",
@@ -48,7 +53,10 @@ const STATUS_LABEL: Record<PaymentRecord["status"], string> = {
   VOID: "Anulado",
 };
 
-const STATUS_TONE: Record<PaymentRecord["status"], "neutral" | "success" | "warning" | "danger"> = {
+const STATUS_TONE: Record<
+  PaymentRecord["status"],
+  "neutral" | "success" | "warning" | "danger"
+> = {
   RECORDED: "warning",
   APPLIED: "success",
   VOID: "danger",
@@ -57,18 +65,31 @@ const STATUS_TONE: Record<PaymentRecord["status"], "neutral" | "success" | "warn
 export default function PaymentsPage() {
   const [page, setPage] = useState(1);
   const [showCreate, setShowCreate] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<PaymentRecord | null>(
+    null,
+  );
+  const [paymentAction, setPaymentAction] = useState<"apply" | "void" | null>(
+    null,
+  );
+  const [invoiceId, setInvoiceId] = useState("");
+  const [actionValue, setActionValue] = useState("");
+  const [actionSubmitting, setActionSubmitting] = useState(false);
   const { pushToast } = useToast();
 
   const swrKey = `/payments?page=${page}`;
-  const { data, error, isLoading, mutate: refetch } = useSWR(
-    swrKey,
-    () => backofficeApi.listPayments({ page, pageSize: 10 })
-  );
+  const {
+    data,
+    error,
+    isLoading,
+    mutate: refetch,
+  } = useSWR(swrKey, () => backofficeApi.listPayments({ page, pageSize: 10 }));
   const payments = data?.items ?? [];
 
-  const { data: customersData } = useSWR(
-    "/customers-all",
-    () => backofficeApi.listCustomers({ page: 1, pageSize: 50 })
+  const { data: customersData } = useSWR("/customers-all", () =>
+    backofficeApi.listCustomers({ page: 1, pageSize: 50 }),
+  );
+  const { data: invoicesData } = useSWR("/invoices-all", () =>
+    backofficeApi.listInvoices({ pageSize: 100 }),
   );
 
   const {
@@ -95,7 +116,47 @@ export default function PaymentsPage() {
       setShowCreate(false);
       await refetch();
     } catch (err) {
-      pushToast(err instanceof ApiError ? err.message : "No fue posible registrar el pago.");
+      pushToast(
+        err instanceof ApiError
+          ? err.message
+          : "No fue posible registrar el pago.",
+      );
+    }
+  }
+
+  function closePaymentAction() {
+    setSelectedPayment(null);
+    setPaymentAction(null);
+    setInvoiceId("");
+    setActionValue("");
+  }
+
+  async function submitPaymentAction() {
+    if (!selectedPayment || !paymentAction || !actionValue.trim()) return;
+    setActionSubmitting(true);
+    try {
+      if (paymentAction === "apply") {
+        await backofficeApi.applyPayment(selectedPayment.id, {
+          invoiceId,
+          amountMinor: String(Math.round(Number(actionValue) * 100)),
+        });
+        pushToast("Pago aplicado.");
+      } else {
+        await backofficeApi.voidPayment(selectedPayment.id, {
+          reason: actionValue.trim(),
+        });
+        pushToast("Pago anulado.");
+      }
+      closePaymentAction();
+      await refetch();
+    } catch (err) {
+      pushToast(
+        err instanceof ApiError
+          ? err.message
+          : "No fue posible completar la acción.",
+      );
+    } finally {
+      setActionSubmitting(false);
     }
   }
 
@@ -116,23 +177,65 @@ export default function PaymentsPage() {
         {isLoading ? (
           <LoadingState label="Cargando pagos..." />
         ) : error ? (
-          <ErrorState title="Error al cargar pagos" description={error.message} onRetry={() => void refetch()} />
+          <ErrorState
+            title="Error al cargar pagos"
+            description={error.message}
+            onRetry={() => void refetch()}
+          />
         ) : payments.length === 0 ? (
-          <EmptyState title="No hay pagos" description="Registra el primer pago usando el botón 'Registrar pago'." />
+          <EmptyState
+            title="No hay pagos"
+            description="Registra el primer pago usando el botón 'Registrar pago'."
+          />
         ) : (
           <>
             <Table
-              columns={["Nº Recibo", "Estado", "Método", "Monto", "Referencia", "Fecha"]}
+              columns={[
+                "Nº Recibo",
+                "Estado",
+                "Método",
+                "Monto",
+                "Referencia",
+                "Fecha",
+                "Acciones",
+              ]}
               rows={payments.map((pay) => [
-                <span key={`num-${pay.id}`} className="inline-code">{pay.paymentNumber}</span>,
-                <Badge key={`st-${pay.id}`} tone={STATUS_TONE[pay.status]}>{STATUS_LABEL[pay.status]}</Badge>,
+                <span key={`num-${pay.id}`} className="inline-code">
+                  {pay.paymentNumber}
+                </span>,
+                <Badge key={`st-${pay.id}`} tone={STATUS_TONE[pay.status]}>
+                  {STATUS_LABEL[pay.status]}
+                </Badge>,
                 METHOD_LABEL[pay.method],
                 `${pay.currencyCode} ${(Number(pay.amountMinor) / 100).toFixed(2)}`,
                 pay.reference ?? "—",
                 new Date(pay.createdAt).toLocaleDateString("es-DO"),
+                <div key={`actions-${pay.id}`} className="flex gap-2">
+                  {pay.status !== "VOID" ? (
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setSelectedPayment(pay);
+                        setPaymentAction("apply");
+                      }}
+                    >
+                      Aplicar
+                    </Button>
+                  ) : null}
+                  {pay.status !== "VOID" ? (
+                    <Button
+                      variant="danger"
+                      onClick={() => {
+                        setSelectedPayment(pay);
+                        setPaymentAction("void");
+                      }}
+                    >
+                      Anular
+                    </Button>
+                  ) : null}
+                </div>,
               ])}
             />
-
           </>
         )}
       </Card>
@@ -140,19 +243,36 @@ export default function PaymentsPage() {
       <Dialog
         open={showCreate}
         title="Registrar pago"
-        onClose={() => { setShowCreate(false); reset(); }}
+        onClose={() => {
+          setShowCreate(false);
+          reset();
+        }}
         actions={
           <>
-            <Button variant="secondary" onClick={() => { setShowCreate(false); reset(); }}>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setShowCreate(false);
+                reset();
+              }}
+            >
               Cancelar
             </Button>
-            <Button type="submit" form="create-payment-form" disabled={isSubmitting}>
+            <Button
+              type="submit"
+              form="create-payment-form"
+              disabled={isSubmitting}
+            >
               {isSubmitting ? "Registrando..." : "Registrar pago"}
             </Button>
           </>
         }
       >
-        <form id="create-payment-form" className="form-grid" onSubmit={handleSubmit(onSubmit)}>
+        <form
+          id="create-payment-form"
+          className="form-grid"
+          onSubmit={handleSubmit(onSubmit)}
+        >
           <FormField label="Cliente" error={errors.customerId?.message}>
             <Select {...register("customerId")}>
               <option value="">— Selecciona un cliente —</option>
@@ -167,13 +287,24 @@ export default function PaymentsPage() {
           <FormField label="Método de pago" error={errors.method?.message}>
             <Select {...register("method")}>
               {PAYMENT_METHODS.map((m) => (
-                <option key={m} value={m}>{METHOD_LABEL[m]}</option>
+                <option key={m} value={m}>
+                  {METHOD_LABEL[m]}
+                </option>
               ))}
             </Select>
           </FormField>
 
-          <FormField label="Monto (en unidad principal, ej. DOP 100.00)" error={errors.amount?.message}>
-            <Input type="number" step="0.01" min="0.01" {...register("amount")} placeholder="0.00" />
+          <FormField
+            label="Monto (en unidad principal, ej. DOP 100.00)"
+            error={errors.amount?.message}
+          >
+            <Input
+              type="number"
+              step="0.01"
+              min="0.01"
+              {...register("amount")}
+              placeholder="0.00"
+            />
           </FormField>
 
           <FormField label="Moneda" error={errors.currencyCode?.message}>
@@ -183,10 +314,80 @@ export default function PaymentsPage() {
             </Select>
           </FormField>
 
-          <FormField label="Referencia (cheque, voucher, etc.)" error={errors.reference?.message}>
+          <FormField
+            label="Referencia (cheque, voucher, etc.)"
+            error={errors.reference?.message}
+          >
             <Input {...register("reference")} placeholder="Opcional" />
           </FormField>
         </form>
+      </Dialog>
+
+      <Dialog
+        open={paymentAction !== null}
+        title={paymentAction === "apply" ? "Aplicar pago" : "Anular pago"}
+        onClose={closePaymentAction}
+        actions={
+          <>
+            <Button variant="secondary" onClick={closePaymentAction}>
+              Cancelar
+            </Button>
+            <Button
+              variant={paymentAction === "void" ? "danger" : "primary"}
+              onClick={() => void submitPaymentAction()}
+              disabled={
+                actionSubmitting ||
+                !actionValue.trim() ||
+                (paymentAction === "apply" && !invoiceId)
+              }
+            >
+              Confirmar
+            </Button>
+          </>
+        }
+      >
+        {paymentAction === "apply" ? (
+          <div className="form-grid">
+            <FormField label="Factura">
+              <Select
+                value={invoiceId}
+                onChange={(event) => setInvoiceId(event.target.value)}
+              >
+                <option value="">Selecciona una factura</option>
+                {(invoicesData?.items ?? [])
+                  .filter(
+                    (invoice) =>
+                      invoice.customerId === selectedPayment?.customerId &&
+                      invoice.currencyCode === selectedPayment?.currencyCode &&
+                      (invoice.status === "ISSUED" ||
+                        invoice.status === "PARTIALLY_PAID"),
+                  )
+                  .map((invoice) => (
+                    <option key={invoice.id} value={invoice.id}>
+                      {invoice.invoiceNumber}
+                    </option>
+                  ))}
+              </Select>
+            </FormField>
+            <FormField label="Monto">
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={actionValue}
+                onChange={(event) => setActionValue(event.target.value)}
+              />
+            </FormField>
+          </div>
+        ) : (
+          <FormField label="Motivo">
+            <Input
+              maxLength={500}
+              value={actionValue}
+              onChange={(event) => setActionValue(event.target.value)}
+            />
+          </FormField>
+        )}
       </Dialog>
     </div>
   );

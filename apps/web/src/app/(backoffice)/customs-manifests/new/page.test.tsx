@@ -1,58 +1,59 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { SWRConfig } from "swr";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import NewCustomsManifestPage from "./page";
-import { backofficeApi } from "@/lib/api/backoffice";
 
-const pushMock = vi.fn();
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: pushMock }),
-}));
-
-vi.mock("@/lib/api/backoffice", () => ({
-  backofficeApi: {
+const { pushMock, backofficeApiMock } = vi.hoisted(() => ({
+  pushMock: vi.fn(),
+  backofficeApiMock: {
+    listMasterShipments: vi.fn(),
     createCustomsManifest: vi.fn(),
   },
 }));
 
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: pushMock }) }));
+vi.mock("@/lib/api/backoffice", () => ({ backofficeApi: backofficeApiMock }));
+
 describe("NewCustomsManifestPage", () => {
   beforeEach(() => {
+    Object.values(backofficeApiMock).forEach((mock) => mock.mockReset());
     pushMock.mockReset();
-    vi.mocked(backofficeApi.createCustomsManifest).mockReset();
   });
 
-  it("creates a manifest without tenant fields and routes to detail", async () => {
-    vi.mocked(backofficeApi.createCustomsManifest).mockResolvedValue({
+  it("creates a manifest linked to an arrived master shipment", async () => {
+    backofficeApiMock.listMasterShipments.mockResolvedValue([
+      { id: "shipment-1", dispatchCode: "DSP-001", status: "ARRIVED" },
+      { id: "shipment-2", dispatchCode: "DSP-002", status: "DRAFT" },
+    ]);
+    backofficeApiMock.createCustomsManifest.mockResolvedValue({
       id: "manifest-1",
-      organizationId: "org-1",
-      code: "CM-20260711-00001",
-      flightNumber: "AA123",
-      arrivalDate: "2026-07-12",
-      status: "DRAFT",
-      createdAt: "2026-07-11T00:00:00.000Z",
-      updatedAt: "2026-07-11T00:00:00.000Z",
-      packages: [],
     });
 
-    render(<NewCustomsManifestPage />);
+    render(
+      <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
+        <NewCustomsManifestPage />
+      </SWRConfig>,
+    );
 
+    fireEvent.change(await screen.findByLabelText("Embarque maestro"), {
+      target: { value: "shipment-1" },
+    });
+    expect(screen.queryByText("DSP-002")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Vuelo"), {
       target: { value: " AA123 " },
-    });
-    fireEvent.change(screen.getByLabelText("Fecha llegada"), {
-      target: { value: "2026-07-12" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Crear manifiesto" }));
 
     await waitFor(() => {
-      expect(backofficeApi.createCustomsManifest).toHaveBeenCalledWith({
+      expect(backofficeApiMock.createCustomsManifest).toHaveBeenCalledWith({
+        masterShipmentId: "shipment-1",
         flightNumber: "AA123",
-        arrivalDate: "2026-07-12",
+        arrivalDate: undefined,
       });
     });
     expect(
-      vi.mocked(backofficeApi.createCustomsManifest).mock.calls[0][0],
+      backofficeApiMock.createCustomsManifest.mock.calls[0][0],
     ).not.toHaveProperty("organizationId");
     expect(pushMock).toHaveBeenCalledWith("/customs-manifests/manifest-1");
   });

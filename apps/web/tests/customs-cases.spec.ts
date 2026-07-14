@@ -159,7 +159,9 @@ test.describe("Customs Cases", () => {
     await page.getByLabel("Nuevo estado *").selectOption("UNDER_REVIEW");
     await page.getByRole("button", { name: "Actualizar estado" }).click();
 
-    await expect(page.getByText("Estado actual: En revisión")).toBeVisible();
+    await expect(
+      page.locator(".ui-badge").filter({ hasText: "En revisión" }),
+    ).toBeVisible();
     expect(statusData).toEqual({ status: "UNDER_REVIEW" });
 
     // Mock recording event

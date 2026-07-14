@@ -60,6 +60,10 @@ describe('CustomsManifestsController', () => {
     expect(controller).toBeDefined();
   });
 
+  it('does not expose simulated SIGA transmission', () => {
+    expect('transmit' in controller).toBe(false);
+  });
+
   it('create should call service', async () => {
     const res = { id: 'man-1' } as any;
     service.create.mockResolvedValue(res);

@@ -5,6 +5,7 @@ export type CustomsManifestRecord = {
   id: string;
   organizationId: string;
   code: string;
+  dispatchId: string | null;
   flightNumber: string | null;
   arrivalDate: Date | null;
   status: CustomsManifestStatus;
@@ -14,11 +15,17 @@ export type CustomsManifestRecord = {
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
+  currentVersion: number;
+  finalizedVersionId: string | null;
 };
 
 export type CustomsManifestDetailRecord = Prisma.CustomsManifestGetPayload<{
   include: {
-    packages: true;
+    dispatch: {
+      include: { originFacility: true; destinationFacility: true };
+    };
+    versions: { include: { items: true } };
+    finalizedVersion: { include: { items: true } };
   };
 }>;
 

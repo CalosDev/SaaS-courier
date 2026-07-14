@@ -27,6 +27,7 @@ export interface InvoiceRecord {
   issuedAt: Date | null;
   dueDate: Date | null;
   voidedAt: Date | null;
+  voidReason: string | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -39,6 +40,8 @@ export interface PaymentAllocationRecord {
   invoiceId: string;
   amountMinor: string;
   appliedAt: Date;
+  reversedAt: Date | null;
+  reversalReason: string | null;
 }
 
 export interface PaymentRecord {
@@ -52,6 +55,7 @@ export interface PaymentRecord {
   status: PaymentStatus;
   recordedAt: Date;
   voidedAt: Date | null;
+  voidReason: string | null;
   createdAt: Date;
   updatedAt: Date;
   allocations: PaymentAllocationRecord[];

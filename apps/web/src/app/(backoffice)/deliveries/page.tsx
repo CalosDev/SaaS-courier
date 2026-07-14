@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { backofficeApi } from "@/lib/api/backoffice";
+import type { DeliveryOrder } from "@/lib/api/contracts";
 
 export default function DeliveriesPage() {
-  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [deliveries, setDeliveries] = useState<DeliveryOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -14,7 +15,7 @@ export default function DeliveriesPage() {
     async function load() {
       try {
         const res = await backofficeApi.listDeliveries();
-        setDeliveries(res.data ?? res ?? []);
+        setDeliveries(res);
       } catch (e) {
         console.error("Failed to fetch deliveries:", e);
         setError("Error al cargar las entregas");
@@ -30,7 +31,9 @@ export default function DeliveriesPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Final Deliveries</h1>
-          <p className="text-gray-500">Gestión de entregas finales y handoffs</p>
+          <p className="text-gray-500">
+            Gestión de entregas finales y handoffs
+          </p>
         </div>
         <Link
           href="/deliveries/new"
@@ -49,7 +52,9 @@ export default function DeliveriesPage() {
 
       <div className="bg-white rounded shadow p-4 border border-gray-200">
         {isLoading ? (
-          <div className="text-center py-12 text-gray-500">Cargando entregas...</div>
+          <div className="text-center py-12 text-gray-500">
+            Cargando entregas...
+          </div>
         ) : (
           <table className="w-full text-left text-sm text-gray-700">
             <thead className="bg-gray-50 text-gray-600 border-b">
@@ -70,8 +75,11 @@ export default function DeliveriesPage() {
                   </td>
                 </tr>
               ) : (
-                deliveries.map((delivery: any) => (
-                  <tr key={delivery.id} className="border-b last:border-0 hover:bg-gray-50">
+                deliveries.map((delivery) => (
+                  <tr
+                    key={delivery.id}
+                    className="border-b last:border-0 hover:bg-gray-50"
+                  >
                     <td className="p-3">{delivery.deliveryNumber}</td>
                     <td className="p-3">
                       <span className="bg-gray-100 px-2 py-1 rounded text-xs border">

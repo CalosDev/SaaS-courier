@@ -2,23 +2,22 @@
 
 ## Desarrollo
 
-- PostgreSQL siempre disponible en Compose.
-- Web y API locales por defecto.
-- Perfil `full` para ejecutar web y API en contenedores.
-- Volúmenes solo para datos de PostgreSQL y, si se necesita, cachés de desarrollo.
+`compose.dev.yml` inicia PostgreSQL, MinIO y Mailpit. Web y API se ejecutan con
+pnpm para conservar recarga rapida. MinIO crea un bucket privado idempotente y
+Mailpit captura correo sin entregarlo a Internet.
 
-## Producción
+## Produccion
 
-- `courier-web`: Next.js `output: standalone`.
+- `courier-web`: Next.js con `output: standalone`.
 - `courier-api`: NestJS compilado y Prisma Client generado.
-- Imágenes multi-stage y usuario no root.
-- Healthchecks.
-- Variables inyectadas en runtime.
-- PostgreSQL y S3 administrados.
+- Imagenes multi-stage y proceso final no root.
+- `/health/live` indica proceso vivo; `/health/ready` valida dependencias.
+- `migrate` es un job de despliegue unico, no una replica permanente.
+- PostgreSQL y object storage son servicios administrados.
 
 ## Reglas
 
-- No incluir secretos ni `.env` en imágenes.
-- No ejecutar migraciones desde cada réplica.
-- No combinar web y API en un mismo contenedor.
-- Usar `.dockerignore` para excluir `node_modules`, `.git`, pruebas y artefactos locales.
+- No copiar `.env`, secretos, pruebas ni artefactos locales a imagenes.
+- No combinar web y API en un contenedor.
+- No ejecutar `prisma db push` en produccion.
+- Fijar las imagenes publicadas por digest en el entorno real.

@@ -9,6 +9,12 @@ export function CustomsManifestStatusBadge({
   switch (status) {
     case "DRAFT":
       return <Badge tone="neutral">Borrador</Badge>;
+    case "VALIDATED":
+      return <Badge tone="success">Validado</Badge>;
+    case "FINALIZED":
+      return <Badge tone="success">Finalizado</Badge>;
+    case "CANCELLED":
+      return <Badge tone="danger">Cancelado</Badge>;
     case "SUBMITTED":
       return <Badge tone="warning">Enviado</Badge>;
     case "APPROVED":

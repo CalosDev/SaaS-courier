@@ -60,6 +60,7 @@ describe('DispatchesService master shipment actions', () => {
     const existing = {
       id: 'dispatch-1',
       status: DispatchStatus.DRAFT,
+      packages: [{ id: 'package-1', status: 'RECEIVED_AT_ORIGIN' }],
     };
     const updated = {
       ...existing,
@@ -115,6 +116,20 @@ describe('DispatchesService master shipment actions', () => {
 
     expect(repository.update).not.toHaveBeenCalled();
     expect(auditWriteSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects closing an empty master shipment', async () => {
+    repository.findById.mockResolvedValue({
+      id: 'dispatch-1',
+      status: DispatchStatus.DRAFT,
+      packages: [],
+    });
+
+    await expect(
+      service.closeMasterShipment(ctx, 'dispatch-1'),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(repository.update).not.toHaveBeenCalled();
   });
 
   it('returns 404 semantics for missing master shipments', async () => {

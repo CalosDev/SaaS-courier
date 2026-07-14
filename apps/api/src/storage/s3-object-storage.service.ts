@@ -1,5 +1,6 @@
 import {
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   NoSuchKey,
   PutObjectCommand,
@@ -62,6 +63,17 @@ export class S3ObjectStorageService implements ObjectStorageService {
 
   getDefaultBucketName(): string {
     return this.config.bucketName;
+  }
+
+  async checkHealth(): Promise<boolean> {
+    try {
+      await this.client.send(
+        new HeadBucketCommand({ Bucket: this.config.bucketName }),
+      );
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async createSignedUploadTarget(

@@ -1,8 +1,15 @@
-import { IsOptional, IsString, IsUUID, IsObject } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  IsUUID,
+  IsObject,
+  MaxLength,
+} from 'class-validator';
 
 export class UpdateDeliveryDto {
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   notes?: string;
 
   @IsOptional()
@@ -11,5 +18,5 @@ export class UpdateDeliveryDto {
 
   @IsOptional()
   @IsObject()
-  deliveryAddressSnap?: Record<string, any>;
+  deliveryAddressSnap?: Record<string, unknown>;
 }

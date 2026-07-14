@@ -35,6 +35,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
 import { OutboxModule } from './outbox/outbox.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
+import { WarehouseModule } from './warehouse/warehouse.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -80,6 +81,7 @@ import { ReportsModule } from './reports/reports.module';
     OutboxModule,
     NotificationsModule,
     ReportsModule,
+    WarehouseModule,
   ],
 })
 export class AppModule implements NestModule {

@@ -36,8 +36,12 @@ describe('PaymentsService', () => {
           useValue: {
             $transaction: jest.fn((cb) =>
               cb({
+                $queryRaw: jest.fn(),
+                customer: {
+                  findUnique: jest.fn().mockResolvedValue({ id: 'cust-1' }),
+                },
                 paymentAllocation: {
-                  delete: jest.fn().mockResolvedValue(true),
+                  update: jest.fn().mockResolvedValue(true),
                 },
               }),
             ),
@@ -59,6 +63,8 @@ describe('PaymentsService', () => {
       id: 'pay-1',
       amountMinor: 100n,
       allocations: [],
+      customerId: 'cust-1',
+      currencyCode: 'USD',
     } as any;
     repo.createPayment.mockResolvedValue(mockDbPayment);
 
@@ -80,6 +86,8 @@ describe('PaymentsService', () => {
       id: 'pay-1',
       amountMinor: 100n,
       allocations: [],
+      customerId: 'cust-1',
+      currencyCode: 'USD',
     } as any;
     repo.getPaymentById.mockResolvedValue(mockDbPayment);
     const res = await service.getPayment('org-1', 'pay-1');
@@ -103,6 +111,8 @@ describe('PaymentsService', () => {
       status: 'RECORDED',
       amountMinor: 100n,
       allocations: [],
+      customerId: 'cust-1',
+      currencyCode: 'USD',
     } as any;
     repo.getPaymentById.mockResolvedValue(mockDbPayment);
 
@@ -110,6 +120,8 @@ describe('PaymentsService', () => {
       id: 'inv-1',
       status: 'ISSUED',
       balanceDueMinor: 100n,
+      customerId: 'cust-1',
+      currencyCode: 'USD',
     } as any;
     repo.getInvoiceById.mockResolvedValue(mockInvoice);
 
@@ -137,6 +149,7 @@ describe('PaymentsService', () => {
       id: 'alloc-1',
       amountMinor: 100n,
       invoiceId: 'inv-1',
+      reversedAt: null,
     } as any;
     const mockDbPayment = {
       id: 'pay-1',

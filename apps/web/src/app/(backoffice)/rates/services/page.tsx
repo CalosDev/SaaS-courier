@@ -41,7 +41,8 @@ export default function ServicesPage() {
 
   async function submitService(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     setMessage(null);
     setError(null);
 
@@ -55,7 +56,7 @@ export default function ServicesPage() {
     try {
       await backofficeApi.createService(payload);
       setMessage("Servicio creado.");
-      event.currentTarget.reset();
+      form.reset();
       await resource.refresh();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "No fue posible guardar.");

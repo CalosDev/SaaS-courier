@@ -166,10 +166,21 @@ export default function ShipmentDetailPage({
                 Ruta
               </span>
               <span className="block text-sm text-gray-900 mt-1 font-medium">
-                {shipment.origin || "-"} -&gt; {shipment.destination || "-"}
+                {shipment.originFacility?.code || shipment.origin || "-"} -&gt;{" "}
+                {shipment.destinationFacility?.code ||
+                  shipment.destination ||
+                  "-"}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-4">
+              <div>
+                <span className="block text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Modo
+                </span>
+                <span className="block text-sm text-gray-900 mt-1">
+                  {shipment.transportMode || "-"}
+                </span>
+              </div>
               <div>
                 <span className="block text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Transportista

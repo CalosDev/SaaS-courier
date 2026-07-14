@@ -3,6 +3,8 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
+const scheduledProcessingDisabled = process.env.NODE_ENV === 'test';
+
 @Injectable()
 export class OutboxProcessorService {
   private readonly logger = new Logger(OutboxProcessorService.name);
@@ -13,7 +15,9 @@ export class OutboxProcessorService {
     private readonly eventEmitter: EventEmitter2,
   ) {}
 
-  @Cron(CronExpression.EVERY_10_SECONDS)
+  @Cron(CronExpression.EVERY_10_SECONDS, {
+    disabled: scheduledProcessingDisabled,
+  })
   async processOutboxEvents() {
     if (this.isProcessing) return;
     this.isProcessing = true;
@@ -66,8 +70,8 @@ export class OutboxProcessorService {
         await this.eventEmitter.emitAsync(event.event_type, event);
 
         // Mark as published
-        await this.prisma.outboxEvent.update({
-          where: { id: event.id },
+        const published = await this.prisma.outboxEvent.updateMany({
+          where: { id: event.id, lockedBy },
           data: {
             status: 'PUBLISHED',
             publishedAt: new Date(),
@@ -76,7 +80,13 @@ export class OutboxProcessorService {
           },
         });
 
-        this.logger.debug(`Successfully processed event ${event.id}`);
+        if (published.count > 0) {
+          this.logger.debug(`Successfully processed event ${event.id}`);
+        } else {
+          this.logger.debug(
+            `Event ${event.id} was removed or its lock changed before publication`,
+          );
+        }
       } catch (err: any) {
         this.logger.error(`Failed to process event ${event.id}`, err);
 
@@ -84,8 +94,8 @@ export class OutboxProcessorService {
         const attempts = event.attempts;
         const status = attempts >= maxAttempts ? 'DEAD_LETTER' : 'PENDING';
 
-        await this.prisma.outboxEvent.update({
-          where: { id: event.id },
+        await this.prisma.outboxEvent.updateMany({
+          where: { id: event.id, lockedBy },
           data: {
             status,
             lockedBy: null,

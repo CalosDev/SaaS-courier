@@ -8,6 +8,8 @@ import type {
 } from './storage.types';
 
 export abstract class ObjectStorageService {
+  abstract checkHealth(): Promise<boolean>;
+
   abstract getDefaultBucketName(): string;
 
   abstract createSignedUploadTarget(

@@ -5,6 +5,8 @@ coverage/
 .turbo/
 apps/api/src/generated/prisma/
 apps/web/test-results/
+output/
+.artifacts/
 .env
 .env.*
 !.env.example
@@ -12,3 +14,4 @@ apps/web/test-results/
 *.docx
 .DS_Store
 .vscode/settings.json
+.codex/

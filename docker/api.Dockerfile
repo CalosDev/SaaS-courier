@@ -6,14 +6,19 @@ WORKDIR /app
 FROM base AS development
 COPY . .
 RUN pnpm install --frozen-lockfile
-CMD ["pnpm", "--filter", "api", "dev"]
+CMD ["pnpm", "--filter", "@courier/api", "dev"]
 
-FROM base AS build
-COPY . .
+FROM base AS dependencies
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter api prisma generate
-RUN pnpm --filter api build
-RUN pnpm deploy --filter api --prod /prod/api
+
+FROM dependencies AS build
+COPY . .
+RUN DATABASE_URL=postgresql://build:build@localhost:5432/build pnpm --filter @courier/api prisma:generate
+RUN pnpm --filter @courier/api build
+RUN pnpm --filter @courier/api deploy --legacy --prod /prod/api
 
 FROM node:22-alpine AS production
 ENV NODE_ENV=production
@@ -22,4 +27,4 @@ RUN addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /prod/api ./
 USER app
 EXPOSE 4000
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

@@ -7,6 +7,7 @@ import {
 import { PrismaDispatchesRepository } from './prisma-dispatches.repository';
 
 import { CreateDispatchDto } from './dto/create-dispatch.dto';
+import { CreateMasterShipmentDto } from './dto/create-master-shipment.dto';
 import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { AddPackagesDto } from './dto/add-packages.dto';
 import { DispatchStatus } from '../generated/prisma/client';
@@ -40,7 +41,14 @@ export class DispatchesService {
     return `DSP-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`;
   }
 
-  async createDispatch(ctx: CommandContext, dto: CreateDispatchDto) {
+  async createDispatch(
+    ctx: CommandContext,
+    dto: CreateDispatchDto,
+    masterShipment?: Pick<
+      CreateMasterShipmentDto,
+      'originFacilityId' | 'destinationFacilityId' | 'transportMode'
+    >,
+  ) {
     if (!ctx.actorEmployeeId) {
       throw new BadRequestException('Employee ID is required');
     }
@@ -59,6 +67,9 @@ export class DispatchesService {
           dispatchCode: this.generateCode(),
           origin: dto.origin,
           destination: dto.destination,
+          originFacilityId: masterShipment?.originFacilityId,
+          destinationFacilityId: masterShipment?.destinationFacilityId,
+          transportMode: masterShipment?.transportMode,
           departureTime: dto.departureTime
             ? new Date(dto.departureTime)
             : undefined,
@@ -97,10 +108,62 @@ export class DispatchesService {
     });
   }
 
+  async createMasterShipment(
+    ctx: CommandContext,
+    dto: CreateMasterShipmentDto,
+  ) {
+    if (!ctx.actorEmployeeId) {
+      throw new BadRequestException('Employee ID is required');
+    }
+    if (dto.originFacilityId === dto.destinationFacilityId) {
+      throw new BadRequestException(
+        'Origin and destination facilities must be different',
+      );
+    }
+
+    const facilities = await this.prisma.facility.findMany({
+      where: {
+        organizationId: ctx.organizationId,
+        id: { in: [dto.originFacilityId, dto.destinationFacilityId] },
+        isActive: true,
+        deletedAt: null,
+      },
+      select: { id: true, code: true },
+    });
+    if (facilities.length !== 2) {
+      throw new NotFoundException('Origin or destination facility not found');
+    }
+
+    const facilityById = new Map(
+      facilities.map((facility) => [facility.id, facility]),
+    );
+    return this.createDispatch(
+      ctx,
+      {
+        ...dto,
+        origin: facilityById.get(dto.originFacilityId)?.code,
+        destination: facilityById.get(dto.destinationFacilityId)?.code,
+      },
+      {
+        originFacilityId: dto.originFacilityId,
+        destinationFacilityId: dto.destinationFacilityId,
+        transportMode: dto.transportMode,
+      },
+    );
+  }
+
   async getDispatches(organizationId: string) {
     return this.repository.findMany({
       where: { organizationId },
       orderBy: { createdAt: 'desc' },
+      include: {
+        originFacility: {
+          select: { id: true, code: true, name: true },
+        },
+        destinationFacility: {
+          select: { id: true, code: true, name: true },
+        },
+      },
     });
   }
 
@@ -127,13 +190,15 @@ export class DispatchesService {
         throw new NotFoundException('Dispatch not found');
       }
 
-      if (
-        existing.status === DispatchStatus.CLOSED ||
-        existing.status === DispatchStatus.COMPLETED ||
-        existing.status === DispatchStatus.CANCELLED
-      ) {
+      if (existing.status !== DispatchStatus.DRAFT) {
         throw new BadRequestException(
           `Cannot update dispatch in ${existing.status} status`,
+        );
+      }
+
+      if (dto.status !== undefined && dto.status !== existing.status) {
+        throw new BadRequestException(
+          'Dispatch status must be changed through a semantic action',
         );
       }
 
@@ -141,7 +206,7 @@ export class DispatchesService {
         ctx.organizationId,
         dispatchId,
         {
-          status: dto.status !== undefined ? dto.status : existing.status,
+          status: existing.status,
           origin: dto.origin !== undefined ? dto.origin : existing.origin,
           destination:
             dto.destination !== undefined
@@ -423,6 +488,37 @@ export class DispatchesService {
         { operation: transition.action, tx },
       );
 
+      const packages =
+        (
+          existing as {
+            packages?: Array<{ id: string; status: string }>;
+          }
+        ).packages ?? [];
+      if (
+        transition.targetStatus === DispatchStatus.CLOSED &&
+        packages.length === 0
+      ) {
+        throw new BadRequestException(
+          'A master shipment must contain at least one package before closing',
+        );
+      }
+      if (
+        transition.targetStatus === DispatchStatus.DEPARTED &&
+        packages.some((pkg) => pkg.status !== 'RECEIVED_AT_ORIGIN')
+      ) {
+        throw new BadRequestException(
+          'All packages must be received at origin before departure',
+        );
+      }
+      if (
+        transition.targetStatus === DispatchStatus.ARRIVED &&
+        packages.some((pkg) => pkg.status !== 'IN_TRANSIT')
+      ) {
+        throw new BadRequestException(
+          'All packages must be in transit before arrival',
+        );
+      }
+
       const timestamp = new Date();
       const data =
         transition.timestampField === undefined
@@ -439,6 +535,24 @@ export class DispatchesService {
         data,
         tx,
       );
+
+      if (transition.targetStatus === DispatchStatus.DEPARTED) {
+        await tx.package.updateMany({
+          where: {
+            organizationId: ctx.organizationId,
+            dispatchId,
+          },
+          data: { status: 'IN_TRANSIT' },
+        });
+      } else if (transition.targetStatus === DispatchStatus.ARRIVED) {
+        await tx.package.updateMany({
+          where: {
+            organizationId: ctx.organizationId,
+            dispatchId,
+          },
+          data: { status: 'ARRIVED_AT_DESTINATION' },
+        });
+      }
 
       await this.auditWriter.write(tx, {
         context: ctx,

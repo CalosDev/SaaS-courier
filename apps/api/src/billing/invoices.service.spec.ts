@@ -34,6 +34,15 @@ describe('InvoicesService', () => {
             $transaction: jest.fn((cb) =>
               cb({
                 invoiceLine: { deleteMany: jest.fn().mockResolvedValue(true) },
+                customer: {
+                  findUnique: jest.fn().mockResolvedValue({ id: 'cust-1' }),
+                },
+                paymentAllocation: { updateMany: jest.fn() },
+                payment: {
+                  findUniqueOrThrow: jest.fn(),
+                  update: jest.fn(),
+                },
+                $queryRaw: jest.fn(),
               }),
             ),
           },
@@ -100,6 +109,17 @@ describe('InvoicesService', () => {
       taxMinor: 0n,
       totalMinor: 100n,
       balanceDueMinor: 100n,
+      lines: [
+        {
+          id: 'line-1',
+          type: 'TRANSPORT',
+          description: 'Shipping',
+          quantity: 1,
+          unitPriceMinor: 100n,
+          totalPriceMinor: 100n,
+        },
+      ],
+      allocations: [],
     } as any;
     repo.findInvoicesByOrganization.mockResolvedValue([mockDbInvoice]);
     const res = await service.listInvoices('org-1');
@@ -115,6 +135,17 @@ describe('InvoicesService', () => {
       taxMinor: 0n,
       totalMinor: 100n,
       balanceDueMinor: 100n,
+      lines: [
+        {
+          id: 'line-1',
+          type: 'TRANSPORT',
+          description: 'Shipping',
+          quantity: 1,
+          unitPriceMinor: 100n,
+          totalPriceMinor: 100n,
+        },
+      ],
+      allocations: [],
     } as any;
     repo.getInvoiceById.mockResolvedValue(mockDbInvoice);
     const mockUpdatedInvoice = { ...mockDbInvoice, status: 'ISSUED' };
@@ -132,6 +163,17 @@ describe('InvoicesService', () => {
       taxMinor: 0n,
       totalMinor: 100n,
       balanceDueMinor: 100n,
+      lines: [
+        {
+          id: 'line-1',
+          type: 'TRANSPORT',
+          description: 'Shipping',
+          quantity: 1,
+          unitPriceMinor: 100n,
+          totalPriceMinor: 100n,
+        },
+      ],
+      allocations: [],
     } as any;
     repo.getInvoiceById.mockResolvedValue(mockDbInvoice);
     const mockUpdatedInvoice = {

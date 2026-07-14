@@ -215,6 +215,59 @@ enum OutboxEventStatus {
   @@map("outbox_event_status")
 }
 
+enum ReportExportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+
+  @@map("report_export_status")
+}
+
+enum ReportType {
+  OPERATIONS
+  INVENTORY
+  BILLING
+  SHIPMENTS
+  CUSTOMS
+
+  @@map("report_type")
+}
+
+enum NotificationChannel {
+  EMAIL
+
+  @@map("notification_channel")
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+  DEAD_LETTER
+
+  @@map("notification_delivery_status")
+}
+
+enum CarrierConnectionStatus {
+  ACTIVE
+  DISABLED
+  ERROR
+
+  @@map("carrier_connection_status")
+}
+
+enum CarrierEventStatus {
+  IN_TRANSIT
+  DELIVERED
+  EXCEPTION
+  UNKNOWN
+
+  @@map("carrier_event_status")
+}
+
 enum PrealertStatus {
   PENDING_ARRIVAL
   MATCHED
@@ -292,6 +345,14 @@ enum DispatchStatus {
   @@map("dispatch_status")
 }
 
+enum TransportMode {
+  AIR
+  SEA
+  GROUND
+
+  @@map("transport_mode")
+}
+
 model FacilityTransfer {
   id                    String                 @id(map: "facility_transfers_pkey") @default(uuid()) @db.Uuid
   organizationId        String                 @map("organization_id") @db.Uuid
@@ -362,12 +423,22 @@ model FacilityTransferEvent {
 
 enum CustomsManifestStatus {
   DRAFT
+  VALIDATED
+  FINALIZED
   SUBMITTED
   APPROVED
   REJECTED
   CANCELLED
 
   @@map("customs_manifest_status")
+}
+
+enum CustomsManifestValidationStatus {
+  PENDING
+  VALID
+  INVALID
+
+  @@map("customs_manifest_validation_status")
 }
 
 enum TrackingEventType {
@@ -514,22 +585,30 @@ model Organization {
   payments           Payment[]
   paymentAllocations PaymentAllocation[]
 
-  packageTrackingEvents  PackageTrackingEvent[]
-  dispatches             Dispatch[]
-  customsManifests       CustomsManifest[]
-  houseShipments         HouseShipment[]
-  houseShipmentPackages  HouseShipmentPackage[]
-  customsCases           CustomsCase[]
-  customsCaseEvents      CustomsCaseEvent[]
-  operationalHolds       OperationalHold[]
-  correctionRequests     CorrectionRequest[]
-  correctionDecisions    CorrectionDecision[]
-  facilityTransfers      FacilityTransfer[]
-  facilityTransferItems  FacilityTransferItem[]
-  facilityTransferEvents FacilityTransferEvent[]
-  deliveryOrders         DeliveryOrder[]
-  deliveryOrderItems     DeliveryOrderItem[]
-  deliveryAttempts       DeliveryAttempt[]
+  packageTrackingEvents    PackageTrackingEvent[]
+  dispatches               Dispatch[]
+  customsManifests         CustomsManifest[]
+  houseShipments           HouseShipment[]
+  houseShipmentPackages    HouseShipmentPackage[]
+  customsCases             CustomsCase[]
+  customsCaseEvents        CustomsCaseEvent[]
+  operationalHolds         OperationalHold[]
+  correctionRequests       CorrectionRequest[]
+  correctionDecisions      CorrectionDecision[]
+  facilityTransfers        FacilityTransfer[]
+  facilityTransferItems    FacilityTransferItem[]
+  facilityTransferEvents   FacilityTransferEvent[]
+  deliveryOrders           DeliveryOrder[]
+  deliveryOrderItems       DeliveryOrderItem[]
+  deliveryAttempts         DeliveryAttempt[]
+  customsManifestVersions  CustomsManifestVersion[]
+  customsManifestItems     CustomsManifestItem[]
+  reportExportJobs         ReportExportJob[]
+  notificationTemplates    NotificationTemplate[]
+  notificationDeliveries   NotificationDelivery[]
+  carrierConnections       CarrierConnection[]
+  carrierTrackingSnapshots CarrierTrackingSnapshot[]
+  carrierWebhookReceipts   CarrierWebhookReceipt[]
 
   @@index([status], map: "organizations_status_idx")
   @@index([deletedAt], map: "organizations_deleted_at_idx")
@@ -627,9 +706,11 @@ model Facility {
   packageInventoryPositions PackageInventoryPosition[]
   inventoryMovements        InventoryMovement[]
 
-  pickupRequests       PickupRequest[]
-  transfersOrigin      FacilityTransfer[] @relation("TransferOriginFacility")
-  transfersDestination FacilityTransfer[] @relation("TransferDestinationFacility")
+  pickupRequests             PickupRequest[]
+  transfersOrigin            FacilityTransfer[] @relation("TransferOriginFacility")
+  transfersDestination       FacilityTransfer[] @relation("TransferDestinationFacility")
+  masterShipmentsOrigin      Dispatch[]         @relation("MasterShipmentOriginFacility")
+  masterShipmentsDestination Dispatch[]         @relation("MasterShipmentDestinationFacility")
 
   @@unique([organizationId, code], map: "facilities_organization_id_code_key")
   @@unique([organizationId, id], map: "facilities_organization_id_id_key")
@@ -972,7 +1053,13 @@ model Employee {
   completedPickupRequests PickupRequest[] @relation("PickupRequestCompletedBy")
   cancelledPickupRequests PickupRequest[] @relation("PickupRequestCancelledBy")
 
-  createdTrackingEvents PackageTrackingEvent[]
+  createdTrackingEvents        PackageTrackingEvent[]
+  recordedCustomsEvents        CustomsCaseEvent[]
+  requestedReportExports       ReportExportJob[]
+  createdNotificationTemplates NotificationTemplate[] @relation("NotificationTemplateCreatedBy")
+  updatedNotificationTemplates NotificationTemplate[] @relation("NotificationTemplateUpdatedBy")
+  createdCarrierConnections    CarrierConnection[]    @relation("CarrierConnectionCreatedBy")
+  updatedCarrierConnections    CarrierConnection[]    @relation("CarrierConnectionUpdatedBy")
 
   requestedHolds              OperationalHold[]  @relation("HoldRequestedBy")
   releasedHolds               OperationalHold[]  @relation("HoldReleasedBy")
@@ -983,8 +1070,8 @@ model Employee {
   requestedCorrections CorrectionRequest[]  @relation("CorrectionRequestedBy")
   decidedCorrections   CorrectionDecision[] @relation("CorrectionDecidedBy")
 
-  createdDeliveryOrders  DeliveryOrder[]   @relation("DeliveryCreatedBy")
-  assignedDeliveryOrders DeliveryOrder[]   @relation("DeliveryAssignedTo")
+  createdDeliveryOrders    DeliveryOrder[]   @relation("DeliveryCreatedBy")
+  assignedDeliveryOrders   DeliveryOrder[]   @relation("DeliveryAssignedTo")
   recordedDeliveryAttempts DeliveryAttempt[] @relation("DeliveryAttemptRecordedBy")
 
   @@unique([organizationId, userId], map: "employees_organization_id_user_id_key")
@@ -1056,27 +1143,35 @@ model Prealert {
 }
 
 model Dispatch {
-  id                   String          @id(map: "dispatches_pkey") @default(uuid()) @db.Uuid
-  organizationId       String          @map("organization_id") @db.Uuid
-  dispatchCode         String          @map("dispatch_code") @db.VarChar(40)
-  status               DispatchStatus  @default(DRAFT)
-  origin               String?         @db.VarChar(120)
-  destination          String?         @db.VarChar(120)
-  carrier              String?         @db.VarChar(120)
-  flightNumber         String?         @map("flight_number") @db.VarChar(40)
-  departureTime        DateTime?       @map("departure_time") @db.Timestamptz(3)
-  estimatedArrivalTime DateTime?       @map("estimated_arrival_time") @db.Timestamptz(3)
-  actualArrivalTime    DateTime?       @map("actual_arrival_time") @db.Timestamptz(3)
-  mawb                 String?         @db.VarChar(120)
-  createdAt            DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt            DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  organization         Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "dispatches_organization_id_fkey")
-  packages             Package[]       @relation("PackageDispatch")
-  houseShipments       HouseShipment[]
+  id                    String            @id(map: "dispatches_pkey") @default(uuid()) @db.Uuid
+  organizationId        String            @map("organization_id") @db.Uuid
+  dispatchCode          String            @map("dispatch_code") @db.VarChar(40)
+  status                DispatchStatus    @default(DRAFT)
+  origin                String?           @db.VarChar(120)
+  destination           String?           @db.VarChar(120)
+  originFacilityId      String?           @map("origin_facility_id") @db.Uuid
+  destinationFacilityId String?           @map("destination_facility_id") @db.Uuid
+  transportMode         TransportMode     @default(AIR) @map("transport_mode")
+  carrier               String?           @db.VarChar(120)
+  flightNumber          String?           @map("flight_number") @db.VarChar(40)
+  departureTime         DateTime?         @map("departure_time") @db.Timestamptz(3)
+  estimatedArrivalTime  DateTime?         @map("estimated_arrival_time") @db.Timestamptz(3)
+  actualArrivalTime     DateTime?         @map("actual_arrival_time") @db.Timestamptz(3)
+  mawb                  String?           @db.VarChar(120)
+  createdAt             DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization          Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "dispatches_organization_id_fkey")
+  originFacility        Facility?         @relation("MasterShipmentOriginFacility", fields: [organizationId, originFacilityId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "dispatches_org_origin_facility_id_fkey")
+  destinationFacility   Facility?         @relation("MasterShipmentDestinationFacility", fields: [organizationId, destinationFacilityId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "dispatches_org_destination_facility_id_fkey")
+  packages              Package[]         @relation("PackageDispatch")
+  houseShipments        HouseShipment[]
+  customsManifests      CustomsManifest[]
 
   @@unique([organizationId, dispatchCode], map: "dispatches_org_code_key")
   @@unique([organizationId, id], map: "dispatches_org_id_key")
   @@index([organizationId, status], map: "dispatches_org_status_idx")
+  @@index([organizationId, originFacilityId], map: "dispatches_org_origin_facility_idx")
+  @@index([organizationId, destinationFacilityId], map: "dispatches_org_destination_facility_idx")
   @@map("dispatches")
 }
 
@@ -1091,7 +1186,7 @@ model HouseShipment {
   updatedAt      DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  dispatch     Dispatch               @relation(fields: [dispatchId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  dispatch     Dispatch               @relation(fields: [organizationId, dispatchId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "house_shipments_org_dispatch_id_fkey")
   packages     HouseShipmentPackage[]
 
   @@unique([organizationId, hawb], map: "house_shipments_org_hawb_key")
@@ -1108,8 +1203,8 @@ model HouseShipmentPackage {
   addedAt         DateTime @default(now()) @map("added_at") @db.Timestamptz(3)
 
   organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
-  houseShipment HouseShipment @relation(fields: [houseShipmentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  package       Package       @relation(fields: [packageId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  houseShipment HouseShipment @relation(fields: [organizationId, houseShipmentId], references: [organizationId, id], onDelete: Cascade, onUpdate: Cascade, map: "hs_packages_org_house_shipment_id_fkey")
+  package       Package       @relation(fields: [organizationId, packageId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "hs_packages_org_package_id_fkey")
 
   @@unique([organizationId, packageId], map: "hs_packages_org_package_key")
   @@index([organizationId, houseShipmentId], map: "hs_packages_org_hs_idx")
@@ -1117,26 +1212,71 @@ model HouseShipmentPackage {
 }
 
 model CustomsManifest {
-  id               String                @id(map: "customs_manifests_pkey") @default(uuid()) @db.Uuid
-  organizationId   String                @map("organization_id") @db.Uuid
-  code             String                @db.VarChar(40)
-  flightNumber     String?               @map("flight_number") @db.VarChar(40)
-  arrivalDate      DateTime?             @map("arrival_date") @db.Date
-  status           CustomsManifestStatus @default(DRAFT)
-  totalPackages    Int                   @default(0) @map("total_packages")
-  totalWeightMinor BigInt                @default(0) @map("total_weight_minor") @db.BigInt
-  totalValueMinor  BigInt                @default(0) @map("total_value_minor") @db.BigInt
-  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt        DateTime?             @map("deleted_at") @db.Timestamptz(3)
-  organization     Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "customs_manifests_organization_id_fkey")
-  packages         Package[]
+  id                 String                   @id(map: "customs_manifests_pkey") @default(uuid()) @db.Uuid
+  organizationId     String                   @map("organization_id") @db.Uuid
+  code               String                   @db.VarChar(40)
+  dispatchId         String?                  @map("dispatch_id") @db.Uuid
+  flightNumber       String?                  @map("flight_number") @db.VarChar(40)
+  arrivalDate        DateTime?                @map("arrival_date") @db.Date
+  status             CustomsManifestStatus    @default(DRAFT)
+  totalPackages      Int                      @default(0) @map("total_packages")
+  totalWeightMinor   BigInt                   @default(0) @map("total_weight_minor") @db.BigInt
+  totalValueMinor    BigInt                   @default(0) @map("total_value_minor") @db.BigInt
+  currentVersion     Int                      @default(0) @map("current_version")
+  finalizedVersionId String?                  @map("finalized_version_id") @db.Uuid
+  createdAt          DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt          DateTime?                @map("deleted_at") @db.Timestamptz(3)
+  organization       Organization             @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "customs_manifests_organization_id_fkey")
+  dispatch           Dispatch?                @relation(fields: [organizationId, dispatchId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "customs_manifests_org_dispatch_id_fkey")
+  versions           CustomsManifestVersion[] @relation("CustomsManifestVersions")
+  finalizedVersion   CustomsManifestVersion?  @relation("FinalizedCustomsManifestVersion", fields: [organizationId, finalizedVersionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "customs_manifests_org_finalized_version_id_fkey")
+  packages           Package[]
 
   @@unique([organizationId, code], map: "customs_manifests_org_code_key")
   @@unique([organizationId, id], map: "customs_manifests_organization_id_id_key")
   @@index([organizationId, status], map: "customs_manifests_org_status_idx")
+  @@index([organizationId, dispatchId], map: "customs_manifests_org_dispatch_idx")
   @@index([organizationId, deletedAt], map: "customs_manifests_org_deleted_at_idx")
   @@map("customs_manifests")
+}
+
+model CustomsManifestVersion {
+  id               String                          @id @default(uuid()) @db.Uuid
+  organizationId   String                          @map("organization_id") @db.Uuid
+  manifestId       String                          @map("manifest_id") @db.Uuid
+  versionNumber    Int                             @map("version_number")
+  validationStatus CustomsManifestValidationStatus @default(PENDING) @map("validation_status")
+  validationErrors Json?                           @map("validation_errors") @db.JsonB
+  shipmentSnapshot Json                            @map("shipment_snapshot") @db.JsonB
+  createdAt        DateTime                        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  manifest     CustomsManifest       @relation("CustomsManifestVersions", fields: [organizationId, manifestId], references: [organizationId, id], onDelete: Cascade, onUpdate: Cascade, map: "customs_manifest_versions_org_manifest_id_fkey")
+  items        CustomsManifestItem[]
+  finalizedFor CustomsManifest[]     @relation("FinalizedCustomsManifestVersion")
+
+  @@unique([organizationId, id], map: "customs_manifest_versions_org_id_key")
+  @@unique([organizationId, manifestId, versionNumber], map: "customs_manifest_versions_org_manifest_version_key")
+  @@index([organizationId, manifestId, createdAt], map: "customs_manifest_versions_org_manifest_created_idx")
+  @@map("customs_manifest_versions")
+}
+
+model CustomsManifestItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  versionId      String   @map("version_id") @db.Uuid
+  packageId      String   @map("package_id") @db.Uuid
+  itemSnapshot   Json     @map("item_snapshot") @db.JsonB
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  version      CustomsManifestVersion @relation(fields: [organizationId, versionId], references: [organizationId, id], onDelete: Cascade, onUpdate: Cascade, map: "customs_manifest_items_org_version_id_fkey")
+  package      Package                @relation(fields: [organizationId, packageId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "customs_manifest_items_org_package_id_fkey")
+
+  @@unique([organizationId, versionId, packageId], map: "customs_manifest_items_org_version_package_key")
+  @@index([organizationId, versionId], map: "customs_manifest_items_org_version_idx")
+  @@map("customs_manifest_items")
 }
 
 model Package {
@@ -1164,6 +1304,7 @@ model Package {
   prealert                         Prealert?                 @relation("PackagePrealert", fields: [organizationId, prealertId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_prealert_id_fkey")
   dispatch                         Dispatch?                 @relation("PackageDispatch", fields: [organizationId, dispatchId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_dispatch_id_fkey")
   customsManifest                  CustomsManifest?          @relation(fields: [organizationId, customsManifestId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_org_customs_manifest_id_fkey")
+  customsManifestItems             CustomsManifestItem[]
   registeredByEmployee             Employee                  @relation("PackageRegisteredByEmployee", fields: [organizationId, registeredByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_registered_by_employee_id_fkey")
   cancelledByEmployee              Employee?                 @relation("PackageCancelledByEmployee", fields: [organizationId, cancelledByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "packages_organization_id_cancelled_by_employee_id_fkey")
   reception                        PackageReception?
@@ -1175,9 +1316,10 @@ model Package {
 
   trackingEvents PackageTrackingEvent[]
 
-  houseShipments        HouseShipmentPackage[]
-  facilityTransferItems FacilityTransferItem[]
-  deliveryOrderItems    DeliveryOrderItem[]
+  houseShipments           HouseShipmentPackage[]
+  facilityTransferItems    FacilityTransferItem[]
+  deliveryOrderItems       DeliveryOrderItem[]
+  carrierTrackingSnapshots CarrierTrackingSnapshot[]
 
   @@unique([organizationId, internalTrackingNumber], map: "packages_organization_id_internal_tracking_number_key")
   @@unique([organizationId, id], map: "packages_organization_id_id_key")
@@ -1510,6 +1652,7 @@ model CustomerInvoice {
   issuedAt        DateTime?           @map("issued_at") @db.Timestamptz(3)
   dueDate         DateTime?           @map("due_date") @db.Date
   voidedAt        DateTime?           @map("voided_at") @db.Timestamptz(3)
+  voidReason      String?             @map("void_reason") @db.VarChar(500)
   notes           String?             @db.VarChar(1000)
   createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -1556,6 +1699,7 @@ model Payment {
   status         PaymentStatus       @default(RECORDED)
   recordedAt     DateTime            @default(now()) @map("recorded_at") @db.Timestamptz(3)
   voidedAt       DateTime?           @map("voided_at") @db.Timestamptz(3)
+  voidReason     String?             @map("void_reason") @db.VarChar(500)
   createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
   organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "payments_organization_id_fkey")
@@ -1576,6 +1720,8 @@ model PaymentAllocation {
   invoiceId      String          @map("invoice_id") @db.Uuid
   amountMinor    BigInt          @map("amount_minor") @db.BigInt
   appliedAt      DateTime        @default(now()) @map("applied_at") @db.Timestamptz(3)
+  reversedAt     DateTime?       @map("reversed_at") @db.Timestamptz(3)
+  reversalReason String?         @map("reversal_reason") @db.VarChar(500)
   createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "payment_allocations_organization_id_fkey")
   payment        Payment         @relation(fields: [organizationId, paymentId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "payment_allocations_org_payment_id_fkey")
@@ -1584,6 +1730,7 @@ model PaymentAllocation {
   @@unique([organizationId, id], map: "payment_allocations_organization_id_id_key")
   @@index([organizationId, paymentId], map: "payment_allocations_org_payment_id_idx")
   @@index([organizationId, invoiceId], map: "payment_allocations_org_invoice_id_idx")
+  @@index([organizationId, paymentId, reversedAt], map: "payment_allocations_org_payment_reversed_idx")
   @@map("payment_allocations")
 }
 
@@ -1661,20 +1808,182 @@ model CustomsCase {
 }
 
 model CustomsCaseEvent {
-  id             String             @id(map: "customs_case_events_pkey") @default(uuid()) @db.Uuid
-  organizationId String             @map("organization_id") @db.Uuid
-  customsCaseId  String             @map("customs_case_id") @db.Uuid
-  source         CustomsEventSource
-  eventDate      DateTime           @map("event_date") @db.Timestamptz(3)
-  description    String             @db.VarChar(1000)
-  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  id                   String             @id(map: "customs_case_events_pkey") @default(uuid()) @db.Uuid
+  organizationId       String             @map("organization_id") @db.Uuid
+  customsCaseId        String             @map("customs_case_id") @db.Uuid
+  source               CustomsEventSource
+  eventDate            DateTime           @map("event_date") @db.Timestamptz(3)
+  description          String             @db.VarChar(1000)
+  evidenceReference    String?            @map("evidence_reference") @db.VarChar(200)
+  recordedByEmployeeId String?            @map("recorded_by_employee_id") @db.Uuid
+  createdAt            DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "customs_case_events_org_id_fkey")
   customsCase  CustomsCase  @relation(fields: [organizationId, customsCaseId], references: [organizationId, id], onDelete: Cascade, onUpdate: Cascade, map: "customs_case_events_org_customs_case_fkey")
+  recordedBy   Employee?    @relation(fields: [organizationId, recordedByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "customs_case_events_recorded_by_fkey")
 
   @@unique([organizationId, id], map: "customs_case_events_organization_id_id_key")
   @@index([organizationId, customsCaseId], map: "customs_case_events_org_customs_case_idx")
   @@map("customs_case_events")
+}
+
+model ReportExportJob {
+  id                    String             @id(map: "report_export_jobs_pkey") @default(uuid()) @db.Uuid
+  organizationId        String             @map("organization_id") @db.Uuid
+  requestedByEmployeeId String             @map("requested_by_employee_id") @db.Uuid
+  reportType            ReportType         @map("report_type")
+  status                ReportExportStatus @default(PENDING)
+  filters               Json
+  idempotencyKey        String             @map("idempotency_key") @db.VarChar(120)
+  fileName              String?            @map("file_name") @db.VarChar(180)
+  contentType           String?            @map("content_type") @db.VarChar(80)
+  content               String?            @db.Text
+  rowCount              Int?               @map("row_count")
+  truncated             Boolean            @default(false)
+  errorCode             String?            @map("error_code") @db.VarChar(120)
+  startedAt             DateTime?          @map("started_at") @db.Timestamptz(3)
+  completedAt           DateTime?          @map("completed_at") @db.Timestamptz(3)
+  expiresAt             DateTime?          @map("expires_at") @db.Timestamptz(3)
+  createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization        Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "report_export_jobs_organization_id_fkey")
+  requestedByEmployee Employee     @relation(fields: [organizationId, requestedByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "report_export_jobs_requested_by_employee_id_fkey")
+
+  @@unique([organizationId, id], map: "report_export_jobs_organization_id_id_key")
+  @@unique([organizationId, idempotencyKey], map: "report_export_jobs_org_idempotency_key_key")
+  @@index([organizationId, status, createdAt], map: "report_export_jobs_org_status_created_at_idx")
+  @@index([status, createdAt], map: "report_export_jobs_status_created_at_idx")
+  @@index([expiresAt], map: "report_export_jobs_expires_at_idx")
+  @@map("report_export_jobs")
+}
+
+model NotificationTemplate {
+  id                  String              @id(map: "notification_templates_pkey") @default(uuid()) @db.Uuid
+  organizationId      String              @map("organization_id") @db.Uuid
+  createdByEmployeeId String              @map("created_by_employee_id") @db.Uuid
+  updatedByEmployeeId String              @map("updated_by_employee_id") @db.Uuid
+  code                String              @db.VarChar(80)
+  eventType           String              @map("event_type") @db.VarChar(120)
+  channel             NotificationChannel @default(EMAIL)
+  subjectTemplate     String              @map("subject_template") @db.VarChar(240)
+  bodyTemplate        String              @map("body_template") @db.Text
+  allowedVariables    Json                @map("allowed_variables") @db.JsonB
+  isActive            Boolean             @default(true) @map("is_active")
+  createdAt           DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization      Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "notification_templates_organization_id_fkey")
+  createdByEmployee Employee               @relation("NotificationTemplateCreatedBy", fields: [organizationId, createdByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "notification_templates_created_by_employee_id_fkey")
+  updatedByEmployee Employee               @relation("NotificationTemplateUpdatedBy", fields: [organizationId, updatedByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "notification_templates_updated_by_employee_id_fkey")
+  deliveries        NotificationDelivery[]
+
+  @@unique([organizationId, id], map: "notification_templates_organization_id_id_key")
+  @@unique([organizationId, code], map: "notification_templates_org_code_key")
+  @@index([organizationId, eventType, isActive], map: "notification_templates_org_event_active_idx")
+  @@map("notification_templates")
+}
+
+model NotificationDelivery {
+  id                String                     @id(map: "notification_deliveries_pkey") @default(uuid()) @db.Uuid
+  organizationId    String                     @map("organization_id") @db.Uuid
+  templateId        String                     @map("template_id") @db.Uuid
+  outboxEventId     String                     @map("outbox_event_id") @db.Uuid
+  channel           NotificationChannel        @default(EMAIL)
+  recipientEmail    String                     @map("recipient_email") @db.VarChar(320)
+  subject           String                     @db.VarChar(240)
+  body              String                     @db.Text
+  status            NotificationDeliveryStatus @default(PENDING)
+  attempts          Int                        @default(0)
+  availableAt       DateTime                   @default(now()) @map("available_at") @db.Timestamptz(3)
+  lockedBy          String?                    @map("locked_by") @db.VarChar(120)
+  lockedUntil       DateTime?                  @map("locked_until") @db.Timestamptz(3)
+  providerMessageId String?                    @map("provider_message_id") @db.VarChar(200)
+  lastErrorCode     String?                    @map("last_error_code") @db.VarChar(120)
+  sentAt            DateTime?                  @map("sent_at") @db.Timestamptz(3)
+  createdAt         DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt         DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "notification_deliveries_organization_id_fkey")
+  template     NotificationTemplate @relation(fields: [organizationId, templateId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "notification_deliveries_org_template_id_fkey")
+
+  @@unique([organizationId, id], map: "notification_deliveries_organization_id_id_key")
+  @@unique([organizationId, outboxEventId, templateId], map: "notification_deliveries_org_outbox_template_key")
+  @@index([status, availableAt, createdAt], map: "notification_deliveries_status_available_created_idx")
+  @@index([organizationId, status, createdAt], map: "notification_deliveries_org_status_created_idx")
+  @@map("notification_deliveries")
+}
+
+model CarrierConnection {
+  id                  String                  @id(map: "carrier_connections_pkey") @default(uuid()) @db.Uuid
+  organizationId      String                  @map("organization_id") @db.Uuid
+  createdByEmployeeId String                  @map("created_by_employee_id") @db.Uuid
+  updatedByEmployeeId String                  @map("updated_by_employee_id") @db.Uuid
+  carrierCode         String                  @map("carrier_code") @db.VarChar(20)
+  displayName         String                  @map("display_name") @db.VarChar(120)
+  connectionKey       String                  @unique(map: "carrier_connections_connection_key_key") @map("connection_key") @db.VarChar(80)
+  secretReference     String                  @map("secret_reference") @db.VarChar(120)
+  status              CarrierConnectionStatus @default(DISABLED)
+  lastTestedAt        DateTime?               @map("last_tested_at") @db.Timestamptz(3)
+  lastErrorCode       String?                 @map("last_error_code") @db.VarChar(120)
+  createdAt           DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime                @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization      Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "carrier_connections_organization_id_fkey")
+  createdByEmployee Employee                  @relation("CarrierConnectionCreatedBy", fields: [organizationId, createdByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "carrier_connections_created_by_employee_id_fkey")
+  updatedByEmployee Employee                  @relation("CarrierConnectionUpdatedBy", fields: [organizationId, updatedByEmployeeId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "carrier_connections_updated_by_employee_id_fkey")
+  snapshots         CarrierTrackingSnapshot[]
+  webhookReceipts   CarrierWebhookReceipt[]
+
+  @@unique([organizationId, id], map: "carrier_connections_organization_id_id_key")
+  @@unique([organizationId, carrierCode], map: "carrier_connections_org_carrier_code_key")
+  @@index([organizationId, status], map: "carrier_connections_org_status_idx")
+  @@map("carrier_connections")
+}
+
+model CarrierWebhookReceipt {
+  id              String    @id(map: "carrier_webhook_receipts_pkey") @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  connectionId    String    @map("connection_id") @db.Uuid
+  providerEventId String    @map("provider_event_id") @db.VarChar(160)
+  payloadHash     String    @map("payload_hash") @db.Char(64)
+  signatureHash   String    @map("signature_hash") @db.Char(64)
+  receivedAt      DateTime  @default(now()) @map("received_at") @db.Timestamptz(3)
+  processedAt     DateTime? @map("processed_at") @db.Timestamptz(3)
+
+  organization Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "carrier_webhook_receipts_organization_id_fkey")
+  connection   CarrierConnection         @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "carrier_webhook_receipts_org_connection_id_fkey")
+  snapshots    CarrierTrackingSnapshot[]
+
+  @@unique([organizationId, id], map: "carrier_webhook_receipts_organization_id_id_key")
+  @@unique([connectionId, providerEventId], map: "carrier_webhook_receipts_connection_event_key")
+  @@index([organizationId, receivedAt], map: "carrier_webhook_receipts_org_received_idx")
+  @@map("carrier_webhook_receipts")
+}
+
+model CarrierTrackingSnapshot {
+  id               String             @id(map: "carrier_tracking_snapshots_pkey") @default(uuid()) @db.Uuid
+  organizationId   String             @map("organization_id") @db.Uuid
+  connectionId     String             @map("connection_id") @db.Uuid
+  packageId        String             @map("package_id") @db.Uuid
+  webhookReceiptId String?            @map("webhook_receipt_id") @db.Uuid
+  externalEventId  String             @map("external_event_id") @db.VarChar(160)
+  status           CarrierEventStatus
+  occurredAt       DateTime           @map("occurred_at") @db.Timestamptz(3)
+  location         String?            @db.VarChar(160)
+  description      String?            @db.VarChar(300)
+  payloadHash      String             @map("payload_hash") @db.Char(64)
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization   Organization           @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "carrier_tracking_snapshots_organization_id_fkey")
+  connection     CarrierConnection      @relation(fields: [organizationId, connectionId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "carrier_tracking_snapshots_org_connection_id_fkey")
+  package        Package                @relation(fields: [organizationId, packageId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "carrier_tracking_snapshots_org_package_id_fkey")
+  webhookReceipt CarrierWebhookReceipt? @relation(fields: [organizationId, webhookReceiptId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "carrier_tracking_snapshots_org_receipt_id_fkey")
+
+  @@unique([organizationId, id], map: "carrier_tracking_snapshots_organization_id_id_key")
+  @@unique([connectionId, externalEventId], map: "carrier_tracking_snapshots_connection_event_key")
+  @@index([organizationId, packageId, occurredAt], map: "carrier_tracking_snapshots_org_package_occurred_idx")
+  @@map("carrier_tracking_snapshots")
 }
 
 model OperationalHold {
@@ -1771,27 +2080,27 @@ enum DeliveryAttemptResult {
 }
 
 model DeliveryOrder {
-  id                    String         @id(map: "delivery_orders_pkey") @default(uuid()) @db.Uuid
-  organizationId        String         @map("organization_id") @db.Uuid
-  deliveryNumber        String         @map("delivery_number") @db.VarChar(40)
-  customerId            String         @map("customer_id") @db.Uuid
-  method                DeliveryMethod
-  status                DeliveryStatus @default(DRAFT)
-  deliveryAddressSnap   Json?          @map("delivery_address_snap")
-  notes                 String?        @db.VarChar(1000)
-  createdById           String         @map("created_by_id") @db.Uuid
-  assignedToId          String?        @map("assigned_to_id") @db.Uuid
-  dispatchedAt          DateTime?      @map("dispatched_at") @db.Timestamptz(3)
-  deliveredAt           DateTime?      @map("delivered_at") @db.Timestamptz(3)
-  createdAt             DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt             DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  id                  String         @id(map: "delivery_orders_pkey") @default(uuid()) @db.Uuid
+  organizationId      String         @map("organization_id") @db.Uuid
+  deliveryNumber      String         @map("delivery_number") @db.VarChar(40)
+  customerId          String         @map("customer_id") @db.Uuid
+  method              DeliveryMethod
+  status              DeliveryStatus @default(DRAFT)
+  deliveryAddressSnap Json?          @map("delivery_address_snap")
+  notes               String?        @db.VarChar(1000)
+  createdById         String         @map("created_by_id") @db.Uuid
+  assignedToId        String?        @map("assigned_to_id") @db.Uuid
+  dispatchedAt        DateTime?      @map("dispatched_at") @db.Timestamptz(3)
+  deliveredAt         DateTime?      @map("delivered_at") @db.Timestamptz(3)
+  createdAt           DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization        Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "delivery_orders_org_id_fkey")
-  customer            Customer            @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "delivery_orders_org_customer_fkey")
-  createdBy           Employee            @relation("DeliveryCreatedBy", fields: [organizationId, createdById], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "delivery_orders_created_by_fkey")
-  assignedTo          Employee?           @relation("DeliveryAssignedTo", fields: [organizationId, assignedToId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "delivery_orders_assigned_to_fkey")
-  items               DeliveryOrderItem[]
-  attempts            DeliveryAttempt[]
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "delivery_orders_org_id_fkey")
+  customer     Customer            @relation(fields: [organizationId, customerId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "delivery_orders_org_customer_fkey")
+  createdBy    Employee            @relation("DeliveryCreatedBy", fields: [organizationId, createdById], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "delivery_orders_created_by_fkey")
+  assignedTo   Employee?           @relation("DeliveryAssignedTo", fields: [organizationId, assignedToId], references: [organizationId, id], onDelete: Restrict, onUpdate: Cascade, map: "delivery_orders_assigned_to_fkey")
+  items        DeliveryOrderItem[]
+  attempts     DeliveryAttempt[]
 
   @@unique([organizationId, id], map: "delivery_orders_org_id_key")
   @@unique([organizationId, deliveryNumber], map: "delivery_orders_org_delivery_number_key")
@@ -1801,11 +2110,11 @@ model DeliveryOrder {
 }
 
 model DeliveryOrderItem {
-  id             String        @id(map: "delivery_order_items_pkey") @default(uuid()) @db.Uuid
-  organizationId String        @map("organization_id") @db.Uuid
-  deliveryId     String        @map("delivery_id") @db.Uuid
-  packageId      String        @map("package_id") @db.Uuid
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  id             String   @id(map: "delivery_order_items_pkey") @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  deliveryId     String   @map("delivery_id") @db.Uuid
+  packageId      String   @map("package_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "delivery_order_items_org_id_fkey")
   delivery     DeliveryOrder @relation(fields: [organizationId, deliveryId], references: [organizationId, id], onDelete: Cascade, onUpdate: Cascade, map: "delivery_order_items_org_delivery_fkey")

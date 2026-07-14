@@ -65,6 +65,7 @@ import type {
   UpdateHouseShipmentDto,
   AddPackagesToHouseShipmentDto,
   CustomsManifest,
+  CustomsManifestVersion,
   CreateCustomsManifestDto,
   UpdateCustomsManifestDto,
   AddPackagesToCustomsManifestDto,
@@ -84,11 +85,25 @@ import type {
   FacilityTransfer,
   CreateTransferDto,
   AddTransferItemDto,
-  DispatchTransferDto,
   ReceiveTransferItemDto,
+  DeliveryOrder,
+  CreateDeliveryDto,
+  RecordDeliveryAttemptDto,
+  OperationalReport,
+  ReportExportJob,
+  ReportType,
+  WarehouseLookupResult,
+  WarehouseBatchPutawayResult,
+  NotificationTemplate,
+  NotificationDelivery,
+  CarrierConnection,
+  CarrierEvent,
+  SystemReadiness,
 } from "@/lib/api/contracts";
 
-function buildQuery(params: Record<string, string | number | boolean | undefined>) {
+function buildQuery(
+  params: Record<string, string | number | boolean | undefined>,
+) {
   const searchParams = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
@@ -103,9 +118,9 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
 
 export const backofficeApi = {
   getSession() {
-    return apiClient.get<{ session: import("@/lib/api/contracts").SessionContext }>(
-      "/auth/session",
-    );
+    return apiClient.get<{
+      session: import("@/lib/api/contracts").SessionContext;
+    }>("/auth/session");
   },
   getAuthorization() {
     return apiClient.get<AuthorizationResponse>("/auth/authorization");
@@ -117,7 +132,9 @@ export const backofficeApi = {
     return apiClient.patch<Organization>("/organizations/current", body);
   },
   getCurrentSettings() {
-    return apiClient.get<OrganizationSettings>("/organizations/current/settings");
+    return apiClient.get<OrganizationSettings>(
+      "/organizations/current/settings",
+    );
   },
   updateCurrentSettings(body: Partial<OrganizationSettings>) {
     return apiClient.patch<OrganizationSettings>(
@@ -134,12 +151,31 @@ export const backofficeApi = {
     return apiClient.get<Onboarding>("/organizations/current/onboarding");
   },
   completeOnboarding() {
-    return apiClient.post<Onboarding>("/organizations/current/onboarding/complete", {});
+    return apiClient.post<Onboarding>(
+      "/organizations/current/onboarding/complete",
+      {},
+    );
   },
   getDashboardMetrics() {
     return apiClient.get<DashboardMetrics>("/reports/dashboard-metrics");
   },
-  listFacilities(params: Record<string, string | number | boolean | undefined>) {
+  getOperationalReport(
+    reportType: ReportType,
+    params: Record<string, string | undefined>,
+  ) {
+    return apiClient.get<OperationalReport>(
+      `/reports/${reportType.toLowerCase()}${buildQuery(params)}`,
+    );
+  },
+  requestReportExport(body: Record<string, unknown>) {
+    return apiClient.post<ReportExportJob>("/report-exports", body);
+  },
+  getReportExport(exportId: string) {
+    return apiClient.get<ReportExportJob>(`/report-exports/${exportId}`);
+  },
+  listFacilities(
+    params: Record<string, string | number | boolean | undefined>,
+  ) {
     return apiClient.get<FacilityListResponse>(
       `/facilities${buildQuery(params)}`,
     );
@@ -159,6 +195,71 @@ export const backofficeApi = {
     return apiClient.get<WarehouseLocationListResponse>(
       `/inventory/locations${buildQuery(params)}`,
     );
+  },
+  lookupWarehouseItem(code: string) {
+    return apiClient.get<WarehouseLookupResult>(
+      `/warehouse/lookup${buildQuery({ code })}`,
+    );
+  },
+  batchPutawayWarehouseItems(body: {
+    codes: string[];
+    toLocationId: string;
+    note?: string;
+  }) {
+    return apiClient.post<WarehouseBatchPutawayResult>(
+      "/warehouse/batch/putaway",
+      body,
+    );
+  },
+  listNotificationTemplates() {
+    return apiClient.get<NotificationTemplate[]>("/notification-templates");
+  },
+  createNotificationTemplate(body: Record<string, unknown>) {
+    return apiClient.post<NotificationTemplate>("/notification-templates", body);
+  },
+  updateNotificationTemplate(templateId: string, body: Record<string, unknown>) {
+    return apiClient.patch<NotificationTemplate>(
+      `/notification-templates/${templateId}`,
+      body,
+    );
+  },
+  listNotificationDeliveries(params: Record<string, string | number | undefined>) {
+    return apiClient.get<{
+      items: NotificationDelivery[];
+      pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
+    }>(`/notification-deliveries${buildQuery(params)}`);
+  },
+  retryNotificationDelivery(deliveryId: string) {
+    return apiClient.post<{ id: string; status: string }>(
+      `/notification-deliveries/${deliveryId}/retry`,
+      {},
+    );
+  },
+  listCarrierConnections() {
+    return apiClient.get<CarrierConnection[]>("/carrier-connections");
+  },
+  createCarrierConnection(body: Record<string, unknown>) {
+    return apiClient.post<CarrierConnection>("/carrier-connections", body);
+  },
+  updateCarrierConnection(connectionId: string, body: Record<string, unknown>) {
+    return apiClient.patch<CarrierConnection>(
+      `/carrier-connections/${connectionId}`,
+      body,
+    );
+  },
+  testCarrierConnection(connectionId: string) {
+    return apiClient.post<CarrierConnection>(
+      `/carrier-connections/${connectionId}/test`,
+      {},
+    );
+  },
+  listPackageCarrierEvents(packageId: string) {
+    return apiClient.get<{ items: CarrierEvent[] }>(
+      `/packages/${packageId}/carrier-events`,
+    );
+  },
+  getSystemReadiness() {
+    return apiClient.get<SystemReadiness>("/health/ready");
   },
   createInventoryLocation(body: Record<string, unknown>) {
     return apiClient.post<WarehouseLocation>("/inventory/locations", body);
@@ -193,7 +294,10 @@ export const backofficeApi = {
     );
   },
   inviteEmployee(body: Record<string, unknown>) {
-    return apiClient.post<EmployeeInvitationResponse>("/employees/invitations", body);
+    return apiClient.post<EmployeeInvitationResponse>(
+      "/employees/invitations",
+      body,
+    );
   },
   getEmployee(employeeId: string) {
     return apiClient.get<Employee>(`/employees/${employeeId}`);
@@ -202,7 +306,9 @@ export const backofficeApi = {
     return apiClient.patch<Employee>(`/employees/${employeeId}`, body);
   },
   replaceEmployeeRoles(employeeId: string, roleIds: string[]) {
-    return apiClient.put<Employee>(`/employees/${employeeId}/roles`, { roleIds });
+    return apiClient.put<Employee>(`/employees/${employeeId}/roles`, {
+      roleIds,
+    });
   },
   replaceEmployeeFacilities(
     employeeId: string,
@@ -252,7 +358,9 @@ export const backofficeApi = {
     return apiClient.patch<Customer>(`/customers/${customerId}`, body);
   },
   listCustomerAddresses(customerId: string) {
-    return apiClient.get<CustomerAddress[]>(`/customers/${customerId}/addresses`);
+    return apiClient.get<CustomerAddress[]>(
+      `/customers/${customerId}/addresses`,
+    );
   },
   createCustomerAddress(customerId: string, body: Record<string, unknown>) {
     return apiClient.post<CustomerAddress>(
@@ -332,7 +440,9 @@ export const backofficeApi = {
     return apiClient.get<PrealertDetail>(`/prealerts/${prealertId}`);
   },
   getExternalTracking(prealertId: string) {
-    return apiClient.get<ExternalTrackingResponse>(`/prealerts/${prealertId}/external-tracking`);
+    return apiClient.get<ExternalTrackingResponse>(
+      `/prealerts/${prealertId}/external-tracking`,
+    );
   },
   updatePrealert(prealertId: string, body: Record<string, unknown>) {
     return apiClient.patch<PrealertDetail>(`/prealerts/${prealertId}`, body);
@@ -343,9 +453,7 @@ export const backofficeApi = {
     });
   },
   listPackages(params: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<PackageListResponse>(
-      `/packages${buildQuery(params)}`,
-    );
+    return apiClient.get<PackageListResponse>(`/packages${buildQuery(params)}`);
   },
   createPackage(body: Record<string, unknown>) {
     return apiClient.post<PackageSummary>("/packages", body);
@@ -362,12 +470,13 @@ export const backofficeApi = {
     });
   },
   receivePackage(packageId: string, body: Record<string, unknown>) {
-    return apiClient.post<PackageReception>(`/packages/${packageId}/receive`, body);
+    return apiClient.post<PackageReception>(
+      `/packages/${packageId}/receive`,
+      body,
+    );
   },
   getPackageReception(packageId: string) {
-    return apiClient.get<PackageReception>(
-      `/packages/${packageId}/reception`,
-    );
+    return apiClient.get<PackageReception>(`/packages/${packageId}/reception`);
   },
   listPackageDocuments(packageId: string) {
     return apiClient.get<PackageDocumentListResponse>(
@@ -422,67 +531,124 @@ export const backofficeApi = {
   quoteRate(body: Record<string, unknown>) {
     return apiClient.post<RateQuote>("/rates/quote", body);
   },
-  listCustomsCases(params?: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<CustomsCaseListResponse>(`/customs-cases${buildQuery(params || {})}`);
+  listCustomsCases(
+    params?: Record<string, string | number | boolean | undefined>,
+  ) {
+    return apiClient.get<CustomsCaseListResponse>(
+      `/customs-cases${buildQuery(params || {})}`,
+    );
   },
   createCustomsCase(data: CreateCustomsCaseDto) {
-    return apiClient.post<CustomsCase>("/customs-cases", data as unknown as Record<string, unknown>);
+    return apiClient.post<CustomsCase>(
+      "/customs-cases",
+      data as unknown as Record<string, unknown>,
+    );
   },
   getCustomsCase(id: string) {
     return apiClient.get<CustomsCase>(`/customs-cases/${id}`);
   },
   recordCustomsCaseEvent(id: string, data: RecordCustomsEventDto) {
-    return apiClient.post<CustomsCaseEvent>(`/customs-cases/${id}/events`, data as unknown as Record<string, unknown>);
+    return apiClient.post<CustomsCaseEvent>(
+      `/customs-cases/${id}/events`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   changeCustomsCaseStatus(id: string, data: ChangeCustomsCaseStatusDto) {
-    return apiClient.post<any>(`/customs-cases/${id}/status`, data as unknown as Record<string, unknown>);
+    return apiClient.post<any>(
+      `/customs-cases/${id}/status`,
+      data as unknown as Record<string, unknown>,
+    );
   },
 
-
   // Dispatches
-  listDispatches(params?: Record<string, string | number | boolean | undefined>) {
+  listDispatches(
+    params?: Record<string, string | number | boolean | undefined>,
+  ) {
     return apiClient.get<Dispatch[]>(`/dispatches${buildQuery(params || {})}`);
   },
   getDispatch(id: string) {
     return apiClient.get<Dispatch>(`/dispatches/${id}`);
   },
   createDispatch(data: CreateDispatchDto) {
-    return apiClient.post<Dispatch>("/dispatches", data as unknown as Record<string, unknown>);
+    return apiClient.post<Dispatch>(
+      "/dispatches",
+      data as unknown as Record<string, unknown>,
+    );
   },
   updateDispatch(id: string, data: UpdateDispatchDto) {
-    return apiClient.patch<Dispatch>(`/dispatches/${id}`, data as unknown as Record<string, unknown>);
+    return apiClient.patch<Dispatch>(
+      `/dispatches/${id}`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   addPackagesToDispatch(id: string, data: AddPackagesToDispatchDto) {
-    return apiClient.post<Dispatch>(`/dispatches/${id}/packages`, data as unknown as Record<string, unknown>);
+    return apiClient.post<Dispatch>(
+      `/dispatches/${id}/packages`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   removePackagesFromDispatch(id: string, data: AddPackagesToDispatchDto) {
-    return apiClient.delete<Dispatch>(`/dispatches/${id}/packages`, data as unknown as Record<string, unknown>);
+    return apiClient.delete<Dispatch>(
+      `/dispatches/${id}/packages`,
+      data as unknown as Record<string, unknown>,
+    );
   },
 
   // Master Shipments
-  listMasterShipments(params?: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<MasterShipment[]>(`/master-shipments${buildQuery(params || {})}`);
+  listMasterShipments(
+    params?: Record<string, string | number | boolean | undefined>,
+  ) {
+    return apiClient.get<MasterShipment[]>(
+      `/master-shipments${buildQuery(params || {})}`,
+    );
   },
   getMasterShipment(id: string) {
     return apiClient.get<MasterShipment>(`/master-shipments/${id}`);
   },
   createMasterShipment(data: CreateMasterShipmentDto) {
-    return apiClient.post<MasterShipment>("/master-shipments", data as unknown as Record<string, unknown>);
+    return apiClient.post<MasterShipment>(
+      "/master-shipments",
+      data as unknown as Record<string, unknown>,
+    );
   },
   updateMasterShipment(id: string, data: UpdateMasterShipmentDto) {
-    return apiClient.patch<MasterShipment>(`/master-shipments/${id}`, data as unknown as Record<string, unknown>);
+    return apiClient.patch<MasterShipment>(
+      `/master-shipments/${id}`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   updateMasterShipmentMawb(id: string, data: UpdateMawbDto) {
-    return apiClient.patch<MasterShipment>(`/master-shipments/${id}/mawb`, data as unknown as Record<string, unknown>);
+    return apiClient.patch<MasterShipment>(
+      `/master-shipments/${id}/mawb`,
+      data as unknown as Record<string, unknown>,
+    );
   },
-  replaceMasterShipmentPackages(id: string, data: AddPackagesToMasterShipmentDto) {
-    return apiClient.put<MasterShipment>(`/master-shipments/${id}/packages`, data as unknown as Record<string, unknown>);
+  replaceMasterShipmentPackages(
+    id: string,
+    data: AddPackagesToMasterShipmentDto,
+  ) {
+    return apiClient.put<MasterShipment>(
+      `/master-shipments/${id}/packages`,
+      data as unknown as Record<string, unknown>,
+    );
   },
-  addPackagesToMasterShipment(id: string, data: AddPackagesToMasterShipmentDto) {
-    return apiClient.post<MasterShipment>(`/master-shipments/${id}/packages`, data as unknown as Record<string, unknown>);
+  addPackagesToMasterShipment(
+    id: string,
+    data: AddPackagesToMasterShipmentDto,
+  ) {
+    return apiClient.post<MasterShipment>(
+      `/master-shipments/${id}/packages`,
+      data as unknown as Record<string, unknown>,
+    );
   },
-  removePackagesFromMasterShipment(id: string, data: AddPackagesToMasterShipmentDto) {
-    return apiClient.delete<MasterShipment>(`/master-shipments/${id}/packages`, data as unknown as Record<string, unknown>);
+  removePackagesFromMasterShipment(
+    id: string,
+    data: AddPackagesToMasterShipmentDto,
+  ) {
+    return apiClient.delete<MasterShipment>(
+      `/master-shipments/${id}/packages`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   closeMasterShipment(id: string) {
     return apiClient.post<MasterShipment>(`/master-shipments/${id}/close`, {});
@@ -499,16 +665,24 @@ export const backofficeApi = {
 
   // Holds
   listHolds(params?: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<OperationalHold[]>(`/holds${buildQuery(params || {})}`);
+    return apiClient.get<OperationalHold[]>(
+      `/holds${buildQuery(params || {})}`,
+    );
   },
   getHold(id: string) {
     return apiClient.get<OperationalHold>(`/holds/${id}`);
   },
   createHold(data: CreateHoldDto) {
-    return apiClient.post<OperationalHold>("/holds", data as unknown as Record<string, unknown>);
+    return apiClient.post<OperationalHold>(
+      "/holds",
+      data as unknown as Record<string, unknown>,
+    );
   },
   updateHold(id: string, data: UpdateHoldDto) {
-    return apiClient.patch<OperationalHold>(`/holds/${id}`, data as unknown as Record<string, unknown>);
+    return apiClient.patch<OperationalHold>(
+      `/holds/${id}`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   releaseHold(id: string, releaseReason: string) {
     return apiClient.post<OperationalHold>(`/holds/${id}/release`, {
@@ -517,17 +691,27 @@ export const backofficeApi = {
   },
 
   // Corrections
-  listCorrections(params?: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<CorrectionRequest[]>(`/corrections${buildQuery(params || {})}`);
+  listCorrections(
+    params?: Record<string, string | number | boolean | undefined>,
+  ) {
+    return apiClient.get<CorrectionRequest[]>(
+      `/corrections${buildQuery(params || {})}`,
+    );
   },
   getCorrection(id: string) {
     return apiClient.get<CorrectionRequest>(`/corrections/${id}`);
   },
   createCorrection(data: CreateCorrectionDto) {
-    return apiClient.post<CorrectionRequest>("/corrections", data as unknown as Record<string, unknown>);
+    return apiClient.post<CorrectionRequest>(
+      "/corrections",
+      data as unknown as Record<string, unknown>,
+    );
   },
   updateCorrection(id: string, data: UpdateCorrectionDto) {
-    return apiClient.patch<CorrectionRequest>(`/corrections/${id}`, data as unknown as Record<string, unknown>);
+    return apiClient.patch<CorrectionRequest>(
+      `/corrections/${id}`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   approveCorrection(id: string, reason?: string) {
     return apiClient.post<CorrectionRequest>(`/corrections/${id}/approve`, {
@@ -545,19 +729,30 @@ export const backofficeApi = {
 
   // House Shipments
   listHouseShipments(shipmentId: string) {
-    return apiClient.get<HouseShipment[]>(`/master-shipments/${shipmentId}/house-shipments`);
+    return apiClient.get<HouseShipment[]>(
+      `/master-shipments/${shipmentId}/house-shipments`,
+    );
   },
   getHouseShipment(id: string) {
     return apiClient.get<HouseShipment>(`/house-shipments/${id}`);
   },
   createHouseShipment(shipmentId: string, data: CreateHouseShipmentDto) {
-    return apiClient.post<HouseShipment>(`/master-shipments/${shipmentId}/house-shipments`, data as unknown as Record<string, unknown>);
+    return apiClient.post<HouseShipment>(
+      `/master-shipments/${shipmentId}/house-shipments`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   updateHouseShipment(id: string, data: UpdateHouseShipmentDto) {
-    return apiClient.patch<HouseShipment>(`/house-shipments/${id}`, data as unknown as Record<string, unknown>);
+    return apiClient.patch<HouseShipment>(
+      `/house-shipments/${id}`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   addPackagesToHouseShipment(id: string, data: AddPackagesToHouseShipmentDto) {
-    return apiClient.put<any>(`/house-shipments/${id}/packages`, data as unknown as Record<string, unknown>);
+    return apiClient.put<any>(
+      `/house-shipments/${id}/packages`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   closeHouseShipment(id: string) {
     return apiClient.post<any>(`/house-shipments/${id}/close`, {});
@@ -567,63 +762,127 @@ export const backofficeApi = {
   },
 
   // Customs Manifests
-  listCustomsManifests(params?: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<CustomsManifest[]>(`/customs-manifests${buildQuery(params || {})}`);
+  listCustomsManifests(
+    params?: Record<string, string | number | boolean | undefined>,
+  ) {
+    return apiClient.get<CustomsManifest[]>(
+      `/customs-manifests${buildQuery(params || {})}`,
+    );
   },
   getCustomsManifest(id: string) {
     return apiClient.get<CustomsManifest>(`/customs-manifests/${id}`);
   },
   createCustomsManifest(data: CreateCustomsManifestDto) {
-    return apiClient.post<CustomsManifest>("/customs-manifests", data as unknown as Record<string, unknown>);
+    return apiClient.post<CustomsManifest>(
+      "/customs-manifests",
+      data as unknown as Record<string, unknown>,
+    );
   },
   updateCustomsManifest(id: string, data: UpdateCustomsManifestDto) {
-    return apiClient.patch<CustomsManifest>(`/customs-manifests/${id}`, data as unknown as Record<string, unknown>);
+    return apiClient.patch<CustomsManifest>(
+      `/customs-manifests/${id}`,
+      data as unknown as Record<string, unknown>,
+    );
   },
-  addPackagesToCustomsManifest(id: string, data: AddPackagesToCustomsManifestDto) {
-    return apiClient.post<any>(`/customs-manifests/${id}/packages`, data as unknown as Record<string, unknown>);
+  addPackagesToCustomsManifest(
+    id: string,
+    data: AddPackagesToCustomsManifestDto,
+  ) {
+    return apiClient.post<any>(
+      `/customs-manifests/${id}/packages`,
+      data as unknown as Record<string, unknown>,
+    );
   },
-  removePackagesFromCustomsManifest(id: string, data: { packageIds: string[] }) {
-    return apiClient.delete<any>(`/customs-manifests/${id}/packages`, data as unknown as Record<string, unknown>);
+  removePackagesFromCustomsManifest(
+    id: string,
+    data: { packageIds: string[] },
+  ) {
+    return apiClient.delete<any>(
+      `/customs-manifests/${id}/packages`,
+      data as unknown as Record<string, unknown>,
+    );
   },
-  transmitCustomsManifest(id: string) {
-    return apiClient.post<CustomsManifest>(`/customs-manifests/${id}/transmit`, {});
+  buildCustomsManifestVersion(id: string) {
+    return apiClient.post<CustomsManifestVersion>(
+      `/customs-manifests/${id}/build-version`,
+      {},
+    );
   },
-
+  validateCustomsManifest(id: string) {
+    return apiClient.post<CustomsManifestVersion>(
+      `/customs-manifests/${id}/validate`,
+      {},
+    );
+  },
+  finalizeCustomsManifest(id: string) {
+    return apiClient.post<CustomsManifest>(
+      `/customs-manifests/${id}/finalize`,
+      {},
+    );
+  },
+  cancelCustomsManifest(id: string) {
+    return apiClient.post<CustomsManifest>(
+      `/customs-manifests/${id}/cancel`,
+      {},
+    );
+  },
   // Invoices
   listInvoices(params?: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<{ items: InvoiceRecord[] }>(`/invoices${buildQuery(params || {})}`);
+    return apiClient.get<{ items: InvoiceRecord[] }>(
+      `/invoices${buildQuery(params || {})}`,
+    );
   },
   getInvoice(id: string) {
     return apiClient.get<InvoiceRecord>(`/invoices/${id}`);
   },
   createInvoice(data: CreateInvoiceDto) {
-    return apiClient.post<InvoiceRecord>("/invoices", data as unknown as Record<string, unknown>);
+    return apiClient.post<InvoiceRecord>(
+      "/invoices",
+      data as unknown as Record<string, unknown>,
+    );
   },
   updateInvoice(id: string, data: UpdateInvoiceDto) {
-    return apiClient.patch<InvoiceRecord>(`/invoices/${id}`, data as unknown as Record<string, unknown>);
+    return apiClient.patch<InvoiceRecord>(
+      `/invoices/${id}`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   issueInvoice(id: string) {
     return apiClient.post<InvoiceRecord>(`/invoices/${id}/issue`, {});
   },
   voidInvoice(id: string, data: VoidReasonDto) {
-    return apiClient.post<InvoiceRecord>(`/invoices/${id}/void`, data as unknown as Record<string, unknown>);
+    return apiClient.post<InvoiceRecord>(
+      `/invoices/${id}/void`,
+      data as unknown as Record<string, unknown>,
+    );
   },
 
   // Payments
   listPayments(params?: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<{ items: PaymentRecord[] }>(`/payments${buildQuery(params || {})}`);
+    return apiClient.get<{ items: PaymentRecord[] }>(
+      `/payments${buildQuery(params || {})}`,
+    );
   },
   getPayment(id: string) {
     return apiClient.get<PaymentRecord>(`/payments/${id}`);
   },
   createPayment(data: CreatePaymentDto) {
-    return apiClient.post<PaymentRecord>("/payments", data as unknown as Record<string, unknown>);
+    return apiClient.post<PaymentRecord>(
+      "/payments",
+      data as unknown as Record<string, unknown>,
+    );
   },
   applyPayment(id: string, data: ApplyPaymentDto) {
-    return apiClient.post<PaymentRecord>(`/payments/${id}/apply`, data as unknown as Record<string, unknown>);
+    return apiClient.post<PaymentRecord>(
+      `/payments/${id}/apply`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   voidPayment(id: string, data: VoidReasonDto) {
-    return apiClient.post<PaymentRecord>(`/payments/${id}/void`, data as unknown as Record<string, unknown>);
+    return apiClient.post<PaymentRecord>(
+      `/payments/${id}/void`,
+      data as unknown as Record<string, unknown>,
+    );
   },
 
   // Pickups
@@ -634,67 +893,124 @@ export const backofficeApi = {
     return apiClient.get<PickupRequestRecord>(`/pickup-requests/${id}`);
   },
   createPickupRequest(data: CreatePickupRequestDto) {
-    return apiClient.post<PickupRequestRecord>("/pickup-requests", data as unknown as Record<string, unknown>);
+    return apiClient.post<PickupRequestRecord>(
+      "/pickup-requests",
+      data as unknown as Record<string, unknown>,
+    );
   },
   updatePickupRequest(id: string, data: UpdatePickupRequestDto) {
-    return apiClient.patch<PickupRequestRecord>(`/pickup-requests/${id}`, data as unknown as Record<string, unknown>);
+    return apiClient.patch<PickupRequestRecord>(
+      `/pickup-requests/${id}`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   markPickupRequestReady(id: string) {
-    return apiClient.post<PickupRequestRecord>(`/pickup-requests/${id}/ready`, {});
+    return apiClient.post<PickupRequestRecord>(
+      `/pickup-requests/${id}/ready`,
+      {},
+    );
   },
   completePickupRequest(id: string) {
-    return apiClient.post<PickupRequestRecord>(`/pickup-requests/${id}/complete`, {});
+    return apiClient.post<PickupRequestRecord>(
+      `/pickup-requests/${id}/complete`,
+      {},
+    );
   },
   cancelPickupRequest(id: string) {
-    return apiClient.post<PickupRequestRecord>(`/pickup-requests/${id}/cancel`, {});
+    return apiClient.post<PickupRequestRecord>(
+      `/pickup-requests/${id}/cancel`,
+      {},
+    );
   },
 
   // Transfers
-  listTransfers(params?: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<{ items: FacilityTransfer[], pagination: any }>(`/transfers${buildQuery(params || {})}`);
+  listTransfers(
+    params?: Record<string, string | number | boolean | undefined>,
+  ) {
+    return apiClient.get<
+      FacilityTransfer[] | { items: FacilityTransfer[]; pagination?: unknown }
+    >(`/transfers${buildQuery(params || {})}`);
   },
   getTransfer(id: string) {
     return apiClient.get<FacilityTransfer>(`/transfers/${id}`);
   },
   createTransfer(data: CreateTransferDto) {
-    return apiClient.post<FacilityTransfer>("/transfers", data as unknown as Record<string, unknown>);
+    return apiClient.post<FacilityTransfer>(
+      "/transfers",
+      data as unknown as Record<string, unknown>,
+    );
   },
   addTransferItems(id: string, data: AddTransferItemDto) {
-    return apiClient.post<FacilityTransfer>(`/transfers/${id}/items`, data as unknown as Record<string, unknown>);
+    return apiClient.post<FacilityTransfer>(
+      `/transfers/${id}/items`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   removeTransferItem(transferId: string, itemId: string) {
-    return apiClient.delete<FacilityTransfer>(`/transfers/${transferId}/items/${itemId}`);
+    return apiClient.delete<FacilityTransfer>(
+      `/transfers/${transferId}/items/${itemId}`,
+    );
   },
-  dispatchTransfer(id: string, data: DispatchTransferDto) {
-    return apiClient.post<FacilityTransfer>(`/transfers/${id}/dispatch`, data as unknown as Record<string, unknown>);
+  dispatchTransfer(id: string) {
+    return apiClient.post<FacilityTransfer>(`/transfers/${id}/dispatch`, {});
   },
-  receiveTransferItem(transferId: string, itemId: string, data: ReceiveTransferItemDto) {
-    return apiClient.put<FacilityTransfer>(`/transfers/${transferId}/items/${itemId}/receive`, data as unknown as Record<string, unknown>);
+  cancelTransfer(id: string) {
+    return apiClient.post<FacilityTransfer>(`/transfers/${id}/cancel`, {});
+  },
+  receiveTransferItem(
+    transferId: string,
+    itemId: string,
+    data: ReceiveTransferItemDto,
+  ) {
+    return apiClient.put<FacilityTransfer>(
+      `/transfers/${transferId}/items/${itemId}/receive`,
+      data as unknown as Record<string, unknown>,
+    );
   },
 
   // Deliveries
-  listDeliveries(params?: Record<string, string | number | boolean | undefined>) {
-    return apiClient.get<any>(`/deliveries${buildQuery(params || {})}`);
+  listDeliveries(
+    params?: Record<string, string | number | boolean | undefined>,
+  ) {
+    return apiClient.get<DeliveryOrder[]>(
+      `/deliveries${buildQuery(params || {})}`,
+    );
   },
   getDelivery(id: string) {
-    return apiClient.get<any>(`/deliveries/${id}`);
+    return apiClient.get<DeliveryOrder>(`/deliveries/${id}`);
   },
-  createDelivery(data: any) {
-    return apiClient.post<any>("/deliveries", data);
+  createDelivery(data: CreateDeliveryDto) {
+    return apiClient.post<DeliveryOrder>(
+      "/deliveries",
+      data as unknown as Record<string, unknown>,
+    );
   },
-  updateDelivery(id: string, data: any) {
-    return apiClient.patch<any>(`/deliveries/${id}`, data);
+  updateDelivery(
+    id: string,
+    data: {
+      notes?: string;
+      assignedToId?: string;
+      deliveryAddressSnap?: Record<string, unknown>;
+    },
+  ) {
+    return apiClient.patch<DeliveryOrder>(
+      `/deliveries/${id}`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   markDeliveryReady(id: string) {
-    return apiClient.post<any>(`/deliveries/${id}/ready`, {});
+    return apiClient.post<DeliveryOrder>(`/deliveries/${id}/ready`, {});
   },
   dispatchDelivery(id: string) {
-    return apiClient.post<any>(`/deliveries/${id}/dispatch`, {});
+    return apiClient.post<DeliveryOrder>(`/deliveries/${id}/dispatch`, {});
   },
-  recordDeliveryAttempt(id: string, data: any) {
-    return apiClient.post<any>(`/deliveries/${id}/attempts`, data);
+  recordDeliveryAttempt(id: string, data: RecordDeliveryAttemptDto) {
+    return apiClient.post<DeliveryOrder>(
+      `/deliveries/${id}/attempts`,
+      data as unknown as Record<string, unknown>,
+    );
   },
   cancelDelivery(id: string) {
-    return apiClient.post<any>(`/deliveries/${id}/cancel`, {});
+    return apiClient.post<DeliveryOrder>(`/deliveries/${id}/cancel`, {});
   },
 };

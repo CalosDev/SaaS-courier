@@ -1,8 +1,10 @@
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 
 import type { AuthenticatedRequest } from './authenticated-request.type';
 import { AuthCookieService } from './auth-cookie.service';
 import { CsrfTokenService } from './csrf-token.service';
+import { SKIP_CSRF_KEY } from './skip-csrf.decorator';
 
 const UNSAFE_HTTP_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -20,12 +22,22 @@ export class CsrfGuard implements CanActivate {
   private readonly allowedOrigins = this.loadAllowedOrigins();
 
   constructor(
+    private readonly reflector: Reflector,
     private readonly authCookieService: AuthCookieService,
     private readonly csrfTokenService: CsrfTokenService,
   ) {}
 
   canActivate(context: ExecutionContext): boolean {
     if (context.getType<'http'>() !== 'http') {
+      return true;
+    }
+
+    if (
+      this.reflector.getAllAndOverride<boolean>(SKIP_CSRF_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ])
+    ) {
       return true;
     }
 

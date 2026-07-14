@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { CustomsManifestStatusBadge } from "@/components/customs-manifests/CustomsManifestStatusBadge";
@@ -13,25 +12,10 @@ function formatArrivalDate(arrivalDate: CustomsManifest["arrivalDate"]) {
 }
 
 export default function CustomsManifestsPage() {
-  const { data: manifests, error, isLoading, mutate } = useSWR<CustomsManifest[]>(
+  const { data: manifests, error, isLoading } = useSWR<CustomsManifest[]>(
     "/customs-manifests",
     () => backofficeApi.listCustomsManifests(),
   );
-
-  const [transmitting, setTransmitting] = useState<string | null>(null);
-
-  const handleTransmit = async (id: string) => {
-    try {
-      setTransmitting(id);
-      await backofficeApi.transmitCustomsManifest(id);
-      await mutate();
-    } catch (err) {
-      console.error("Error transmitting manifest:", err);
-      alert("Error al transmitir manifiesto a SIGA.");
-    } finally {
-      setTransmitting(null);
-    }
-  };
 
   return (
     <div className="page-stack">
@@ -87,17 +71,6 @@ export default function CustomsManifestsPage() {
                         >
                           Ver detalle
                         </Link>
-                        {manifest.status === "DRAFT" ? (
-                          <Button
-                            variant="primary"
-                            disabled={transmitting === manifest.id}
-                            onClick={() => handleTransmit(manifest.id)}
-                          >
-                            {transmitting === manifest.id
-                              ? "Transmitiendo..."
-                              : "Transmitir a SIGA"}
-                          </Button>
-                        ) : null}
                       </div>
                     </td>
                   </tr>

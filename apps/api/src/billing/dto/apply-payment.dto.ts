@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, IsUUID } from 'class-validator';
+import { IsNotEmpty, IsString, IsUUID, Matches } from 'class-validator';
 
 export class ApplyPaymentDto {
   @IsUUID()
@@ -6,5 +6,6 @@ export class ApplyPaymentDto {
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^[1-9]\d*$/)
   amountMinor: string;
 }

@@ -4,6 +4,8 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  ArrayNotEmpty,
+  MaxLength,
   ValidateNested,
 } from 'class-validator';
 import { CreateInvoiceLineDto } from './create-invoice.dto';
@@ -15,10 +17,12 @@ export class UpdateInvoiceDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   notes?: string;
 
   @IsOptional()
   @IsArray()
+  @ArrayNotEmpty()
   @ValidateNested({ each: true })
   @Type(() => CreateInvoiceLineDto)
   lines?: CreateInvoiceLineDto[];

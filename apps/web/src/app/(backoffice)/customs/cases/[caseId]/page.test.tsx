@@ -160,4 +160,41 @@ describe("CustomsCaseDetailPage", () => {
       vi.mocked(backofficeApi.changeCustomsCaseStatus).mock.calls[0][1],
     ).not.toHaveProperty("organizationId");
   });
+
+  it("requires evidence for portal events and hides integration-only source", async () => {
+    vi.mocked(backofficeApi.recordCustomsCaseEvent).mockResolvedValue({
+      id: "event-2",
+    } as any);
+    await renderPage();
+
+    expect(
+      screen.queryByRole("option", { name: /Integraci/i }),
+    ).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Fuente *"), {
+      target: { value: "OFFICIAL_PORTAL" },
+    });
+    fireEvent.change(screen.getByLabelText("Fecha del evento *"), {
+      target: { value: "2026-07-11T13:30" },
+    });
+    fireEvent.change(screen.getByLabelText(/Descripci/), {
+      target: { value: "Consulta manual al portal" },
+    });
+    expect(
+      screen.getByRole("button", { name: "Registrar evento" }),
+    ).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Referencia oficial *"), {
+      target: { value: " DGA-4455 " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Registrar evento" }));
+
+    await waitFor(() =>
+      expect(backofficeApi.recordCustomsCaseEvent).toHaveBeenCalledWith(
+        "case-1",
+        expect.objectContaining({
+          source: "OFFICIAL_PORTAL",
+          evidenceReference: "DGA-4455",
+        }),
+      ),
+    );
+  });
 });

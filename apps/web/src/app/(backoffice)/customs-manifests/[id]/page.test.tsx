@@ -1,6 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { Suspense } from "react";
-import { act } from "react";
+import { act, Suspense } from "react";
 import { SWRConfig } from "swr";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -11,9 +10,10 @@ const { pushToastMock, backofficeApiMock } = vi.hoisted(() => ({
   backofficeApiMock: {
     getCustomsManifest: vi.fn(),
     updateCustomsManifest: vi.fn(),
-    addPackagesToCustomsManifest: vi.fn(),
-    removePackagesFromCustomsManifest: vi.fn(),
-    transmitCustomsManifest: vi.fn(),
+    buildCustomsManifestVersion: vi.fn(),
+    validateCustomsManifest: vi.fn(),
+    finalizeCustomsManifest: vi.fn(),
+    cancelCustomsManifest: vi.fn(),
   },
 }));
 
@@ -21,40 +21,30 @@ vi.mock("next/link", () => ({
   default: ({
     href,
     children,
-    className,
   }: {
     href: string;
     children: React.ReactNode;
-    className?: string;
-  }) => (
-    <a href={href} className={className}>
-      {children}
-    </a>
-  ),
+  }) => <a href={href}>{children}</a>,
 }));
-
 vi.mock("@/components/ui/toast", () => ({
   useToast: () => ({ pushToast: pushToastMock }),
 }));
-
-vi.mock("@/lib/api/backoffice", () => ({
-  backofficeApi: backofficeApiMock,
-}));
+vi.mock("@/lib/api/backoffice", () => ({ backofficeApi: backofficeApiMock }));
 
 function manifest(overrides = {}) {
   return {
     id: "manifest-1",
-    organizationId: "org-1",
-    code: "CM-20260711-00001",
+    code: "CM-001",
     flightNumber: "AA123",
     arrivalDate: "2026-07-12",
     status: "DRAFT",
-    createdAt: "2026-07-11T00:00:00.000Z",
-    updatedAt: "2026-07-11T00:00:00.000Z",
-    packages: [
+    currentVersion: 1,
+    versions: [
       {
-        id: "package-1",
-        internalTrackingNumber: "PK-001",
+        id: "version-1",
+        versionNumber: 1,
+        validationStatus: "PENDING",
+        items: [{ id: "item-1" }],
       },
     ],
     ...overrides,
@@ -65,7 +55,7 @@ async function renderPage() {
   await act(async () => {
     render(
       <SWRConfig value={{ provider: () => new Map(), dedupingInterval: 0 }}>
-        <Suspense fallback={<div>Loading route</div>}>
+        <Suspense fallback={<div>Cargando ruta</div>}>
           <CustomsManifestDetailPage
             params={Promise.resolve({ id: "manifest-1" })}
           />
@@ -81,109 +71,39 @@ describe("CustomsManifestDetailPage", () => {
     pushToastMock.mockReset();
   });
 
-  it("updates draft manifest data and packages without sending tenant fields", async () => {
+  it("builds and validates immutable versions through semantic endpoints", async () => {
     backofficeApiMock.getCustomsManifest.mockResolvedValue(manifest());
-    backofficeApiMock.updateCustomsManifest.mockResolvedValue(
-      manifest({
-        flightNumber: "AA456",
-        arrivalDate: "2026-07-13",
-      }),
-    );
-    backofficeApiMock.addPackagesToCustomsManifest.mockResolvedValue({});
-    backofficeApiMock.removePackagesFromCustomsManifest.mockResolvedValue({});
-
+    backofficeApiMock.buildCustomsManifestVersion.mockResolvedValue({});
+    backofficeApiMock.validateCustomsManifest.mockResolvedValue({});
     await renderPage();
 
-    expect(await screen.findByDisplayValue("AA123")).toBeInTheDocument();
-    expect(screen.getByText("PK-001")).toBeInTheDocument();
-    expect(screen.getByRole("link")).toHaveAttribute(
-      "href",
-      "/customs-manifests",
-    );
-
-    fireEvent.change(screen.getByLabelText("Vuelo"), {
-      target: { value: "AA456" },
-    });
-    fireEvent.change(screen.getByLabelText("Fecha llegada"), {
-      target: { value: "2026-07-13" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Guardar cambios" }));
-
-    await waitFor(() => {
-      expect(backofficeApiMock.updateCustomsManifest).toHaveBeenCalledWith(
-        "manifest-1",
-        {
-          flightNumber: "AA456",
-          arrivalDate: "2026-07-13",
-        },
-      );
-    });
-    expect(backofficeApiMock.updateCustomsManifest.mock.calls[0][1]).not.toHaveProperty(
-      "organizationId",
-    );
-
-    fireEvent.change(screen.getByLabelText("IDs de paquetes para agregar"), {
-      target: { value: " package-2, package-3 " },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Agregar paquetes" }));
-
-    await waitFor(() => {
-      expect(backofficeApiMock.addPackagesToCustomsManifest).toHaveBeenCalledWith(
-        "manifest-1",
-        {
-          packageIds: ["package-2", "package-3"],
-        },
-      );
-    });
-
-    fireEvent.change(screen.getByLabelText("IDs de paquetes para quitar"), {
-      target: { value: " package-2 " },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Quitar paquetes" }));
-
-    await waitFor(() => {
+    expect(await screen.findByText("v1")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Construir versión" }));
+    await waitFor(() =>
       expect(
-        backofficeApiMock.removePackagesFromCustomsManifest,
-      ).toHaveBeenCalledWith("manifest-1", {
-        packageIds: ["package-2"],
-      });
-    });
-  });
-
-  it("transmits draft manifests to SIGA", async () => {
-    backofficeApiMock.getCustomsManifest.mockResolvedValue(manifest());
-    backofficeApiMock.transmitCustomsManifest.mockResolvedValue(
-      manifest({ status: "SUBMITTED" }),
+        backofficeApiMock.buildCustomsManifestVersion,
+      ).toHaveBeenCalledWith("manifest-1"),
     );
-
-    await renderPage();
-
-    fireEvent.click(await screen.findByRole("button", { name: "Transmitir a SIGA" }));
-
-    await waitFor(() => {
-      expect(backofficeApiMock.transmitCustomsManifest).toHaveBeenCalledWith(
+    fireEvent.click(screen.getByRole("button", { name: "Validar" }));
+    await waitFor(() =>
+      expect(backofficeApiMock.validateCustomsManifest).toHaveBeenCalledWith(
         "manifest-1",
-      );
-    });
-    expect(pushToastMock).toHaveBeenCalledWith(
-      "Manifiesto transmitido a SIGA.",
+      ),
     );
   });
 
-  it("renders submitted manifests as read-only", async () => {
+  it("renders finalized manifests as frozen", async () => {
     backofficeApiMock.getCustomsManifest.mockResolvedValue(
-      manifest({ status: "SUBMITTED" }),
+      manifest({ status: "FINALIZED" }),
     );
-
     await renderPage();
 
     expect(await screen.findByDisplayValue("AA123")).toBeDisabled();
-    expect(screen.getByLabelText("Fecha llegada")).toBeDisabled();
     expect(
-      screen.queryByRole("button", { name: "Transmitir a SIGA" }),
+      screen.queryByRole("button", { name: "Construir versión" }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: "Agregar paquetes" }),
+      screen.queryByRole("button", { name: "Cancelar" }),
     ).not.toBeInTheDocument();
   });
 });

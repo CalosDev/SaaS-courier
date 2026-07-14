@@ -6,6 +6,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 export function configureHttpApp(app: NestExpressApplication): void {
   const allowedOrigins = loadAllowedOrigins();
 
+  app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
   app.use(
     helmet({
       hsts: process.env.NODE_ENV === 'production' ? undefined : false,

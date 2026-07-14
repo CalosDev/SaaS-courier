@@ -38,6 +38,7 @@ describe('WebhookDispatcherService', () => {
       delete process.env.WEBHOOK_SIMULATION_URL;
       const debugSpy = jest.spyOn((service as any).logger, 'debug');
 
+      const sensitivePayload = { documentNumber: '00112345678' };
       await service.handleOutboxEvent({
         id: 'evt-1',
         event_type: 'package.received',
@@ -45,11 +46,14 @@ describe('WebhookDispatcherService', () => {
         aggregate_type: 'Package',
         aggregate_id: 'pkg-1',
         occurred_at: new Date().toISOString(),
-        payload: { test: true },
+        payload: sensitivePayload,
       });
 
       expect(debugSpy).toHaveBeenCalledWith(
         expect.stringContaining('[SIMULATED WEBHOOK]'),
+      );
+      expect(debugSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining(sensitivePayload.documentNumber),
       );
     });
 

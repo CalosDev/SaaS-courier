@@ -6,12 +6,17 @@ import {
   IsString,
   IsArray,
   IsUUID,
+  ArrayNotEmpty,
+  ArrayUnique,
+  MaxLength,
+  ValidateIf,
 } from 'class-validator';
 import { DeliveryMethod } from '../../generated/prisma/client';
 
 export class CreateDeliveryDto {
   @IsNotEmpty()
   @IsString()
+  @MaxLength(40)
   deliveryNumber!: string;
 
   @IsNotEmpty()
@@ -22,12 +27,14 @@ export class CreateDeliveryDto {
   @IsEnum(DeliveryMethod)
   method!: DeliveryMethod;
 
-  @IsOptional()
+  @ValidateIf((dto: CreateDeliveryDto) => dto.method === 'HOME_DELIVERY')
+  @IsNotEmpty()
   @IsObject()
-  deliveryAddressSnap?: Record<string, any>;
+  deliveryAddressSnap?: Record<string, unknown>;
 
   @IsOptional()
   @IsString()
+  @MaxLength(1000)
   notes?: string;
 
   @IsOptional()
@@ -35,6 +42,8 @@ export class CreateDeliveryDto {
   assignedToId?: string;
 
   @IsArray()
+  @ArrayNotEmpty()
+  @ArrayUnique()
   @IsUUID(4, { each: true })
   packageIds!: string[];
 }

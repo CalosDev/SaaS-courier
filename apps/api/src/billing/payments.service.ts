@@ -30,10 +30,24 @@ export class PaymentsService {
     const paymentNumber = `PAY-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     return this.prisma.$transaction(async (tx) => {
+      const customer = await tx.customer.findUnique({
+        where: {
+          organizationId_id: {
+            organizationId,
+            id: input.customerId,
+          },
+        },
+        select: { id: true },
+      });
+      if (!customer) throw new NotFoundException('Customer not found');
       const dbPayment = await this.billingRepository.createPayment(
         {
           organization: { connect: { id: organizationId } },
-          customer: { connect: { id: input.customerId } },
+          customer: {
+            connect: {
+              organizationId_id: { organizationId, id: input.customerId },
+            },
+          },
           paymentNumber,
           method: input.method,
           amountMinor: BigInt(input.amountMinor),
@@ -91,6 +105,18 @@ export class PaymentsService {
     context?: CommandContext,
   ): Promise<PaymentRecord> {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id" FROM "payments"
+        WHERE "organization_id" = ${organizationId}::uuid
+          AND "id" = ${paymentId}::uuid
+        FOR UPDATE
+      `;
+      await tx.$queryRaw`
+        SELECT "id" FROM "customer_invoices"
+        WHERE "organization_id" = ${organizationId}::uuid
+          AND "id" = ${input.invoiceId}::uuid
+        FOR UPDATE
+      `;
       const payment = await this.billingRepository.getPaymentById(
         organizationId,
         paymentId,
@@ -111,6 +137,16 @@ export class PaymentsService {
           'Cannot apply payment to draft or voided invoice',
         );
       }
+      if (invoice.customerId !== payment.customerId) {
+        throw new BadRequestException(
+          'Payment and invoice must belong to the same customer',
+        );
+      }
+      if (invoice.currencyCode !== payment.currencyCode) {
+        throw new BadRequestException(
+          'Payment and invoice currencies must match',
+        );
+      }
 
       const applyAmountMinor = BigInt(input.amountMinor);
       if (applyAmountMinor <= 0n) {
@@ -123,10 +159,9 @@ export class PaymentsService {
       }
 
       // Check available payment amount
-      const alreadyApplied = payment.allocations.reduce(
-        (sum: bigint, a: PaymentAllocation) => sum + a.amountMinor,
-        0n,
-      );
+      const alreadyApplied = payment.allocations
+        .filter((allocation) => allocation.reversedAt === null)
+        .reduce((sum: bigint, a: PaymentAllocation) => sum + a.amountMinor, 0n);
       const availableAmount = payment.amountMinor - alreadyApplied;
       if (applyAmountMinor > availableAmount) {
         throw new BadRequestException(
@@ -137,8 +172,16 @@ export class PaymentsService {
       const allocation = await this.billingRepository.createPaymentAllocation(
         {
           organization: { connect: { id: organizationId } },
-          payment: { connect: { id: paymentId } },
-          invoice: { connect: { id: invoice.id } },
+          payment: {
+            connect: {
+              organizationId_id: { organizationId, id: paymentId },
+            },
+          },
+          invoice: {
+            connect: {
+              organizationId_id: { organizationId, id: invoice.id },
+            },
+          },
           amountMinor: applyAmountMinor,
         },
         tx,
@@ -204,6 +247,12 @@ export class PaymentsService {
     context?: CommandContext,
   ): Promise<PaymentRecord> {
     return this.prisma.$transaction(async (tx) => {
+      await tx.$queryRaw`
+        SELECT "id" FROM "payments"
+        WHERE "organization_id" = ${organizationId}::uuid
+          AND "id" = ${paymentId}::uuid
+        FOR UPDATE
+      `;
       const payment = await this.billingRepository.getPaymentById(
         organizationId,
         paymentId,
@@ -214,7 +263,15 @@ export class PaymentsService {
         throw new BadRequestException('Payment is already voided');
 
       // We need to un-apply all allocations
-      for (const allocation of payment.allocations) {
+      for (const allocation of payment.allocations.filter(
+        (item) => item.reversedAt === null,
+      )) {
+        await tx.$queryRaw`
+          SELECT "id" FROM "customer_invoices"
+          WHERE "organization_id" = ${organizationId}::uuid
+            AND "id" = ${allocation.invoiceId}::uuid
+          FOR UPDATE
+        `;
         const invoice = await this.billingRepository.getInvoiceById(
           organizationId,
           allocation.invoiceId,
@@ -234,15 +291,16 @@ export class PaymentsService {
             tx,
           );
         }
-        await tx.paymentAllocation.delete({
+        await tx.paymentAllocation.update({
           where: { organizationId_id: { organizationId, id: allocation.id } },
+          data: { reversedAt: new Date(), reversalReason: input.reason },
         });
       }
 
       const updated = await this.billingRepository.updatePayment(
         organizationId,
         paymentId,
-        { status: 'VOID', voidedAt: new Date() },
+        { status: 'VOID', voidedAt: new Date(), voidReason: input.reason },
         tx,
       );
 
@@ -278,6 +336,7 @@ export class PaymentsService {
       status: payment.status,
       recordedAt: payment.recordedAt,
       voidedAt: payment.voidedAt,
+      voidReason: payment.voidReason,
       createdAt: payment.createdAt,
       updatedAt: payment.updatedAt,
       allocations: (payment.allocations || []).map((a) => ({
@@ -286,6 +345,8 @@ export class PaymentsService {
         invoiceId: a.invoiceId,
         amountMinor: a.amountMinor.toString(),
         appliedAt: a.appliedAt,
+        reversedAt: a.reversedAt,
+        reversalReason: a.reversalReason,
       })),
     };
   }

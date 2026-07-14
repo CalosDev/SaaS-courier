@@ -9,7 +9,7 @@ import {
   Put,
 } from '@nestjs/common';
 import { AddPackagesDto } from './dto/add-packages.dto';
-import { CreateDispatchDto } from './dto/create-dispatch.dto';
+import { CreateMasterShipmentDto } from './dto/create-master-shipment.dto';
 import { UpdateMawbDto } from './dto/update-mawb.dto';
 import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { DispatchesService } from './dispatches.service';
@@ -26,9 +26,9 @@ export class MasterShipmentsController {
   @RequirePermissions(SHIPMENT_PERMISSIONS.MANAGE)
   async createMasterShipment(
     @CurrentCommandContext() ctx: CommandContext,
-    @Body() dto: CreateDispatchDto,
+    @Body() dto: CreateMasterShipmentDto,
   ) {
-    return this.dispatchesService.createDispatch(ctx, dto);
+    return this.dispatchesService.createMasterShipment(ctx, dto);
   }
 
   @Get()

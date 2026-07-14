@@ -6,12 +6,17 @@ WORKDIR /app
 FROM base AS development
 COPY . .
 RUN pnpm install --frozen-lockfile
-CMD ["pnpm", "--filter", "web", "dev"]
+CMD ["pnpm", "--filter", "@courier/web", "dev"]
 
-FROM base AS build
-COPY . .
+FROM base AS dependencies
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json apps/api/package.json
+COPY apps/web/package.json apps/web/package.json
 RUN pnpm install --frozen-lockfile
-RUN pnpm --filter web build
+
+FROM dependencies AS build
+COPY . .
+RUN pnpm --filter @courier/web build
 
 FROM node:22-alpine AS production
 ENV NODE_ENV=production

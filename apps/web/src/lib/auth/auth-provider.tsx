@@ -42,6 +42,10 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const PUBLIC_PATHS = new Set(["/login", "/activate"]);
 
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/track/");
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -97,7 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       apiClient.clearCsrf();
       setState({ status: "anonymous" });
 
-      if (!PUBLIC_PATHS.has(pathname)) {
+      if (!isPublicPath(pathname)) {
         router.replace("/login");
       }
     });
