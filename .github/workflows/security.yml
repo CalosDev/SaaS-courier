@@ -16,7 +16,7 @@ jobs:
   dependencies-and-repository:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
       - uses: pnpm/action-setup@v6.0.9
@@ -41,7 +41,7 @@ jobs:
   filesystem-scan:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
       - name: Scan repository
         uses: aquasecurity/trivy-action@v0.36.0
         with:
@@ -74,7 +74,7 @@ jobs:
           - name: web
             dockerfile: docker/web.Dockerfile
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
       - name: Build image
         run: docker build --build-arg STORAGE_PUBLIC_ORIGIN=https://objects.example --file "${{ matrix.dockerfile }}" --tag "courier-${{ matrix.name }}:scan" .
       - name: Scan image
