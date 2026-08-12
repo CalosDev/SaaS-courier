@@ -35,7 +35,7 @@ Estado tecnico: COMPLETADO. Estado de negocio: PENDIENTE DE APROBACION DEL RESPO
 - [x] Riesgos residuales y responsables estan documentados.
 - [ ] El responsable aprueba iniciar el piloto.
 
-Evidencia y riesgos: `docs/pilot-uat-results-2026-07-14.md`.
+Evidencia y riesgos: `docs/archive/pilot-uat-results-2026-07-14.md`.
 
 Solo despues de esta firma debe registrarse la accion de auditoria
 `release.pilot.accepted`. La preparacion tecnica no equivale a aceptacion humana.
