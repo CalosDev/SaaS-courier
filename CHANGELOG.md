@@ -11,4 +11,4 @@
 - Reembolsos quedan fuera del MVP inicial.
 - Se protegen las líneas de facturas emitidas.
 - Se impiden tarifas solapadas con exclusión GiST.
-- Se agrega plan de implementación con Codex, ADRs y plantillas Docker.
+- Se agrega plan de implementacion, ADRs y plantillas Docker.
