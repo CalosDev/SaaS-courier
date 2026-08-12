@@ -5,6 +5,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Public } from '../auth/http/public.decorator';
 import { AccountsService } from './accounts.service';
 import { ActivateAccountDto } from './dto/activate-account.dto';
+import { TenantHostExempt } from '../tenant-host/tenant-host-exempt.decorator';
 
 @Controller('accounts')
 export class AccountsController {
@@ -12,6 +13,7 @@ export class AccountsController {
 
   @Post('activate')
   @Public()
+  @TenantHostExempt()
   @HttpCode(204)
   @Throttle({
     default: {

@@ -17,6 +17,7 @@ Monorepo de una plataforma SaaS B2B multi-tenant para digitalizar la operación 
 - `docs/docker.md`
 - `docs/deployment.md`
 - `docs/database.md`
+- `docs/organization-provisioning.md`
 
 El esquema ejecutable se mantiene exclusivamente mediante Prisma y migraciones
 versionadas. El SQL v0.2 de referencia vive en `docs/archive/` y no debe
@@ -76,6 +77,8 @@ Los primeros endpoints administrativos protegidos disponibles actualmente son:
 
 - `GET /organizations/current`
 - `PATCH /organizations/current`
+- `GET /organizations/current/regulatory-profile`
+- `PATCH /organizations/current/regulatory-profile`
 - `GET /organizations/current/settings`
 - `PATCH /organizations/current/settings`
 - `GET /organizations/current/capabilities`
@@ -150,9 +153,18 @@ El backend expone autenticacion con cookies HttpOnly y proteccion CSRF. En desar
 ```bash
 CORS_ORIGINS=http://localhost:3000
 COOKIE_SECURE=false
+APP_BASE_DOMAIN=localhost
+TENANT_SUBDOMAINS_ENABLED=false
+TENANT_ALLOW_BARE_LOCALHOST=true
+TRUST_PROXY=loopback,linklocal,uniquelocal
 ```
 
 El frontend debe pedir primero `GET /auth/csrf`, enviar el token devuelto en `X-CSRF-Token` y usar `credentials: include` en cada `fetch` autenticado.
+
+En produccion, `TENANT_SUBDOMAINS_ENABLED=true` hace que el subdominio determine
+la organizacion esperada. La API rechaza una sesion cuyo `organizationId` no
+coincida con el host. `TRUST_PROXY` acepta una lista explicita de proxies o
+rangos; el valor global `true` esta prohibido.
 
 El throttling de NestJS usa almacenamiento en memoria por proceso. El piloto se
 despliega con una sola replica API; cualquier escalado horizontal requiere rate

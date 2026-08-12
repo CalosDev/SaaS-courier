@@ -9,10 +9,16 @@ import { UpdateCurrentOrganizationDto } from './dto/update-current-organization.
 import { OrganizationsService } from './organizations.service';
 import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
 import type { CommandContext } from '../request-context/request-context.types';
+import { UpdateOrganizationRegulatoryProfileDto } from './dto/update-organization-regulatory-profile.dto';
+import { OrganizationRegulatoryProfileService } from './organization-regulatory-profile.service';
+import type { OrganizationRegulatoryProfileRecord } from './organization-regulatory-profile.types';
 
 @Controller('organizations')
 export class OrganizationsController {
-  constructor(private readonly organizationsService: OrganizationsService) {}
+  constructor(
+    private readonly organizationsService: OrganizationsService,
+    private readonly regulatoryProfiles: OrganizationRegulatoryProfileService,
+  ) {}
 
   @Get('current')
   @RequirePermissions('organizations.read')
@@ -48,6 +54,36 @@ export class OrganizationsController {
     return this.serializeOrganization(organization);
   }
 
+  @Get('current/regulatory-profile')
+  @RequirePermissions('organizations.read')
+  async getCurrentRegulatoryProfile(
+    @CurrentSession() session: SessionContext,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    this.setNoStore(response);
+    return this.serializeRegulatoryProfile(
+      await this.regulatoryProfiles.getCurrent(session.organizationId),
+    );
+  }
+
+  @Patch('current/regulatory-profile')
+  @RequirePermissions('organizations.manage')
+  async updateCurrentRegulatoryProfile(
+    @CurrentSession() session: SessionContext,
+    @CurrentCommandContext() context: CommandContext,
+    @Res({ passthrough: true }) response: Response,
+    @Body() body: UpdateOrganizationRegulatoryProfileDto,
+  ) {
+    this.setNoStore(response);
+    return this.serializeRegulatoryProfile(
+      await this.regulatoryProfiles.updateCurrent(
+        session.organizationId,
+        body,
+        context,
+      ),
+    );
+  }
+
   private setNoStore(response: Response): void {
     response.setHeader('Cache-Control', 'no-store');
   }
@@ -71,6 +107,23 @@ export class OrganizationsController {
       trialEndsAt: organization.trialEndsAt?.toISOString() ?? null,
       createdAt: organization.createdAt.toISOString(),
       updatedAt: organization.updatedAt.toISOString(),
+    };
+  }
+
+  private serializeRegulatoryProfile(
+    profile: OrganizationRegulatoryProfileRecord,
+  ) {
+    return {
+      fiscalAddress: profile.fiscalAddress,
+      authorizedRepresentativeName: profile.authorizedRepresentativeName,
+      authorizedRepresentativeEmail: profile.authorizedRepresentativeEmail,
+      authorizedRepresentativePhone: profile.authorizedRepresentativePhone,
+      courierRegistrationStatus: profile.courierRegistrationStatus,
+      dgaOperatorCode: profile.dgaOperatorCode,
+      electronicInvoicingStatus: profile.electronicInvoicingStatus,
+      declaredAt: profile.declaredAt?.toISOString() ?? null,
+      createdAt: profile.createdAt.toISOString(),
+      updatedAt: profile.updatedAt.toISOString(),
     };
   }
 }

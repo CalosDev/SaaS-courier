@@ -1,0 +1,42 @@
+{
+  "organization": {
+    "legalName": "Courier Ejemplo SRL",
+    "commercialName": "Courier Ejemplo",
+    "slug": "courier-ejemplo",
+    "rnc": "000000000",
+    "email": "operaciones@example.com",
+    "phone": "+1-809-000-0000",
+    "planCode": "PILOT",
+    "maxUsers": 10,
+    "maxFacilities": 3,
+    "trialDays": 30
+  },
+  "regulatoryProfile": {
+    "fiscalAddress": "Direccion fiscal declarada por el courier",
+    "authorizedRepresentativeName": "Representante Autorizado",
+    "authorizedRepresentativeEmail": "representante@example.com",
+    "authorizedRepresentativePhone": "+1-809-000-0001",
+    "courierRegistrationStatus": "IN_PROCESS",
+    "dgaOperatorCode": "",
+    "electronicInvoicingStatus": "IN_PROCESS"
+  },
+  "primaryFacility": {
+    "code": "SDQ-01",
+    "name": "Sucursal principal",
+    "type": "BRANCH",
+    "ownershipType": "OWNED",
+    "countryCode": "DO",
+    "province": "Distrito Nacional",
+    "city": "Santo Domingo",
+    "addressLine1": "Direccion operativa",
+    "isCustomerFacing": true,
+    "isPackageOrigin": false,
+    "isDistributionCenter": true
+  },
+  "administrator": {
+    "email": "admin@example.com",
+    "firstName": "Administrador",
+    "lastName": "Inicial",
+    "employeeCode": "ADMIN-001"
+  }
+}

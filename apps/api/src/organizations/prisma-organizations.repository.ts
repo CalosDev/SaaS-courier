@@ -33,6 +33,9 @@ export class PrismaOrganizationsRepository implements OrganizationsRepository {
             settings: {
               create: {},
             },
+            regulatoryProfile: {
+              create: {},
+            },
           },
         }),
       );

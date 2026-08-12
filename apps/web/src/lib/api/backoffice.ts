@@ -21,6 +21,7 @@ import type {
   Onboarding,
   Organization,
   OrganizationCapabilities,
+  OrganizationRegulatoryProfile,
   OrganizationSettings,
   PackageDetail,
   PackageDocument,
@@ -131,6 +132,17 @@ export const backofficeApi = {
   updateCurrentOrganization(body: Partial<Organization>) {
     return apiClient.patch<Organization>("/organizations/current", body);
   },
+  getCurrentRegulatoryProfile() {
+    return apiClient.get<OrganizationRegulatoryProfile>(
+      "/organizations/current/regulatory-profile",
+    );
+  },
+  updateCurrentRegulatoryProfile(body: Partial<OrganizationRegulatoryProfile>) {
+    return apiClient.patch<OrganizationRegulatoryProfile>(
+      "/organizations/current/regulatory-profile",
+      body,
+    );
+  },
   getCurrentSettings() {
     return apiClient.get<OrganizationSettings>(
       "/organizations/current/settings",
@@ -215,18 +227,31 @@ export const backofficeApi = {
     return apiClient.get<NotificationTemplate[]>("/notification-templates");
   },
   createNotificationTemplate(body: Record<string, unknown>) {
-    return apiClient.post<NotificationTemplate>("/notification-templates", body);
+    return apiClient.post<NotificationTemplate>(
+      "/notification-templates",
+      body,
+    );
   },
-  updateNotificationTemplate(templateId: string, body: Record<string, unknown>) {
+  updateNotificationTemplate(
+    templateId: string,
+    body: Record<string, unknown>,
+  ) {
     return apiClient.patch<NotificationTemplate>(
       `/notification-templates/${templateId}`,
       body,
     );
   },
-  listNotificationDeliveries(params: Record<string, string | number | undefined>) {
+  listNotificationDeliveries(
+    params: Record<string, string | number | undefined>,
+  ) {
     return apiClient.get<{
       items: NotificationDelivery[];
-      pagination: { page: number; pageSize: number; totalItems: number; totalPages: number };
+      pagination: {
+        page: number;
+        pageSize: number;
+        totalItems: number;
+        totalPages: number;
+      };
     }>(`/notification-deliveries${buildQuery(params)}`);
   },
   retryNotificationDelivery(deliveryId: string) {

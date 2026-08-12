@@ -19,6 +19,7 @@ describe('OnboardingService', () => {
     const completedAt = null;
     repository.getOnboardingSnapshot.mockResolvedValueOnce({
       organizationProfileCompleted: true,
+      regulatoryProfileCompleted: true,
       operationalSettingsCompleted: true,
       customerCodePolicyCompleted: true,
       activeFacilities: 1,
@@ -40,6 +41,7 @@ describe('OnboardingService', () => {
     repository.getOnboardingSnapshot
       .mockResolvedValueOnce({
         organizationProfileCompleted: true,
+        regulatoryProfileCompleted: true,
         operationalSettingsCompleted: true,
         customerCodePolicyCompleted: true,
         activeFacilities: 1,
@@ -49,6 +51,7 @@ describe('OnboardingService', () => {
       })
       .mockResolvedValueOnce({
         organizationProfileCompleted: true,
+        regulatoryProfileCompleted: true,
         operationalSettingsCompleted: true,
         customerCodePolicyCompleted: true,
         activeFacilities: 1,
@@ -69,6 +72,7 @@ describe('OnboardingService', () => {
   it('rejects completion when requirements are incomplete', async () => {
     repository.getOnboardingSnapshot.mockResolvedValueOnce({
       organizationProfileCompleted: true,
+      regulatoryProfileCompleted: true,
       operationalSettingsCompleted: true,
       customerCodePolicyCompleted: false,
       activeFacilities: 0,
@@ -86,6 +90,7 @@ describe('OnboardingService', () => {
     const completedAt = new Date('2026-07-01T12:00:00.000Z');
     repository.getOnboardingSnapshot.mockResolvedValueOnce({
       organizationProfileCompleted: true,
+      regulatoryProfileCompleted: true,
       operationalSettingsCompleted: true,
       customerCodePolicyCompleted: true,
       activeFacilities: 1,

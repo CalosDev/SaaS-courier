@@ -2,11 +2,12 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { ValidationPipe } from '@nestjs/common';
 import type { NestExpressApplication } from '@nestjs/platform-express';
+import { isAllowedOrigin, loadAllowedOrigins } from './allowed-origin';
 
 export function configureHttpApp(app: NestExpressApplication): void {
   const allowedOrigins = loadAllowedOrigins();
 
-  app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
+  app.set('trust proxy', loadTrustedProxies());
   app.use(
     helmet({
       hsts: process.env.NODE_ENV === 'production' ? undefined : false,
@@ -21,7 +22,7 @@ export function configureHttpApp(app: NestExpressApplication): void {
         return;
       }
 
-      callback(null, allowedOrigins.includes(origin));
+      callback(null, isAllowedOrigin(origin, allowedOrigins));
     },
     methods: ['GET', 'HEAD', 'OPTIONS', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'X-CSRF-Token'],
@@ -39,11 +40,15 @@ export function configureHttpApp(app: NestExpressApplication): void {
   );
 }
 
-function loadAllowedOrigins(): string[] {
-  const rawOrigins = process.env.CORS_ORIGINS ?? 'http://localhost:3000';
+function loadTrustedProxies(): false | string[] {
+  const configured = process.env.TRUST_PROXY?.trim() ?? 'false';
 
-  return rawOrigins
+  if (configured === 'false') {
+    return false;
+  }
+
+  return configured
     .split(',')
-    .map((origin) => origin.trim())
-    .filter((origin) => origin.length > 0);
+    .map((entry) => entry.trim())
+    .filter(Boolean);
 }

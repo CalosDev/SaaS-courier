@@ -76,15 +76,21 @@ export class AuthHttpService {
       email: body.email,
       password: body.password,
     });
+    const organizations = request.tenantHost
+      ? authenticatedUser.organizations.filter(
+          (organization) =>
+            organization.organizationId === request.tenantHost?.organizationId,
+        )
+      : authenticatedUser.organizations;
 
-    if (authenticatedUser.organizations.length === 0) {
+    if (organizations.length === 0) {
       throw new OrganizationAccessDeniedError();
     }
 
-    if (authenticatedUser.organizations.length === 1) {
+    if (organizations.length === 1) {
       const context = await this.authService.selectOrganization({
         userId: authenticatedUser.userId,
-        organizationId: authenticatedUser.organizations[0].organizationId,
+        organizationId: organizations[0].organizationId,
       });
       const createdSession = await this.sessionsService.createSession({
         userId: context.userId,
@@ -121,7 +127,7 @@ export class AuthHttpService {
 
     return {
       status: 'organization_selection_required',
-      organizations: authenticatedUser.organizations,
+      organizations,
     };
   }
 
@@ -134,6 +140,13 @@ export class AuthHttpService {
     session: SerializedSessionContext;
   }> {
     this.setNoStore(response);
+
+    if (
+      request.tenantHost &&
+      request.tenantHost.organizationId !== body.organizationId
+    ) {
+      throw new OrganizationAccessDeniedError();
+    }
 
     const challengeToken =
       this.authCookieService.readLoginChallengeToken(request);

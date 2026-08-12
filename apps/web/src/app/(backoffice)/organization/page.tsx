@@ -18,10 +18,15 @@ export default function OrganizationPage() {
   const resource = useAsyncState(
     useCallback(
       () =>
-      Promise.all([
-        backofficeApi.getCurrentOrganization(),
-        backofficeApi.getCurrentSettings(),
-      ]).then(([organization, settings]) => ({ organization, settings })),
+        Promise.all([
+          backofficeApi.getCurrentOrganization(),
+          backofficeApi.getCurrentSettings(),
+          backofficeApi.getCurrentRegulatoryProfile(),
+        ]).then(([organization, settings, regulatoryProfile]) => ({
+          organization,
+          settings,
+          regulatoryProfile,
+        })),
       [],
     ),
   );
@@ -42,7 +47,7 @@ export default function OrganizationPage() {
     );
   }
 
-  const { organization, settings } = resource.data;
+  const { organization, settings, regulatoryProfile } = resource.data;
 
   async function handleProfileSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -61,7 +66,9 @@ export default function OrganizationPage() {
       setMessage("Perfil de organización actualizado.");
       await resource.refresh();
     } catch (error) {
-      setError(error instanceof ApiError ? error.message : "No fue posible guardar.");
+      setError(
+        error instanceof ApiError ? error.message : "No fue posible guardar.",
+      );
     }
   }
 
@@ -74,9 +81,14 @@ export default function OrganizationPage() {
     try {
       await backofficeApi.updateCurrentSettings({
         locale: String(formData.get("locale") || ""),
-        dateFormat: String(formData.get("dateFormat") || "") as "DMY" | "MDY" | "YMD",
+        dateFormat: String(formData.get("dateFormat") || "") as
+          | "DMY"
+          | "MDY"
+          | "YMD",
         weightUnit: String(formData.get("weightUnit") || "") as "LB" | "KG",
-        dimensionUnit: String(formData.get("dimensionUnit") || "") as "IN" | "CM",
+        dimensionUnit: String(formData.get("dimensionUnit") || "") as
+          | "IN"
+          | "CM",
         timezone: String(formData.get("timezone") || ""),
         currencyCode: String(formData.get("currencyCode") || ""),
         countryCode: String(formData.get("countryCode") || ""),
@@ -84,7 +96,9 @@ export default function OrganizationPage() {
           formData.get("customerCodeStrategy") || "",
         ) as "AUTO_RANDOM" | "AUTO_SEQUENTIAL",
         customerCodePrefix: String(formData.get("customerCodePrefix") || ""),
-        customerCodeRandomLength: Number(formData.get("customerCodeRandomLength") || 0),
+        customerCodeRandomLength: Number(
+          formData.get("customerCodeRandomLength") || 0,
+        ),
         customerCodeSequencePadding: Number(
           formData.get("customerCodeSequencePadding") || 0,
         ),
@@ -92,7 +106,46 @@ export default function OrganizationPage() {
       setMessage("Configuración operativa actualizada.");
       await resource.refresh();
     } catch (error) {
-      setError(error instanceof ApiError ? error.message : "No fue posible guardar.");
+      setError(
+        error instanceof ApiError ? error.message : "No fue posible guardar.",
+      );
+    }
+  }
+
+  async function handleRegulatorySubmit(
+    event: React.FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    setMessage(null);
+    setError(null);
+
+    try {
+      await backofficeApi.updateCurrentRegulatoryProfile({
+        fiscalAddress: String(formData.get("fiscalAddress") || ""),
+        authorizedRepresentativeName: String(
+          formData.get("authorizedRepresentativeName") || "",
+        ),
+        authorizedRepresentativeEmail: String(
+          formData.get("authorizedRepresentativeEmail") || "",
+        ),
+        authorizedRepresentativePhone: String(
+          formData.get("authorizedRepresentativePhone") || "",
+        ),
+        courierRegistrationStatus: String(
+          formData.get("courierRegistrationStatus") || "UNKNOWN",
+        ) as typeof regulatoryProfile.courierRegistrationStatus,
+        dgaOperatorCode: String(formData.get("dgaOperatorCode") || ""),
+        electronicInvoicingStatus: String(
+          formData.get("electronicInvoicingStatus") || "UNKNOWN",
+        ) as typeof regulatoryProfile.electronicInvoicingStatus,
+      });
+      setMessage("Perfil regulatorio actualizado.");
+      await resource.refresh();
+    } catch (error) {
+      setError(
+        error instanceof ApiError ? error.message : "No fue posible guardar.",
+      );
     }
   }
 
@@ -113,7 +166,11 @@ export default function OrganizationPage() {
           <h2>Perfil</h2>
           <form className="form-grid" onSubmit={handleProfileSubmit}>
             <FormField label="Razón social">
-              <Input name="legalName" defaultValue={organization.legalName} required />
+              <Input
+                name="legalName"
+                defaultValue={organization.legalName}
+                required
+              />
             </FormField>
             <FormField label="Nombre comercial">
               <Input
@@ -155,19 +212,34 @@ export default function OrganizationPage() {
               </Select>
             </FormField>
             <FormField label="Unidad de dimensión">
-              <Select name="dimensionUnit" defaultValue={settings.dimensionUnit}>
+              <Select
+                name="dimensionUnit"
+                defaultValue={settings.dimensionUnit}
+              >
                 <option value="IN">IN</option>
                 <option value="CM">CM</option>
               </Select>
             </FormField>
             <FormField label="Zona horaria">
-              <Input name="timezone" defaultValue={settings.timezone} required />
+              <Input
+                name="timezone"
+                defaultValue={settings.timezone}
+                required
+              />
             </FormField>
             <FormField label="Moneda">
-              <Input name="currencyCode" defaultValue={settings.currencyCode} required />
+              <Input
+                name="currencyCode"
+                defaultValue={settings.currencyCode}
+                required
+              />
             </FormField>
             <FormField label="País">
-              <Input name="countryCode" defaultValue={settings.countryCode} required />
+              <Input
+                name="countryCode"
+                defaultValue={settings.countryCode}
+                required
+              />
             </FormField>
             <FormField label="Estrategia de código">
               <Select
@@ -201,6 +273,74 @@ export default function OrganizationPage() {
               />
             </FormField>
             <Button type="submit">Guardar configuración</Button>
+          </form>
+        </Card>
+
+        <Card>
+          <h2>Perfil regulatorio</h2>
+          <form className="form-grid" onSubmit={handleRegulatorySubmit}>
+            <FormField label="Dirección fiscal">
+              <Input
+                name="fiscalAddress"
+                defaultValue={regulatoryProfile.fiscalAddress || ""}
+              />
+            </FormField>
+            <FormField label="Representante autorizado">
+              <Input
+                name="authorizedRepresentativeName"
+                defaultValue={
+                  regulatoryProfile.authorizedRepresentativeName || ""
+                }
+              />
+            </FormField>
+            <FormField label="Correo del representante">
+              <Input
+                name="authorizedRepresentativeEmail"
+                type="email"
+                defaultValue={
+                  regulatoryProfile.authorizedRepresentativeEmail || ""
+                }
+              />
+            </FormField>
+            <FormField label="Teléfono del representante">
+              <Input
+                name="authorizedRepresentativePhone"
+                defaultValue={
+                  regulatoryProfile.authorizedRepresentativePhone || ""
+                }
+              />
+            </FormField>
+            <FormField label="Registro como courier">
+              <Select
+                name="courierRegistrationStatus"
+                defaultValue={regulatoryProfile.courierRegistrationStatus}
+              >
+                <option value="UNKNOWN">Sin declarar</option>
+                <option value="IN_PROCESS">En proceso</option>
+                <option value="AUTHORIZED">Autorizado</option>
+                <option value="SUSPENDED">Suspendido</option>
+                <option value="REVOKED">Revocado</option>
+              </Select>
+            </FormField>
+            <FormField label="Identificación interna DGA">
+              <Input
+                name="dgaOperatorCode"
+                defaultValue={regulatoryProfile.dgaOperatorCode || ""}
+              />
+            </FormField>
+            <FormField label="Facturación electrónica">
+              <Select
+                name="electronicInvoicingStatus"
+                defaultValue={regulatoryProfile.electronicInvoicingStatus}
+              >
+                <option value="UNKNOWN">Sin declarar</option>
+                <option value="NOT_ENROLLED">No incorporado</option>
+                <option value="IN_PROCESS">En proceso</option>
+                <option value="ENABLED">Habilitado</option>
+                <option value="EXEMPT">Exento</option>
+              </Select>
+            </FormField>
+            <Button type="submit">Guardar perfil regulatorio</Button>
           </form>
         </Card>
       </section>

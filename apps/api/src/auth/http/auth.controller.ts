@@ -19,6 +19,7 @@ import { CurrentSession } from './current-session.decorator';
 import { LoginDto } from './dto/login.dto';
 import { SelectOrganizationDto } from './dto/select-organization.dto';
 import { Public } from './public.decorator';
+import { TenantHostExempt } from '../../tenant-host/tenant-host-exempt.decorator';
 
 @Controller('auth')
 export class AuthController {
@@ -29,6 +30,7 @@ export class AuthController {
 
   @Get('csrf')
   @Public()
+  @TenantHostExempt()
   @Throttle({
     default: {
       limit: 60,
@@ -112,6 +114,7 @@ export class AuthController {
 
   @Post('logout')
   @Public()
+  @TenantHostExempt()
   @HttpCode(204)
   async logout(
     @Req() request: AuthenticatedRequest,

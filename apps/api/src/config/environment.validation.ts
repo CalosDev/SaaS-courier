@@ -1,9 +1,14 @@
+import { isIP } from 'node:net';
+
 const BOOLEAN_KEYS = [
   'COOKIE_SECURE',
   'S3_FORCE_PATH_STYLE',
   'SMTP_SECURE',
   'READINESS_REQUIRE_S3',
   'READINESS_REQUIRE_SMTP',
+  'TENANT_SUBDOMAINS_ENABLED',
+  'TENANT_ALLOW_BARE_LOCALHOST',
+  'ALLOW_ORGANIZATION_PROVISIONING',
 ] as const;
 
 const DEVELOPMENT_SECRET_MARKERS = [
@@ -32,6 +37,7 @@ export function validateEnvironment(
   validateOptionalUrl(environment, 'API_INTERNAL_URL');
   validateCorsOrigins(environment);
   validateOptionalServiceGroups(environment);
+  validateTenantHostConfiguration(environment, nodeEnvironment);
 
   if (nodeEnvironment === 'production') {
     validateProductionEnvironment(environment);
@@ -52,6 +58,8 @@ function validateProductionEnvironment(environment: Record<string, unknown>) {
   requireValue(environment, 'SMTP_HOST');
   requireValue(environment, 'SMTP_FROM');
   requireValue(environment, 'CLAMAV_HOST');
+  requireValue(environment, 'APP_BASE_DOMAIN');
+  const trustedProxies = requireValue(environment, 'TRUST_PROXY');
 
   if (text(environment.APP_ENV) !== 'production') {
     fail('APP_ENV must be production when NODE_ENV=production');
@@ -67,6 +75,15 @@ function validateProductionEnvironment(environment: Record<string, unknown>) {
   }
   if (text(environment.FILE_SCAN_MODE) !== 'clamav') {
     fail('FILE_SCAN_MODE must be clamav in production');
+  }
+  if (text(environment.TENANT_SUBDOMAINS_ENABLED) !== 'true') {
+    fail('TENANT_SUBDOMAINS_ENABLED must be true in production');
+  }
+  if (text(environment.TENANT_ALLOW_BARE_LOCALHOST) === 'true') {
+    fail('TENANT_ALLOW_BARE_LOCALHOST cannot be true in production');
+  }
+  if (trustedProxies === 'false') {
+    fail('TRUST_PROXY must define trusted proxy ranges in production');
   }
   if (!['AES256', 'aws:kms'].includes(encryption)) {
     fail('S3_SERVER_SIDE_ENCRYPTION must be AES256 or aws:kms in production');
@@ -113,6 +130,81 @@ function validateProductionEnvironment(environment: Record<string, unknown>) {
     )
   ) {
     fail('Production configuration contains a known development credential');
+  }
+}
+
+function validateTenantHostConfiguration(
+  environment: Record<string, unknown>,
+  nodeEnvironment: string,
+) {
+  const enabled = text(environment.TENANT_SUBDOMAINS_ENABLED) === 'true';
+  const baseDomain = text(environment.APP_BASE_DOMAIN);
+  const trustedProxies = text(environment.TRUST_PROXY) ?? 'false';
+
+  if (enabled && !baseDomain) {
+    fail('APP_BASE_DOMAIN is required when tenant subdomains are enabled');
+  }
+  if (baseDomain) {
+    validateHostname(baseDomain, 'APP_BASE_DOMAIN');
+    if (
+      nodeEnvironment === 'production' &&
+      ['localhost', '127.0.0.1', '::1'].includes(baseDomain.toLowerCase())
+    ) {
+      fail('APP_BASE_DOMAIN must be a production domain');
+    }
+  }
+  if (trustedProxies === 'true') {
+    fail('TRUST_PROXY cannot trust every source');
+  }
+  if (trustedProxies !== 'false') {
+    const entries = trustedProxies
+      .split(',')
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    if (
+      entries.length === 0 ||
+      entries.some((entry) => !isTrustedProxy(entry))
+    ) {
+      fail('TRUST_PROXY must contain valid proxy names, addresses or CIDRs');
+    }
+  }
+}
+
+function isTrustedProxy(value: string): boolean {
+  if (['loopback', 'linklocal', 'uniquelocal'].includes(value)) {
+    return true;
+  }
+
+  const [address, prefix, ...extra] = value.split('/');
+  if (extra.length > 0 || !address) return false;
+
+  const version = isIP(address);
+  if (version === 0) return false;
+  if (prefix === undefined) return true;
+  if (!/^\d+$/.test(prefix)) return false;
+
+  const numericPrefix = Number(prefix);
+  return version === 4
+    ? numericPrefix >= 0 && numericPrefix <= 32
+    : numericPrefix >= 0 && numericPrefix <= 128;
+}
+
+function validateHostname(value: string, key: string) {
+  const normalized = value.trim().toLowerCase().replace(/\.$/, '');
+  if (
+    !normalized ||
+    normalized.includes('://') ||
+    normalized.includes(':') ||
+    normalized
+      .split('.')
+      .some(
+        (label) =>
+          !label ||
+          label.length > 63 ||
+          !/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/.test(label),
+      )
+  ) {
+    fail(`${key} must be a hostname without protocol or port`);
   }
 }
 

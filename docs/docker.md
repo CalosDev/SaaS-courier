@@ -17,6 +17,10 @@ Mailpit captura correo sin entregarlo a Internet.
 - PostgreSQL y object storage son servicios administrados.
 - El escaneo ClamAV se despliega como dependencia interna separada y nunca se
   expone directamente a Internet.
+- El proxy de entrada preserva el host original en `X-Forwarded-Host`; la API
+  solo lo acepta desde los rangos declarados en `TRUST_PROXY`.
+- DNS y TLS cubren `*.APP_BASE_DOMAIN`; no se admiten dominios personalizados
+  durante el piloto.
 
 ## Reglas
 
