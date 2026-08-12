@@ -113,6 +113,7 @@ export interface OnboardingSnapshot {
   organizationProfileCompleted: boolean;
   operationalSettingsCompleted: boolean;
   customerCodePolicyCompleted: boolean;
+  regulatoryProfileCompleted: boolean;
   activeFacilities: number;
   activeEmployees: number;
   activeRolesWithPermissions: number;
@@ -124,6 +125,7 @@ export interface OnboardingStepRecord {
     | 'ORGANIZATION_PROFILE'
     | 'OPERATIONAL_SETTINGS'
     | 'CUSTOMER_CODE_POLICY'
+    | 'REGULATORY_PROFILE'
     | 'ACTIVE_FACILITY'
     | 'ACTIVE_EMPLOYEE'
     | 'ACTIVE_ROLE';

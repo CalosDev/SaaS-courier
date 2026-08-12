@@ -1,6 +1,8 @@
 export const AUDIT_ACTIONS = [
   'organization.updated',
   'organization.settings.updated',
+  'organization.regulatory_profile.updated',
+  'organization.provisioned',
   'organization.onboarding.completed',
   'facility.created',
   'facility.updated',
@@ -122,6 +124,7 @@ export type AuditActionCode = (typeof AUDIT_ACTIONS)[number];
 export const AUDIT_ENTITY_TYPES = [
   'ORGANIZATION',
   'ORGANIZATION_SETTINGS',
+  'ORGANIZATION_REGULATORY_PROFILE',
   'FACILITY',
   'EMPLOYEE',
   'ROLE',

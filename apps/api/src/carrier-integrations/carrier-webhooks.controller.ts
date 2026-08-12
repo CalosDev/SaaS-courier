@@ -13,9 +13,11 @@ import { Public } from '../auth/http/public.decorator';
 import { SkipCsrf } from '../auth/http/skip-csrf.decorator';
 import { CarrierConnectionsService } from './carrier-connections.service';
 import { CarrierWebhookDto } from './dto/carrier-webhook.dto';
+import { TenantHostExempt } from '../tenant-host/tenant-host-exempt.decorator';
 
 @Public()
 @SkipCsrf()
+@TenantHostExempt()
 @Controller('webhooks/carriers')
 export class CarrierWebhooksController {
   constructor(private readonly carriers: CarrierConnectionsService) {}

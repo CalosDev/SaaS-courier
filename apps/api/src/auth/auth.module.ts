@@ -22,6 +22,8 @@ import { LoginChallengesService } from './login-challenges/login-challenges.serv
 import { PrismaLoginChallengesRepository } from './login-challenges/prisma-login-challenges.repository';
 import { LoginLockoutPolicy } from './login-lockout.policy';
 import { PrismaAuthRepository } from './prisma-auth.repository';
+import { TenantHostGuard } from '../tenant-host/tenant-host.guard';
+import { TenantHostModule } from '../tenant-host/tenant-host.module';
 
 @Module({
   imports: [
@@ -29,6 +31,7 @@ import { PrismaAuthRepository } from './prisma-auth.repository';
     AccountsModule,
     RbacModule,
     SessionsModule,
+    TenantHostModule,
     ThrottlerModule.forRoot({
       throttlers: [
         {
@@ -66,6 +69,10 @@ import { PrismaAuthRepository } from './prisma-auth.repository';
     {
       provide: APP_GUARD,
       useClass: SessionAuthGuard,
+    },
+    {
+      provide: APP_GUARD,
+      useClass: TenantHostGuard,
     },
     {
       provide: APP_GUARD,

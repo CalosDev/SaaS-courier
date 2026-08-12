@@ -25,6 +25,23 @@ S3 requiere `S3_SERVER_SIDE_ENCRYPTION=AES256` o `aws:kms`; KMS requiere
 `S3_KMS_KEY_ID`.
 Una configuracion incompleta detiene el proceso antes de aceptar trafico.
 
+La resolucion multi-tenant por host requiere:
+
+```text
+APP_BASE_DOMAIN=plataforma.example
+TENANT_SUBDOMAINS_ENABLED=true
+TENANT_ALLOW_BARE_LOCALHOST=false
+TRUST_PROXY=loopback,linklocal,uniquelocal
+```
+
+Crear DNS y TLS para `*.plataforma.example`. El proxy debe reemplazar
+`X-Forwarded-Host` con el host original del cliente y eliminar cualquier valor
+recibido del exterior. `TRUST_PROXY` debe contener solo las redes o direcciones
+desde las que la API recibe trafico; `true` y proxies abiertos son invalidos.
+Next debe recibir el subdominio del tenant y conservarlo al ejecutar el rewrite
+`/backend/*` hacia la API. Una sesion emitida para un subdominio no es valida en
+otro, aunque el usuario pertenezca a ambas organizaciones.
+
 La imagen web se construye con
 `--build-arg STORAGE_PUBLIC_ORIGIN=https://objetos.example`. Ese origen se
 incorpora a la CSP y debe coincidir con el host de las URLs firmadas de carga.
@@ -43,6 +60,11 @@ incorpora a la CSP y debe coincidir con el host de las URLs firmadas de carga.
 PostgreSQL y S3 deben ser administrados. TLS termina en el ingress o proxy;
 cookies usan `Secure`, `HttpOnly` y `SameSite`. El ingress solo envia trafico a
 replicas con readiness exitoso.
+
+El dominio base sin subdominio no expone operaciones tenant. Las excepciones al
+host son endpoints concretos: health publico, emision CSRF, activacion, logout,
+tracking publico y webhooks autenticados por su propio mecanismo. No excluir
+familias completas como `/auth/*`.
 
 `/health/live` y `/health/ready` son publicos, limitados y no revelan nombres de
 dependencias. `/health/dependencies` requiere sesion y `organizations.read`.

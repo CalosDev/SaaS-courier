@@ -5,6 +5,7 @@ import type { AuthenticatedRequest } from './authenticated-request.type';
 import { AuthCookieService } from './auth-cookie.service';
 import { CsrfTokenService } from './csrf-token.service';
 import { SKIP_CSRF_KEY } from './skip-csrf.decorator';
+import { isAllowedOrigin, loadAllowedOrigins } from '../../http/allowed-origin';
 
 const UNSAFE_HTTP_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
@@ -19,7 +20,7 @@ export class CsrfValidationError extends Error {
 
 @Injectable()
 export class CsrfGuard implements CanActivate {
-  private readonly allowedOrigins = this.loadAllowedOrigins();
+  private readonly allowedOrigins = loadAllowedOrigins();
 
   constructor(
     private readonly reflector: Reflector,
@@ -81,17 +82,8 @@ export class CsrfGuard implements CanActivate {
   }
 
   private isAllowedOrigin(origin: string | undefined): boolean {
-    return typeof origin === 'string' && this.allowedOrigins.has(origin);
-  }
-
-  private loadAllowedOrigins(): Set<string> {
-    const rawOrigins = process.env.CORS_ORIGINS ?? 'http://localhost:3000';
-
-    return new Set(
-      rawOrigins
-        .split(',')
-        .map((origin) => origin.trim())
-        .filter((origin) => origin.length > 0),
+    return (
+      typeof origin === 'string' && isAllowedOrigin(origin, this.allowedOrigins)
     );
   }
 }

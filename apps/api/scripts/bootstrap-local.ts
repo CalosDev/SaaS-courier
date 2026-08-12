@@ -47,6 +47,12 @@ async function main(): Promise<void> {
         update: {},
       });
 
+      await tx.organizationRegulatoryProfile.upsert({
+        where: { organizationId: organization.id },
+        create: { organizationId: organization.id },
+        update: {},
+      });
+
       const facility = await tx.facility.upsert({
         where: {
           organizationId_code: {

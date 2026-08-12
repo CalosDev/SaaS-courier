@@ -96,6 +96,11 @@ export class OnboardingService {
         completed: snapshot.customerCodePolicyCompleted,
       },
       {
+        code: 'REGULATORY_PROFILE',
+        required: true,
+        completed: snapshot.regulatoryProfileCompleted,
+      },
+      {
         code: 'ACTIVE_FACILITY',
         required: true,
         completed: snapshot.activeFacilities > 0,

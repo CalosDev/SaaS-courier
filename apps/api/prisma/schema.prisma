@@ -19,6 +19,26 @@ enum OrganizationStatus {
   @@map("organization_status")
 }
 
+enum CourierRegistrationStatus {
+  UNKNOWN
+  IN_PROCESS
+  AUTHORIZED
+  SUSPENDED
+  REVOKED
+
+  @@map("courier_registration_status")
+}
+
+enum ElectronicInvoicingStatus {
+  UNKNOWN
+  NOT_ENROLLED
+  IN_PROCESS
+  ENABLED
+  EXEMPT
+
+  @@map("electronic_invoicing_status")
+}
+
 enum FacilityType {
   INTERNATIONAL_WAREHOUSE
   DISTRIBUTION_CENTER
@@ -533,24 +553,24 @@ enum FacilityTransferEventType {
 }
 
 model Organization {
-  id                        String                     @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
-  legalName                 String                     @map("legal_name") @db.VarChar(200)
-  commercialName            String                     @map("commercial_name") @db.VarChar(120)
-  slug                      String                     @unique(map: "organizations_slug_key") @db.VarChar(80)
-  rnc                       String?                    @db.VarChar(20)
-  email                     String?                    @db.VarChar(320)
-  phone                     String?                    @db.VarChar(32)
-  countryCode               String                     @default("DO") @map("country_code") @db.Char(2)
-  currencyCode              String                     @default("DOP") @map("currency_code") @db.Char(3)
-  timezone                  String                     @default("America/Santo_Domingo") @db.VarChar(64)
-  status                    OrganizationStatus         @default(TRIAL)
-  planCode                  String                     @default("PILOT") @map("plan_code") @db.VarChar(40)
-  maxUsers                  Int                        @default(5) @map("max_users")
-  maxFacilities             Int                        @default(2) @map("max_facilities")
-  trialEndsAt               DateTime?                  @map("trial_ends_at") @db.Timestamptz(3)
-  createdAt                 DateTime                   @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt                 DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
-  deletedAt                 DateTime?                  @map("deleted_at") @db.Timestamptz(3)
+  id                        String                         @id(map: "organizations_pkey") @default(uuid()) @db.Uuid
+  legalName                 String                         @map("legal_name") @db.VarChar(200)
+  commercialName            String                         @map("commercial_name") @db.VarChar(120)
+  slug                      String                         @unique(map: "organizations_slug_key") @db.VarChar(80)
+  rnc                       String?                        @db.VarChar(20)
+  email                     String?                        @db.VarChar(320)
+  phone                     String?                        @db.VarChar(32)
+  countryCode               String                         @default("DO") @map("country_code") @db.Char(2)
+  currencyCode              String                         @default("DOP") @map("currency_code") @db.Char(3)
+  timezone                  String                         @default("America/Santo_Domingo") @db.VarChar(64)
+  status                    OrganizationStatus             @default(TRIAL)
+  planCode                  String                         @default("PILOT") @map("plan_code") @db.VarChar(40)
+  maxUsers                  Int                            @default(5) @map("max_users")
+  maxFacilities             Int                            @default(2) @map("max_facilities")
+  trialEndsAt               DateTime?                      @map("trial_ends_at") @db.Timestamptz(3)
+  createdAt                 DateTime                       @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                 DateTime                       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt                 DateTime?                      @map("deleted_at") @db.Timestamptz(3)
   facilities                Facility[]
   customers                 Customer[]
   customerAddresses         CustomerAddress[]
@@ -562,6 +582,7 @@ model Organization {
   rolePermissions           RolePermission[]
   userSessions              UserSession[]
   settings                  OrganizationSettings?
+  regulatoryProfile         OrganizationRegulatoryProfile?
   customerImportJobs        CustomerImportJob[]
   customerImportRows        CustomerImportRow[]
   auditLogs                 AuditLog[]
@@ -613,6 +634,25 @@ model Organization {
   @@index([status], map: "organizations_status_idx")
   @@index([deletedAt], map: "organizations_deleted_at_idx")
   @@map("organizations")
+}
+
+model OrganizationRegulatoryProfile {
+  organizationId                String                    @id(map: "organization_regulatory_profiles_pkey") @map("organization_id") @db.Uuid
+  fiscalAddress                 String?                   @map("fiscal_address") @db.VarChar(500)
+  authorizedRepresentativeName  String?                   @map("authorized_representative_name") @db.VarChar(200)
+  authorizedRepresentativeEmail String?                   @map("authorized_representative_email") @db.VarChar(320)
+  authorizedRepresentativePhone String?                   @map("authorized_representative_phone") @db.VarChar(32)
+  courierRegistrationStatus     CourierRegistrationStatus @default(UNKNOWN) @map("courier_registration_status")
+  dgaOperatorCode               String?                   @map("dga_operator_code") @db.VarChar(80)
+  electronicInvoicingStatus     ElectronicInvoicingStatus @default(UNKNOWN) @map("electronic_invoicing_status")
+  declaredAt                    DateTime?                 @map("declared_at") @db.Timestamptz(3)
+  createdAt                     DateTime                  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                     DateTime                  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization                  Organization              @relation(fields: [organizationId], references: [id], onDelete: Restrict, onUpdate: Cascade, map: "organization_regulatory_profiles_organization_id_fkey")
+
+  @@index([courierRegistrationStatus], map: "organization_regulatory_profiles_courier_status_idx")
+  @@index([electronicInvoicingStatus], map: "organization_regulatory_profiles_invoicing_status_idx")
+  @@map("organization_regulatory_profiles")
 }
 
 model AuditLog {

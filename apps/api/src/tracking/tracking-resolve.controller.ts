@@ -5,12 +5,14 @@ import { Public } from '../auth/http/public.decorator';
 import { CurrentCommandContext } from '../request-context/current-command-context.decorator';
 import type { CommandContext } from '../request-context/request-context.types';
 import { TrackingService } from './tracking.service';
+import { TenantHostExempt } from '../tenant-host/tenant-host-exempt.decorator';
 
 @Controller()
 export class TrackingResolveController {
   constructor(private readonly trackingService: TrackingService) {}
 
   @Public()
+  @TenantHostExempt()
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @Get('public/organizations/:slug/tracking/:reference')
   resolvePublic(

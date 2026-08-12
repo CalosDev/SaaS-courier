@@ -112,6 +112,10 @@ import {
   OrganizationSlugConflictError,
 } from '../../organizations/organization.errors';
 import {
+  InvalidOrganizationRegulatoryProfileInputError,
+  OrganizationRegulatoryProfileNotFoundError,
+} from '../../organizations/organization-regulatory-profile.errors';
+import {
   InvalidOrganizationSettingsInputError,
   OnboardingAlreadyCompletedError,
   OnboardingRequirementsIncompleteError,
@@ -164,6 +168,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
       exception instanceof InvalidSessionInputError ||
       exception instanceof InvalidLoginChallengeInputError ||
       exception instanceof InvalidOrganizationInputError ||
+      exception instanceof InvalidOrganizationRegulatoryProfileInputError ||
       exception instanceof InvalidFacilityInputError ||
       exception instanceof InvalidCustomerInputError ||
       exception instanceof InvalidPrealertInputError ||
@@ -237,6 +242,7 @@ export class AuthHttpExceptionFilter implements ExceptionFilter {
 
     if (
       exception instanceof OrganizationNotFoundError ||
+      exception instanceof OrganizationRegulatoryProfileNotFoundError ||
       exception instanceof FacilityNotFoundError ||
       exception instanceof FacilityOrganizationUnavailableError ||
       exception instanceof CustomerNotFoundError ||

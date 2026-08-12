@@ -223,6 +223,13 @@ describe('Customer imports integration', () => {
           });
         }
         if (cleanup.organizationIds.length > 0) {
+          await prismaService.organizationRegulatoryProfile.deleteMany({
+            where: {
+              organizationId: {
+                in: cleanup.organizationIds,
+              },
+            },
+          });
           await prismaService.organizationSettings.deleteMany({
             where: {
               organizationId: {

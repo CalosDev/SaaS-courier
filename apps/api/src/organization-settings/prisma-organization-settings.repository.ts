@@ -175,35 +175,43 @@ export class PrismaOrganizationSettingsRepository implements OrganizationSetting
       return null;
     }
 
-    const [activeFacilities, activeEmployees, activeRolesWithPermissions] =
-      await this.prismaService.$transaction(async (tx) => {
-        const facilityCount = await tx.facility.count({
-          where: {
-            organizationId,
-            deletedAt: null,
-            isActive: true,
-          },
-        });
-        const employeeCount = await tx.employee.count({
-          where: {
-            organizationId,
-            deletedAt: null,
-            status: 'ACTIVE',
-          },
-        });
-        const roleCount = await tx.role.count({
-          where: {
-            organizationId,
-            deletedAt: null,
-            isActive: true,
-            rolePermissions: {
-              some: {},
-            },
-          },
-        });
-
-        return [facilityCount, employeeCount, roleCount] as const;
+    const [
+      activeFacilities,
+      activeEmployees,
+      activeRolesWithPermissions,
+      regulatoryProfile,
+    ] = await this.prismaService.$transaction(async (tx) => {
+      const facilityCount = await tx.facility.count({
+        where: {
+          organizationId,
+          deletedAt: null,
+          isActive: true,
+        },
       });
+      const employeeCount = await tx.employee.count({
+        where: {
+          organizationId,
+          deletedAt: null,
+          status: 'ACTIVE',
+        },
+      });
+      const roleCount = await tx.role.count({
+        where: {
+          organizationId,
+          deletedAt: null,
+          isActive: true,
+          rolePermissions: {
+            some: {},
+          },
+        },
+      });
+
+      const profile = await tx.organizationRegulatoryProfile.findUnique({
+        where: { organizationId },
+      });
+
+      return [facilityCount, employeeCount, roleCount, profile] as const;
+    });
 
     return {
       organizationProfileCompleted:
@@ -216,6 +224,14 @@ export class PrismaOrganizationSettingsRepository implements OrganizationSetting
         current.settings.customerCodePrefix.length > 0 &&
         current.settings.customerCodeRandomLength >= 4 &&
         current.settings.customerCodeSequencePadding >= 3,
+      regulatoryProfileCompleted:
+        Boolean(current.settings.onboardingCompletedAt) ||
+        Boolean(
+          regulatoryProfile?.fiscalAddress &&
+          regulatoryProfile.authorizedRepresentativeName &&
+          regulatoryProfile.courierRegistrationStatus !== 'UNKNOWN' &&
+          regulatoryProfile.electronicInvoicingStatus !== 'UNKNOWN',
+        ),
       activeFacilities,
       activeEmployees,
       activeRolesWithPermissions,

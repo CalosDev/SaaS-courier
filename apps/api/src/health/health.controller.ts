@@ -4,6 +4,7 @@ import { SmtpEmailSender } from '../notifications/smtp-email.sender';
 import { PrismaService } from '../prisma/prisma.service';
 import { ObjectStorageService } from '../storage/object-storage.service';
 import { RequirePermissions } from '../rbac/http/require-permissions.decorator';
+import { TenantHostExempt } from '../tenant-host/tenant-host-exempt.decorator';
 
 export interface HealthResponse {
   status: 'ok';
@@ -28,6 +29,7 @@ export class HealthController {
 
   @Get()
   @Public()
+  @TenantHostExempt()
   getHealth(): HealthResponse {
     return {
       status: 'ok',
@@ -38,12 +40,14 @@ export class HealthController {
 
   @Get('live')
   @Public()
+  @TenantHostExempt()
   getLiveness(): HealthResponse {
     return this.getHealth();
   }
 
   @Get('ready')
   @Public()
+  @TenantHostExempt()
   async getReadiness() {
     const readiness = await this.resolveReadiness();
     const body = {

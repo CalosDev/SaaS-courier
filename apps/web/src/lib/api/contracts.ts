@@ -145,6 +145,29 @@ export type OrganizationSettings = {
   updatedAt: string;
 };
 
+export type OrganizationRegulatoryProfile = {
+  fiscalAddress: string | null;
+  authorizedRepresentativeName: string | null;
+  authorizedRepresentativeEmail: string | null;
+  authorizedRepresentativePhone: string | null;
+  courierRegistrationStatus:
+    | "UNKNOWN"
+    | "IN_PROCESS"
+    | "AUTHORIZED"
+    | "SUSPENDED"
+    | "REVOKED";
+  dgaOperatorCode: string | null;
+  electronicInvoicingStatus:
+    | "UNKNOWN"
+    | "NOT_ENROLLED"
+    | "IN_PROCESS"
+    | "ENABLED"
+    | "EXEMPT";
+  declaredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type OrganizationCapabilities = {
   planCode: string;
   modules: string[];
@@ -167,6 +190,7 @@ export type Onboarding = {
       | "ORGANIZATION_PROFILE"
       | "OPERATIONAL_SETTINGS"
       | "CUSTOMER_CODE_POLICY"
+      | "REGULATORY_PROFILE"
       | "ACTIVE_FACILITY"
       | "ACTIVE_EMPLOYEE"
       | "ACTIVE_ROLE";
@@ -1140,10 +1164,7 @@ export interface UpdatePickupRequestDto {
 
 export interface PublicTrackingResult {
   organization: { slug: string; name: string };
-  referenceType:
-    | "INTERNAL_TRACKING"
-    | "EXTERNAL_TRACKING"
-    | "PREALERT_CODE";
+  referenceType: "INTERNAL_TRACKING" | "EXTERNAL_TRACKING" | "PREALERT_CODE";
   internalTrackingNumber: string | null;
   status: string;
   timeline: Array<{

@@ -37,6 +37,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { ReportsModule } from './reports/reports.module';
 import { WarehouseModule } from './warehouse/warehouse.module';
 import { validateEnvironment } from './config/environment.validation';
+import { OrganizationProvisioningModule } from './provisioning/organization-provisioning.module';
 @Module({
   imports: [
     ConfigModule.forRoot({
@@ -63,6 +64,7 @@ import { validateEnvironment } from './config/environment.validation';
     HealthModule,
     InventoryModule,
     OrganizationSettingsModule,
+    OrganizationProvisioningModule,
     PackagesModule,
     HoldsModule,
     CorrectionsModule,

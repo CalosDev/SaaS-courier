@@ -121,6 +121,9 @@ describe('Organization onboarding and customer imports HTTP', () => {
           organizationId: organization.id,
         },
       });
+      await prisma.organizationRegulatoryProfile.create({
+        data: { organizationId: organization.id },
+      });
 
       const otherOrganization = await prisma.organization.create({
         data: {
@@ -135,6 +138,9 @@ describe('Organization onboarding and customer imports HTTP', () => {
         data: {
           organizationId: otherOrganization.id,
         },
+      });
+      await prisma.organizationRegulatoryProfile.create({
+        data: { organizationId: otherOrganization.id },
       });
 
       const user = await prisma.user.create({
@@ -251,6 +257,54 @@ describe('Organization onboarding and customer imports HTTP', () => {
         customerCodeStrategy: 'AUTO_RANDOM',
       });
       expect(settingsResponse.body).not.toHaveProperty('organizationId');
+
+      const regulatoryResponse = await request(server)
+        .get('/organizations/current/regulatory-profile')
+        .set('Cookie', sessionCookie)
+        .expect(200);
+      expect(regulatoryResponse.headers['cache-control']).toBe('no-store');
+      expect(regulatoryResponse.body).toMatchObject({
+        fiscalAddress: null,
+        courierRegistrationStatus: 'UNKNOWN',
+        electronicInvoicingStatus: 'UNKNOWN',
+      });
+      expect(regulatoryResponse.body).not.toHaveProperty('organizationId');
+
+      await request(server)
+        .patch('/organizations/current/regulatory-profile')
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send({
+          organizationId: otherOrganization.id,
+          fiscalAddress: 'Attempted cross-tenant update',
+        })
+        .expect(400);
+
+      await request(server)
+        .patch('/organizations/current/regulatory-profile')
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send({
+          fiscalAddress: 'Santo Domingo, Republica Dominicana',
+          authorizedRepresentativeName: 'Ada Lovelace',
+          authorizedRepresentativeEmail: 'admin@courier.test',
+          courierRegistrationStatus: 'IN_PROCESS',
+          dgaOperatorCode: 'DGA-TEST-01',
+          electronicInvoicingStatus: 'NOT_ENROLLED',
+        })
+        .expect(200);
+
+      await expect(
+        prisma.organizationRegulatoryProfile.findUniqueOrThrow({
+          where: { organizationId: otherOrganization.id },
+        }),
+      ).resolves.toMatchObject({
+        fiscalAddress: null,
+        courierRegistrationStatus: 'UNKNOWN',
+        electronicInvoicingStatus: 'UNKNOWN',
+      });
 
       await request(server)
         .patch('/organizations/current/settings')
@@ -519,6 +573,13 @@ describe('Organization onboarding and customer imports HTTP', () => {
               },
             },
           });
+          await prismaService.organizationRegulatoryProfile.deleteMany({
+            where: {
+              organizationId: {
+                in: cleanup.organizationIds,
+              },
+            },
+          });
           await prismaService.organization.deleteMany({
             where: {
               id: {
@@ -631,6 +692,13 @@ describe('Organization onboarding and customer imports HTTP', () => {
             cleanup.organizationIds,
           );
           await prismaService.organizationSettings.deleteMany({
+            where: {
+              organizationId: {
+                in: cleanup.organizationIds,
+              },
+            },
+          });
+          await prismaService.organizationRegulatoryProfile.deleteMany({
             where: {
               organizationId: {
                 in: cleanup.organizationIds,

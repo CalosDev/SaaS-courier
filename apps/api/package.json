@@ -24,6 +24,7 @@
     "prisma:migrate:status": "prisma migrate status --config ./prisma.config.ts",
     "rbac:sync-permissions": "ts-node scripts/sync-permissions.ts",
     "bootstrap:local": "ts-node scripts/bootstrap-local.ts",
+    "provision:organization": "ts-node scripts/provision-organization.ts",
     "outbox:status": "ts-node scripts/outbox-status.ts",
     "pilot:integrations:check": "ts-node scripts/check-pilot-integrations.ts",
     "test": "jest --runInBand",
