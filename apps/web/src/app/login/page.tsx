@@ -14,6 +14,7 @@ import {
   type AuthenticationMembership,
   useAuth,
 } from "@/lib/auth/auth-provider";
+import { resolveAuthenticatedRedirect } from "@/lib/auth/safe-redirect";
 
 function LoginPageContent() {
   const router = useRouter();
@@ -27,7 +28,7 @@ function LoginPageContent() {
 
   useEffect(() => {
     if (state.status === "authenticated") {
-      router.replace(searchParams.get("next") || "/dashboard");
+      router.replace(resolveAuthenticatedRedirect(searchParams.get("next")));
     }
   }, [router, searchParams, state.status]);
 
@@ -45,7 +46,7 @@ function LoginPageContent() {
         return;
       }
 
-      router.replace(searchParams.get("next") || "/dashboard");
+      router.replace(resolveAuthenticatedRedirect(searchParams.get("next")));
     } catch (cause) {
       setError(
         cause instanceof ApiError ? cause.message : "No fue posible iniciar sesion.",
@@ -61,7 +62,7 @@ function LoginPageContent() {
 
     try {
       await selectOrganization(organizationId);
-      router.replace(searchParams.get("next") || "/dashboard");
+      router.replace(resolveAuthenticatedRedirect(searchParams.get("next")));
     } catch (cause) {
       setError(
         cause instanceof ApiError

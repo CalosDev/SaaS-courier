@@ -7,7 +7,6 @@ import {
   PrealertForm,
   type PrealertSubmitPayload,
 } from "@/components/prealerts/prealert-form";
-import { ExternalTrackingTimeline } from "@/components/prealerts/external-tracking-timeline";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -255,7 +254,6 @@ export default function PrealertDetailPage({
             </ul>
           </Card>
 
-          <ExternalTrackingTimeline prealertId={prealertId} />
         </section>
 
         {canManage && resource.data.status === "PENDING_ARRIVAL" ? (

@@ -9,6 +9,7 @@ import { OrganizationsService } from '../src/organizations/organizations.service
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const LOCAL_DATABASE_URL =
+  process.env.DATABASE_URL ??
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 
 describe('Organization settings integration', () => {

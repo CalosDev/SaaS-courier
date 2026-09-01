@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
-import { Prisma, type PackageReception } from '../generated/prisma/client';
+import {
+  PackageStatus,
+  Prisma,
+  type PackageReception,
+} from '../generated/prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CommandContext } from '../request-context/request-context.types';
 import {
@@ -12,6 +16,7 @@ import {
   PackageReceptionConflictError,
   PackageReceptionFacilityUnavailableError,
 } from './package-reception.errors';
+import { assertPackageStatusTransition } from './package-status.policy';
 import type {
   PackageReceptionRecord,
   ReceivePackageRecord,
@@ -65,11 +70,10 @@ export class PrismaPackageReceptionsRepository implements PackageReceptionsRepos
         return existing.id;
       }
 
-      if (packageRecord.status !== 'RECEPTION_PENDING') {
-        throw new InvalidPackageStatusTransitionError(
-          `Package cannot be received from status ${packageRecord.status}`,
-        );
-      }
+      assertPackageStatusTransition(
+        packageRecord.status,
+        PackageStatus.RECEIVED_AT_ORIGIN,
+      );
 
       const facility = await tx.facility.findFirst({
         where: {

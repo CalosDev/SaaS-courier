@@ -10,12 +10,13 @@ import { CreateDispatchDto } from './dto/create-dispatch.dto';
 import { CreateMasterShipmentDto } from './dto/create-master-shipment.dto';
 import { UpdateDispatchDto } from './dto/update-dispatch.dto';
 import { AddPackagesDto } from './dto/add-packages.dto';
-import { DispatchStatus } from '../generated/prisma/client';
+import { DispatchStatus, PackageStatus } from '../generated/prisma/client';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import type { AuditActionCode } from '../audit/audit.catalog';
 import { OperationalHoldGuard } from '../holds/operational-hold.guard';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CommandContext } from '../request-context/request-context.types';
+import { assertPackageStatusTransition } from '../packages/package-status.policy';
 import { randomUUID } from 'crypto';
 
 type MasterShipmentTransition = {
@@ -517,6 +518,21 @@ export class DispatchesService {
         throw new BadRequestException(
           'All packages must be in transit before arrival',
         );
+      }
+
+      const targetPackageStatus =
+        transition.targetStatus === DispatchStatus.DEPARTED
+          ? PackageStatus.IN_TRANSIT
+          : transition.targetStatus === DispatchStatus.ARRIVED
+            ? PackageStatus.ARRIVED_AT_DESTINATION
+            : null;
+      if (targetPackageStatus) {
+        for (const packageRecord of packages) {
+          assertPackageStatusTransition(
+            packageRecord.status as PackageStatus,
+            targetPackageStatus,
+          );
+        }
       }
 
       const timestamp = new Date();

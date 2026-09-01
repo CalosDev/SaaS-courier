@@ -17,6 +17,7 @@ import {
   Prisma,
 } from '../generated/prisma/client';
 import type { CommandContext } from '../request-context/request-context.types';
+import { assertPackageStatusTransition } from '../packages/package-status.policy';
 
 @Injectable()
 export class DeliveriesService {
@@ -284,6 +285,12 @@ export class DeliveriesService {
       packageIds,
       { operation: 'delivery dispatch' },
     );
+    for (const item of delivery.items) {
+      assertPackageStatusTransition(
+        item.package.status,
+        PackageStatus.OUT_FOR_DELIVERY,
+      );
+    }
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.deliveryOrder.update({
@@ -372,12 +379,24 @@ export class DeliveriesService {
 
         if (updatedStatus === DeliveryStatus.DELIVERED) {
           const packageIds = delivery.items.map((item) => item.packageId);
+          for (const item of delivery.items) {
+            assertPackageStatusTransition(
+              item.package.status,
+              PackageStatus.DELIVERED,
+            );
+          }
           await tx.package.updateMany({
             where: { organizationId, id: { in: packageIds } },
             data: { status: PackageStatus.DELIVERED },
           });
         } else if (updatedStatus === DeliveryStatus.FAILED) {
           const packageIds = delivery.items.map((item) => item.packageId);
+          for (const item of delivery.items) {
+            assertPackageStatusTransition(
+              item.package.status,
+              PackageStatus.ARRIVED_AT_DESTINATION,
+            );
+          }
           await tx.package.updateMany({
             where: { organizationId, id: { in: packageIds } },
             data: { status: PackageStatus.ARRIVED_AT_DESTINATION },

@@ -12,7 +12,6 @@ import type {
   Employee,
   EmployeeInvitationResponse,
   EmployeeListResponse,
-  ExternalTrackingResponse,
   Facility,
   FacilityListResponse,
   InventoryMovementListResponse,
@@ -417,15 +416,6 @@ export const backofficeApi = {
       body,
     );
   },
-  updateCustomerCustomsVerification(
-    customerId: string,
-    body: Record<string, unknown>,
-  ) {
-    return apiClient.patch<CustomerCustomsProfile>(
-      `/customers/${customerId}/customs-profile/verification`,
-      body,
-    );
-  },
   listCustomerImports() {
     return apiClient.get<CustomerImportJob[]>("/customer-imports");
   },
@@ -463,11 +453,6 @@ export const backofficeApi = {
   },
   getPrealert(prealertId: string) {
     return apiClient.get<PrealertDetail>(`/prealerts/${prealertId}`);
-  },
-  getExternalTracking(prealertId: string) {
-    return apiClient.get<ExternalTrackingResponse>(
-      `/prealerts/${prealertId}/external-tracking`,
-    );
   },
   updatePrealert(prealertId: string, body: Record<string, unknown>) {
     return apiClient.patch<PrealertDetail>(`/prealerts/${prealertId}`, body);

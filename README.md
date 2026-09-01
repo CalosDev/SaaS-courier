@@ -146,4 +146,6 @@ No usar `prisma db push` en produccion.
 El repositorio contiene la linea base funcional del Modelo A+ y los modulos
 operativos definidos para el piloto. Las integraciones regulatorias y con
 carriers se mantienen sujetas a sus contratos, credenciales y validaciones
-externas correspondientes.
+externas correspondientes. Las conexiones y webhooks firmados conservan
+evidencia real; no se muestran respuestas de tracking simuladas como si
+provinieran de un carrier.

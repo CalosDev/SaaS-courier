@@ -9,7 +9,6 @@ const { useAuthMock, backofficeApiMock } = vi.hoisted(() => ({
   useAuthMock: vi.fn(),
   backofficeApiMock: {
     getPrealert: vi.fn(),
-    getExternalTracking: vi.fn(),
   },
 }));
 
@@ -29,13 +28,6 @@ describe("PrealertDetailPage", () => {
         status: "authenticated",
         permissionCodes: ["prealerts.read", "prealerts.manage"],
       },
-    });
-    backofficeApiMock.getExternalTracking.mockResolvedValue({
-      trackingNumber: "1Z-999-AA1-01-2345-6784",
-      carrier: "UPS",
-      status: "UNKNOWN",
-      events: [],
-      lastCheckedAt: "2026-07-10T00:00:00.000Z",
     });
   });
 

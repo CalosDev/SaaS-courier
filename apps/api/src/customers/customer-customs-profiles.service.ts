@@ -52,6 +52,18 @@ export class CustomerCustomsProfilesService {
     input: UpsertCustomerCustomsProfileIdentityInput,
     context?: CommandContext,
   ): Promise<CustomerCustomsProfileRecord> {
+    const verification = this.normalizeVerificationUpdate(
+      organizationId,
+      customerId,
+      {
+        status: input.status ?? 'UNKNOWN',
+        source: input.source,
+        checkedAt: input.checkedAt,
+        externalReference: input.externalReference,
+        notes: input.notes,
+      },
+      context,
+    );
     const record: UpsertCustomerCustomsProfileIdentityRecord = {
       organizationId: this.normalizeRequiredField(
         organizationId,
@@ -63,11 +75,11 @@ export class CustomerCustomsProfilesService {
         input.documentType,
         input.documentNumber,
       ),
-      ruaStatus: 'UNKNOWN',
-      verificationSource: null,
-      lastCheckedAt: null,
-      verifiedAt: null,
-      externalReference: null,
+      ruaStatus: verification.ruaStatus,
+      verificationSource: verification.verificationSource,
+      lastCheckedAt: verification.lastCheckedAt,
+      verifiedAt: verification.verifiedAt,
+      externalReference: verification.externalReference,
       notes:
         input.notes === undefined
           ? undefined
@@ -89,6 +101,7 @@ export class CustomerCustomsProfilesService {
       organizationId,
       customerId,
       input,
+      context,
     );
     const profile = await (context
       ? this.customerCustomsProfilesRepository.updateVerification(
@@ -108,6 +121,7 @@ export class CustomerCustomsProfilesService {
     organizationId: string,
     customerId: string,
     input: UpdateCustomerCustomsVerificationInput,
+    context?: CommandContext,
   ): UpdateCustomerCustomsVerificationRecord {
     const status = this.normalizeRegistrationStatus(input.status);
     const normalizedNotes =
@@ -135,6 +149,14 @@ export class CustomerCustomsProfilesService {
       input.source === undefined
         ? null
         : this.normalizeVerificationSource(input.source);
+    if (
+      source === 'OFFICIAL_INTEGRATION' &&
+      context?.actorType !== 'INTEGRATION'
+    ) {
+      throw new InvalidCustomerCustomsProfileError(
+        'Invalid customer customs profile input: OFFICIAL_INTEGRATION can only be recorded by an integration actor',
+      );
+    }
     const checkedAt =
       input.checkedAt === undefined
         ? null

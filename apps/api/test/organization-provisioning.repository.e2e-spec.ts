@@ -12,6 +12,7 @@ import { RbacService } from '../src/rbac/rbac.service';
 import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
 
 const LOCAL_DATABASE_URL =
+  process.env.DATABASE_URL ??
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 
 describe('OrganizationProvisioningService repository integration', () => {

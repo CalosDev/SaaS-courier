@@ -59,7 +59,6 @@ services:
     environment:
       NODE_ENV: production
       API_INTERNAL_URL: http://api:4000
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     restart: unless-stopped
     depends_on:
       api:

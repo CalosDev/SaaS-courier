@@ -52,7 +52,9 @@ git diff --check
 MinIO y Mailpit permiten comprobar localmente documentos y email. Los carriers
 requieren credenciales autorizadas para una certificacion contra el sandbox del
 proveedor; firma, replay, aislamiento y persistencia append-only se prueban sin
-esas credenciales. SIGA permanece fuera de alcance hasta autorizacion oficial.
+esas credenciales. El producto no fabrica estados ni eventos de tracking cuando
+no existe un adaptador autorizado. SIGA permanece fuera de alcance hasta
+autorizacion oficial.
 
 Las exportaciones de reportes siguen almacenadas temporalmente en PostgreSQL y
 expiran segun la politica implementada. No mover ese almacenamiento sin una

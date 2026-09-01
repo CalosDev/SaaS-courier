@@ -20,6 +20,7 @@ import {
   PackageStatus,
 } from '../generated/prisma/client';
 import { randomBytes } from 'node:crypto';
+import { assertPackageStatusTransition } from '../packages/package-status.policy';
 
 @Injectable()
 export class TransfersService {
@@ -297,6 +298,22 @@ export class TransfersService {
           'Every package must remain in the transfer origin facility',
         );
       }
+      const packageRecords = await tx.package.findMany({
+        where: {
+          organizationId: ctx.organizationId,
+          id: { in: transfer.items.map((item) => item.packageId) },
+        },
+        select: { id: true, status: true },
+      });
+      if (packageRecords.length !== transfer.items.length) {
+        throw new NotFoundException('One or more transfer packages not found');
+      }
+      for (const packageRecord of packageRecords) {
+        assertPackageStatusTransition(
+          packageRecord.status,
+          PackageStatus.IN_TRANSIT,
+        );
+      }
 
       const occurredAt = new Date();
       for (const position of positions) {
@@ -473,6 +490,25 @@ export class TransfersService {
     );
 
     return this.prisma.$transaction(async (tx) => {
+      if (placesPackage) {
+        const packageRecord = await tx.package.findUnique({
+          where: {
+            organizationId_id: {
+              organizationId: ctx.organizationId,
+              id: item.packageId,
+            },
+          },
+          select: { status: true },
+        });
+        if (!packageRecord) {
+          throw new NotFoundException('Transfer package not found');
+        }
+        assertPackageStatusTransition(
+          packageRecord.status,
+          PackageStatus.ARRIVED_AT_DESTINATION,
+        );
+      }
+
       const updatedItem = await tx.facilityTransferItem.update({
         where: {
           organizationId_id: {

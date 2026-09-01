@@ -5,6 +5,7 @@ import { AccountsModule } from './accounts/accounts.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BillingModule } from './billing/billing.module';
+import { CarrierIntegrationsModule } from './carrier-integrations/carrier-integrations.module';
 import { CustomersModule } from './customers/customers.module';
 import { CustomerImportsModule } from './customer-imports/customer-imports.module';
 import { EmployeesModule } from './employees/employees.module';
@@ -57,6 +58,7 @@ import { OrganizationProvisioningModule } from './provisioning/organization-prov
     AuditModule,
     AuthModule,
     BillingModule,
+    CarrierIntegrationsModule,
     CustomersModule,
     CustomerImportsModule,
     EmployeesModule,

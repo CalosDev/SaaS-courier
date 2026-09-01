@@ -19,6 +19,7 @@ import { PrismaFacilitiesRepository } from '../src/facilities/prisma-facilities.
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const LOCAL_DATABASE_URL =
+  process.env.DATABASE_URL ??
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 
 describe('Facilities repository integration', () => {

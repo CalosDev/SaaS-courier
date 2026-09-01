@@ -4,7 +4,6 @@ import { ExternalTrackingNormalizer } from '../common/tracking/external-tracking
 import { CustomersModule } from '../customers/customers.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
 import { PrismaModule } from '../prisma/prisma.module';
-import { CarrierIntegrationsModule } from '../carrier-integrations/carrier-integrations.module';
 import { PrealertCodeService } from './prealert-code.service';
 import { PrismaPrealertsRepository } from './prisma-prealerts.repository';
 import { PrealertsController } from './prealerts.controller';
@@ -12,12 +11,7 @@ import { PrealertsRepository } from './prealerts.repository';
 import { PrealertsService } from './prealerts.service';
 
 @Module({
-  imports: [
-    PrismaModule,
-    CustomersModule,
-    OrganizationsModule,
-    CarrierIntegrationsModule,
-  ],
+  imports: [PrismaModule, CustomersModule, OrganizationsModule],
   controllers: [PrealertsController],
   providers: [
     PrealertCodeService,

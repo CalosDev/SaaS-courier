@@ -7,8 +7,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import type { CommandContext } from '../request-context/request-context.types';
 import { AddTrackingEventDto } from './dto/add-tracking-event.dto';
-import { TrackingEventType, PackageStatus } from '../generated/prisma/client';
+import { Prisma, type PackageStatus } from '../generated/prisma/client';
 import { ExternalTrackingNormalizer } from '../common/tracking/external-tracking-normalizer';
+import { assertTrackingEventMatchesPackageStatus } from '../packages/package-status.policy';
+
+type LockedPackageRow = {
+  id: string;
+  status: PackageStatus;
+};
 
 @Injectable()
 export class TrackingService {
@@ -171,18 +177,24 @@ export class TrackingService {
     dto: AddTrackingEventDto,
   ) {
     return this.prisma.$transaction(async (tx) => {
-      const pkg = await tx.package.findUnique({
-        where: {
-          organizationId_id: {
-            organizationId: context.organizationId,
-            id: packageId,
-          },
-        },
-      });
+      const packages = await tx.$queryRaw<LockedPackageRow[]>(Prisma.sql`
+        SELECT id, status
+        FROM packages
+        WHERE organization_id = ${context.organizationId}
+          AND id = ${packageId}
+          AND deleted_at IS NULL
+        FOR UPDATE
+      `);
+      const pkg = packages[0];
 
-      if (!pkg || pkg.deletedAt) {
+      if (!pkg) {
         throw new NotFoundException('Package not found');
       }
+      if (!context.actorEmployeeId) {
+        throw new BadRequestException('Employee actor is required');
+      }
+
+      assertTrackingEventMatchesPackageStatus(pkg.status, dto.eventType);
 
       const newEvent = await tx.packageTrackingEvent.create({
         data: {
@@ -191,46 +203,9 @@ export class TrackingService {
           eventType: dto.eventType,
           location: dto.location,
           description: dto.description,
-          createdById: context.actorEmployeeId!,
+          createdById: context.actorEmployeeId,
         },
       });
-
-      // Update package status depending on event type if needed
-      // Map tracking events to package statuses
-      let newPackageStatus: PackageStatus | undefined = undefined;
-      switch (dto.eventType) {
-        case TrackingEventType.RECEIVED_AT_ORIGIN:
-          newPackageStatus = PackageStatus.RECEIVED_AT_ORIGIN;
-          break;
-        case TrackingEventType.IN_TRANSIT:
-          newPackageStatus = PackageStatus.IN_TRANSIT;
-          break;
-        case TrackingEventType.ARRIVED_AT_DESTINATION:
-          newPackageStatus = PackageStatus.ARRIVED_AT_DESTINATION;
-          break;
-        case TrackingEventType.OUT_FOR_DELIVERY:
-          newPackageStatus = PackageStatus.OUT_FOR_DELIVERY;
-          break;
-        case TrackingEventType.DELIVERED:
-          newPackageStatus = PackageStatus.DELIVERED;
-          break;
-        default:
-          break; // Keep current status
-      }
-
-      if (newPackageStatus && pkg.status !== newPackageStatus) {
-        await tx.package.update({
-          where: {
-            organizationId_id: {
-              organizationId: context.organizationId,
-              id: packageId,
-            },
-          },
-          data: {
-            status: newPackageStatus,
-          },
-        });
-      }
 
       await this.auditOutboxWriter.write(tx, {
         context,
@@ -242,6 +217,7 @@ export class TrackingService {
         payload: {
           packageId,
           eventType: dto.eventType,
+          packageStatus: pkg.status,
         },
         emitOutbox: true,
       });

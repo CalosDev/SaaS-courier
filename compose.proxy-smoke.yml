@@ -1,0 +1,41 @@
+services:
+  api-probe:
+    image: node:22-alpine
+    command:
+      - node
+      - -e
+      - |
+        require('node:http').createServer((request, response) => {
+          response.setHeader('content-type', 'application/json');
+          response.end(JSON.stringify({
+            host: request.headers.host,
+            forwardedHost: request.headers['x-forwarded-host'],
+            forwardedProto: request.headers['x-forwarded-proto'],
+            url: request.url,
+          }));
+        }).listen(4000, '0.0.0.0');
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health/live"]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+      args:
+        STORAGE_PUBLIC_ORIGIN: https://objects.example
+    environment:
+      NODE_ENV: production
+      API_INTERNAL_URL: http://api-probe:4000
+    ports:
+      - "127.0.0.1:3100:3000"
+    depends_on:
+      api-probe:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 2s
+      timeout: 2s
+      retries: 30

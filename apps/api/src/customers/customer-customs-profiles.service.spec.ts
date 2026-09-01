@@ -281,6 +281,72 @@ describe('CustomerCustomsProfilesService', () => {
     );
   });
 
+  it('upserts identity and verification atomically', async () => {
+    const checkedAt = '2026-07-01T12:00:00.000Z';
+    customerCustomsProfilesRepository.upsertIdentity.mockResolvedValueOnce(
+      buildCustomsProfileRecord({
+        ruaStatus: 'REGISTERED',
+        verificationSource: 'DGA_PORTAL',
+        lastCheckedAt: new Date(checkedAt),
+        verifiedAt: new Date(checkedAt),
+      }),
+    );
+
+    await service.upsertIdentity(
+      'fbd54afb-62e8-4f5e-bfa9-293ee5d4dcf7',
+      '5a79a84d-9bd9-4c63-8b1b-c3728bba6294',
+      {
+        documentType: 'CEDULA',
+        documentNumber: '001-1234567-8',
+        status: 'REGISTERED',
+        source: 'DGA_PORTAL',
+        checkedAt,
+        externalReference: 'DGA-123',
+      },
+    );
+
+    expect(
+      customerCustomsProfilesRepository.upsertIdentity,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        documentNumber: '00112345678',
+        ruaStatus: 'REGISTERED',
+        verificationSource: 'DGA_PORTAL',
+        lastCheckedAt: new Date(checkedAt),
+        verifiedAt: new Date(checkedAt),
+        externalReference: 'DGA-123',
+      }),
+    );
+  });
+
+  it('rejects official provenance from a human actor', async () => {
+    await expect(
+      service.updateVerification(
+        'fbd54afb-62e8-4f5e-bfa9-293ee5d4dcf7',
+        '5a79a84d-9bd9-4c63-8b1b-c3728bba6294',
+        {
+          status: 'REGISTERED',
+          source: 'OFFICIAL_INTEGRATION',
+          checkedAt: '2026-07-01T12:00:00.000Z',
+        },
+        {
+          organizationId: 'fbd54afb-62e8-4f5e-bfa9-293ee5d4dcf7',
+          actorType: 'EMPLOYEE',
+          actorUserId: '64ac55a2-8a4f-4e3b-b580-39cf8c92d55d',
+          actorEmployeeId: '5a79a84d-9bd9-4c63-8b1b-c3728bba6294',
+          source: 'HTTP',
+          requestId: 'request-1',
+          correlationId: 'correlation-1',
+          ipAddress: null,
+          userAgent: null,
+        },
+      ),
+    ).rejects.toBeInstanceOf(InvalidCustomerCustomsProfileError);
+    expect(
+      customerCustomsProfilesRepository.updateVerification,
+    ).not.toHaveBeenCalled();
+  });
+
   it('translates duplicate identities into a domain conflict', async () => {
     customerCustomsProfilesRepository.upsertIdentity.mockRejectedValueOnce(
       new CustomerIdentityConflictError('CEDULA', '00112345678'),

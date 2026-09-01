@@ -27,6 +27,7 @@
     "pilot:backup": "powershell -ExecutionPolicy Bypass -File scripts/db-backup.ps1",
     "pilot:restore:verify": "powershell -ExecutionPolicy Bypass -File scripts/db-restore-verify.ps1",
     "pilot:load": "node scripts/smoke-load.mjs",
+    "smoke:web-proxy": "node scripts/smoke-web-api-proxy.mjs",
     "pilot:integrations:check": "pnpm --filter @courier/api pilot:integrations:check",
     "rbac:sync-permissions": "pnpm --filter @courier/api rbac:sync-permissions",
     "bootstrap:local": "pnpm --filter @courier/api bootstrap:local",

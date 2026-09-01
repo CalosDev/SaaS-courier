@@ -15,6 +15,7 @@ import type { CommandContext } from '../src/request-context/request-context.type
 import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
 
 const LOCAL_DATABASE_URL =
+  process.env.DATABASE_URL ??
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 const TRACKING_ONE = '1Z-999-AA1-01-2345-6784';
 const TRACKING_ONE_NORMALIZED = '1Z999AA10123456784';

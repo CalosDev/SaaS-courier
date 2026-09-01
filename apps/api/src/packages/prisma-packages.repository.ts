@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
 import { PrealertNotFoundError } from '../prealerts/prealert.errors';
 import {
+  PackageStatus,
   Prisma,
   type Employee,
   type Package,
@@ -10,6 +11,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import type { CommandContext } from '../request-context/request-context.types';
 import { PackageCodeService } from './package-code.service';
+import { assertPackageStatusTransition } from './package-status.policy';
 import {
   InvalidPackageStatusTransitionError,
   PackageCodeGenerationError,
@@ -608,11 +610,7 @@ export class PrismaPackagesRepository implements PackagesRepository {
           return current.id;
         }
 
-        if (current.status !== 'RECEPTION_PENDING') {
-          throw new InvalidPackageStatusTransitionError(
-            'Only reception-pending packages can be cancelled',
-          );
-        }
+        assertPackageStatusTransition(current.status, PackageStatus.CANCELLED);
 
         if (!context?.actorEmployeeId) {
           throw new InvalidPackageStatusTransitionError(

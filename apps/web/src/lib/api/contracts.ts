@@ -57,21 +57,6 @@ export type AuthorizationResponse = {
   permissionCodes: PermissionCode[];
 };
 
-export type ExternalTrackingEvent = {
-  timestamp: string;
-  status: string;
-  location: string;
-  description: string;
-};
-
-export type ExternalTrackingResponse = {
-  trackingNumber: string;
-  carrier: string;
-  isDelivered: boolean;
-  estimatedDelivery: string | null;
-  events: ExternalTrackingEvent[];
-};
-
 export type DashboardMetrics = {
   pendingPackages: number;
   unmatchedPrealerts: number;

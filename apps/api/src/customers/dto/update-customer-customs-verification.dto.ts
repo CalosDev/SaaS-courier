@@ -2,7 +2,7 @@ import { IsIn, IsOptional, IsString, MaxLength } from 'class-validator';
 
 import {
   CUSTOMS_REGISTRATION_STATUS_VALUES,
-  CUSTOMS_VERIFICATION_SOURCE_VALUES,
+  MANUAL_CUSTOMS_VERIFICATION_SOURCE_VALUES,
 } from '../customer.types';
 
 export class UpdateCustomerCustomsVerificationDto {
@@ -10,8 +10,8 @@ export class UpdateCustomerCustomsVerificationDto {
   status!: (typeof CUSTOMS_REGISTRATION_STATUS_VALUES)[number];
 
   @IsOptional()
-  @IsIn(CUSTOMS_VERIFICATION_SOURCE_VALUES)
-  source?: (typeof CUSTOMS_VERIFICATION_SOURCE_VALUES)[number];
+  @IsIn(MANUAL_CUSTOMS_VERIFICATION_SOURCE_VALUES)
+  source?: (typeof MANUAL_CUSTOMS_VERIFICATION_SOURCE_VALUES)[number];
 
   @IsOptional()
   @IsString()

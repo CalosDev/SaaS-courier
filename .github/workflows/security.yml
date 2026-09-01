@@ -84,3 +84,13 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: 1
+
+  web-proxy-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.0
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version: 22
+      - name: Verify runtime API proxy and tenant host propagation
+        run: node scripts/smoke-web-api-proxy.mjs

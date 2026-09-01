@@ -122,16 +122,35 @@ export default function CustomerDetailPage({
   async function handleCustoms(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const formData = new FormData(event.currentTarget);
+    const status = String(formData.get("ruaStatus") || "");
+    const checkedAtValue = String(formData.get("checkedAt") || "");
+    const requiresCheck = [
+      "REGISTERED",
+      "NOT_REGISTERED",
+      "VERIFICATION_FAILED",
+    ].includes(status);
+
+    if (requiresCheck && !checkedAtValue) {
+      setMessage(null);
+      setError("La fecha de verificacion es obligatoria para este estado RUA.");
+      return;
+    }
+
+    const checkedAtDate = checkedAtValue ? new Date(checkedAtValue) : null;
+    if (checkedAtDate && Number.isNaN(checkedAtDate.getTime())) {
+      setMessage(null);
+      setError("La fecha de verificacion no es valida.");
+      return;
+    }
+    const checkedAt = checkedAtDate?.toISOString();
 
     try {
       await backofficeApi.upsertCustomerCustomsProfile(customerId, {
         documentType: String(formData.get("documentType") || ""),
         documentNumber: String(formData.get("documentNumber") || ""),
-        notes: String(formData.get("notes") || "") || undefined,
-      });
-      await backofficeApi.updateCustomerCustomsVerification(customerId, {
-        status: String(formData.get("ruaStatus") || ""),
+        status,
         source: String(formData.get("verificationSource") || "") || undefined,
+        checkedAt,
         externalReference:
           String(formData.get("externalReference") || "") || undefined,
         notes: String(formData.get("notes") || "") || undefined,
@@ -290,8 +309,19 @@ export default function CustomerDetailPage({
                 >
                   <option value="MANUAL">MANUAL</option>
                   <option value="DGA_PORTAL">DGA_PORTAL</option>
-                  <option value="OFFICIAL_INTEGRATION">OFFICIAL_INTEGRATION</option>
+                  {customsProfile?.verificationSource === "OFFICIAL_INTEGRATION" ? (
+                    <option value="OFFICIAL_INTEGRATION" disabled>
+                      OFFICIAL_INTEGRATION (solo integracion)
+                    </option>
+                  ) : null}
                 </Select>
+              </FormField>
+              <FormField label="Fecha de verificacion">
+                <Input
+                  name="checkedAt"
+                  type="datetime-local"
+                  defaultValue={toDatetimeLocal(customsProfile?.lastCheckedAt)}
+                />
               </FormField>
               <FormField label="Referencia externa">
                 <Input
@@ -309,4 +339,12 @@ export default function CustomerDetailPage({
       </section>
     </div>
   );
+}
+
+function toDatetimeLocal(value: string | null | undefined): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
 }

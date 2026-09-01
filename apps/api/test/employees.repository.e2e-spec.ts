@@ -15,6 +15,7 @@ import type { EmployeeInvitationRepositoryResult } from '../src/employees/employ
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const LOCAL_DATABASE_URL =
+  process.env.DATABASE_URL ??
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 
 function daysFromNow(days: number): Date {

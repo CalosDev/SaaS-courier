@@ -9,6 +9,7 @@ import { configureHttpApp } from '../src/http/configure-http-app';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const LOCAL_DATABASE_URL =
+  process.env.DATABASE_URL ??
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 const ALLOWED_ORIGIN = 'http://localhost:3000';
 const DISALLOWED_ORIGIN = 'http://evil.example.test';
@@ -92,6 +93,7 @@ describe('HTTP authentication flow', () => {
   let app: NestExpressApplication | null = null;
   let moduleRef: TestingModule | null = null;
   let prismaService: PrismaService | null = null;
+  let previousTrustProxy: string | undefined;
   const cleanup = {
     employeeFacilityIds: [] as string[],
     employeeIds: [] as string[],
@@ -101,10 +103,21 @@ describe('HTTP authentication flow', () => {
   };
 
   beforeAll(() => {
+    previousTrustProxy = process.env.TRUST_PROXY;
     process.env.DATABASE_URL = LOCAL_DATABASE_URL;
     process.env.NODE_ENV = 'test';
     process.env.COOKIE_SECURE = 'false';
     process.env.CORS_ORIGINS = ALLOWED_ORIGIN;
+    process.env.TRUST_PROXY = 'loopback';
+  });
+
+  afterAll(() => {
+    if (previousTrustProxy === undefined) {
+      delete process.env.TRUST_PROXY;
+      return;
+    }
+
+    process.env.TRUST_PROXY = previousTrustProxy;
   });
 
   it('exposes secure cookie-based authentication with CSRF, organization selection, rotation, and logout', async () => {

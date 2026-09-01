@@ -28,8 +28,8 @@ Usar esta modalidad para verificar paridad de contenedores, no necesariamente co
 ## Migraciones
 
 ```bash
-pnpm --filter api prisma migrate dev
-pnpm --filter api prisma generate
+pnpm --filter @courier/api prisma migrate dev
+pnpm --filter @courier/api prisma generate
 ```
 
 No utilizar `prisma db push` como sustituto del historial de migraciones.

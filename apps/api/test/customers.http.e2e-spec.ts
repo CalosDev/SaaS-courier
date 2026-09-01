@@ -13,6 +13,7 @@ import { SessionsService } from '../src/sessions/sessions.service';
 import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
 
 const LOCAL_DATABASE_URL =
+  process.env.DATABASE_URL ??
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 const ALLOWED_ORIGIN = 'http://localhost:3000';
 
@@ -604,6 +605,43 @@ describe('Customers admin HTTP', () => {
         verificationSource: 'MANUAL',
       });
       expect(registeredProfile.verifiedAt).toBe('2026-07-01T12:00:00.000Z');
+
+      const atomicProfileResponse = await request(server)
+        .put(`/customers/${individualCustomer.id}/customs-profile`)
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send({
+          documentType: 'CEDULA',
+          documentNumber: '001-1234567-8',
+          status: 'NOT_REGISTERED',
+          source: 'DGA_PORTAL',
+          checkedAt: '2026-07-02T12:00:00.000Z',
+          externalReference: 'DGA-124',
+        })
+        .expect(200);
+      expect(atomicProfileResponse.body).toMatchObject({
+        documentNumber: '00112345678',
+        ruaStatus: 'NOT_REGISTERED',
+        verificationSource: 'DGA_PORTAL',
+        lastCheckedAt: '2026-07-02T12:00:00.000Z',
+        verifiedAt: null,
+        externalReference: 'DGA-124',
+      });
+
+      await request(server)
+        .patch(
+          `/customers/${individualCustomer.id}/customs-profile/verification`,
+        )
+        .set('Origin', ALLOWED_ORIGIN)
+        .set('X-CSRF-Token', csrfBody.csrfToken)
+        .set('Cookie', [sessionCookie, csrfCookie])
+        .send({
+          status: 'REGISTERED',
+          source: 'OFFICIAL_INTEGRATION',
+          checkedAt: '2026-07-02T12:00:00.000Z',
+        })
+        .expect(400);
 
       const resetProfileResponse = await request(server)
         .put(`/customers/${individualCustomer.id}/customs-profile`)

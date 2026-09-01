@@ -22,7 +22,6 @@ import { CreatePrealertDto } from './dto/create-prealert.dto';
 import { ListPrealertsDto } from './dto/list-prealerts.dto';
 import { UpdatePrealertDto } from './dto/update-prealert.dto';
 import { PrealertsService } from './prealerts.service';
-import { CarrierTrackingService } from '../carrier-integrations/carrier-tracking.service';
 import type {
   PrealertEmployeeSummary,
   PrealertListResult,
@@ -32,10 +31,7 @@ import type {
 
 @Controller('prealerts')
 export class PrealertsController {
-  constructor(
-    private readonly prealertsService: PrealertsService,
-    private readonly carrierTrackingService: CarrierTrackingService,
-  ) {}
+  constructor(private readonly prealertsService: PrealertsService) {}
 
   @Get()
   @RequirePermissions('prealerts.read')
@@ -90,32 +86,6 @@ export class PrealertsController {
     );
 
     return this.serializeDetail(prealert);
-  }
-
-  @Get(':prealertId/external-tracking')
-  @RequirePermissions('prealerts.read')
-  async getExternalTracking(
-    @CurrentSession() session: SessionContext,
-    @Param('prealertId', new ParseUUIDPipe({ version: '4' }))
-    prealertId: string,
-    @Res({ passthrough: true }) response: Response,
-  ) {
-    this.setNoStore(response);
-
-    // Fetch prealert to get tracking number and carrier
-    const prealert = await this.prealertsService.getById(
-      session.organizationId,
-      prealertId,
-    );
-
-    if (!prealert.externalTrackingNumber) {
-      return null;
-    }
-
-    return this.carrierTrackingService.fetchTracking(
-      prealert.externalTrackingNumber,
-      prealert.carrierName || 'UNKNOWN',
-    );
   }
 
   @Patch(':prealertId')

@@ -29,6 +29,10 @@ export const CUSTOMS_VERIFICATION_SOURCE_VALUES = [
   'DGA_PORTAL',
   'OFFICIAL_INTEGRATION',
 ] as const;
+export const MANUAL_CUSTOMS_VERIFICATION_SOURCE_VALUES = [
+  'MANUAL',
+  'DGA_PORTAL',
+] as const;
 
 export type CustomerType = (typeof CUSTOMER_TYPE_VALUES)[number];
 export type CustomerStatus = (typeof CUSTOMER_STATUS_VALUES)[number];
@@ -234,6 +238,10 @@ export interface CustomerCustomsProfileRecord {
 export interface UpsertCustomerCustomsProfileIdentityInput {
   documentType: CustomerIdentityDocumentType;
   documentNumber: string;
+  status?: CustomsRegistrationStatus;
+  source?: CustomsVerificationSource;
+  checkedAt?: string;
+  externalReference?: string;
   notes?: string;
 }
 

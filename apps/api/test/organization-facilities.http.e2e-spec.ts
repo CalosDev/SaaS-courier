@@ -13,6 +13,7 @@ import { AuthCookieService } from '../src/auth/http/auth-cookie.service';
 import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
 
 const LOCAL_DATABASE_URL =
+  process.env.DATABASE_URL ??
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 const ALLOWED_ORIGIN = 'http://localhost:3000';
 

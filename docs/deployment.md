@@ -38,9 +38,19 @@ Crear DNS y TLS para `*.plataforma.example`. El proxy debe reemplazar
 `X-Forwarded-Host` con el host original del cliente y eliminar cualquier valor
 recibido del exterior. `TRUST_PROXY` debe contener solo las redes o direcciones
 desde las que la API recibe trafico; `true` y proxies abiertos son invalidos.
-Next debe recibir el subdominio del tenant y conservarlo al ejecutar el rewrite
-`/backend/*` hacia la API. Una sesion emitida para un subdominio no es valida en
+Next debe recibir el subdominio del tenant. El Route Handler server-only de
+`/backend/*` elimina cabeceras de forwarding aportadas por el navegador y
+establece `X-Forwarded-Host` con el host recibido antes de llamar a la API. Una
+sesion emitida para un subdominio no es valida en
 otro, aunque el usuario pertenezca a ambas organizaciones.
+
+`API_INTERNAL_URL` es una variable server-only obligatoria en runtime para la
+imagen web; no se incorpora al bundle del navegador. Validar la imagen y la
+propagacion del host tenant antes de publicar:
+
+```powershell
+pnpm smoke:web-proxy
+```
 
 La imagen web se construye con
 `--build-arg STORAGE_PUBLIC_ORIGIN=https://objetos.example`. Ese origen se

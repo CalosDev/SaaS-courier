@@ -8,6 +8,7 @@ import { configureHttpApp } from '../src/http/configure-http-app';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 const LOCAL_DATABASE_URL =
+  process.env.DATABASE_URL ??
   'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
 
 describe('Public tracking HTTP', () => {
@@ -71,10 +72,31 @@ describe('Public tracking HTTP', () => {
         ),
       );
       expect(throttled.some((response) => response.status === 429)).toBe(true);
+
+      await expect(
+        db.packageTrackingEvent.update({
+          where: { id: first.trackingEventId },
+          data: { description: 'Tampered tracking evidence' },
+        }),
+      ).rejects.toThrow(/append-only/u);
+      await expect(
+        db.packageTrackingEvent.delete({
+          where: { id: first.trackingEventId },
+        }),
+      ).rejects.toThrow(/append-only/u);
+      await expect(
+        db.package.update({
+          where: { id: first.packageId },
+          data: { status: 'DELIVERED' },
+        }),
+      ).rejects.toThrow(/invalid package status transition/u);
     } finally {
       if (prisma) {
-        await prisma.packageTrackingEvent.deleteMany({
-          where: { organizationId: { in: organizationIds } },
+        await prisma.$transaction(async (tx) => {
+          await tx.$executeRaw`SELECT set_config('app.allow_append_only_cleanup', 'on', true)`;
+          await tx.packageTrackingEvent.deleteMany({
+            where: { organizationId: { in: organizationIds } },
+          });
         });
         await prisma.package.deleteMany({
           where: { organizationId: { in: organizationIds } },
@@ -175,7 +197,7 @@ async function seedTenant(prisma: PrismaService, label: string) {
       notes: 'Sensitive internal note',
     },
   });
-  await prisma.packageTrackingEvent.create({
+  const trackingEvent = await prisma.packageTrackingEvent.create({
     data: {
       organizationId: organization.id,
       packageId: pkg.id,
@@ -192,5 +214,7 @@ async function seedTenant(prisma: PrismaService, label: string) {
     internalTracking,
     externalTracking,
     prealertCode: prealert.prealertCode,
+    packageId: pkg.id,
+    trackingEventId: trackingEvent.id,
   };
 }
