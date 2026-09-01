@@ -1,22 +1,17 @@
-import { Test, type TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 
-import { AppModule } from '../src/app.module';
-import { AuthCookieService } from '../src/auth/http/auth-cookie.service';
 import { PrismaAuditOutboxWriter } from '../src/audit/prisma-audit-outbox.writer';
-import { configureHttpApp } from '../src/http/configure-http-app';
-import { PasswordHasher } from '../src/accounts/password-hasher';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { RbacService } from '../src/rbac/rbac.service';
 import type { CommandContext } from '../src/request-context/request-context.types';
-import { SessionsService } from '../src/sessions/sessions.service';
-import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
-
-const LOCAL_DATABASE_URL =
-  process.env.DATABASE_URL ??
-  'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
+import {
+  cleanupCoreHttpTestData,
+  configureHttpE2eEnvironment,
+  createAuthenticatedHttpSession,
+  createHttpE2eContext,
+} from './http-e2e-test-kit';
 
 describe('Audit HTTP', () => {
   let app: NestExpressApplication | null = null;
@@ -30,30 +25,23 @@ describe('Audit HTTP', () => {
     sessionIds: [] as string[],
   };
 
-  beforeAll(() => {
-    process.env.DATABASE_URL = LOCAL_DATABASE_URL;
-    process.env.NODE_ENV = 'test';
-    process.env.COOKIE_SECURE = 'false';
-    process.env.CORS_ORIGINS = 'http://localhost:3000';
-  });
+  beforeAll(configureHttpE2eEnvironment);
 
   it('requires audit.read and returns only safe records from the active tenant', async () => {
     try {
-      moduleRef = await Test.createTestingModule({
-        imports: [AppModule],
-      }).compile();
-      app = moduleRef.createNestApplication<NestExpressApplication>();
-      configureHttpApp(app);
-      await app.init();
-
-      const database = moduleRef.get(PrismaService);
+      const httpContext = await createHttpE2eContext();
+      moduleRef = httpContext.moduleRef;
+      app = httpContext.app;
+      const {
+        prisma: database,
+        passwordHasher,
+        rbacService,
+        sessionsService,
+        authCookieService,
+        server,
+      } = httpContext;
       prisma = database;
-      const passwordHasher = moduleRef.get(PasswordHasher);
-      const rbacService = moduleRef.get(RbacService);
-      const sessionsService = moduleRef.get(SessionsService);
-      const authCookieService = moduleRef.get(AuthCookieService);
       const writer = new PrismaAuditOutboxWriter();
-      await rbacService.syncPermissionCatalog();
 
       const suffix = randomUUID();
       const organizations = await Promise.all(
@@ -102,11 +90,13 @@ describe('Audit HTTP', () => {
         employeeId: employee.id,
         roleId: role.id,
       });
-      const session = await sessionsService.createSession({
+      const session = await createAuthenticatedHttpSession({
+        sessionsService,
+        authCookieService,
         userId: user.id,
         organizationId: organizations[0].id,
+        cleanupSessionIds: cleanup.sessionIds,
       });
-      cleanup.sessionIds.push(session.session.sessionId);
 
       for (const organization of organizations) {
         const context: CommandContext = {
@@ -134,14 +124,10 @@ describe('Audit HTTP', () => {
         );
       }
 
-      const server = app.getHttpServer() as Parameters<typeof request>[0];
       await request(server).get('/audit-logs').expect(401);
       const response = await request(server)
         .get('/audit-logs?page=1&pageSize=20')
-        .set(
-          'Cookie',
-          `${authCookieService.getSessionCookieName()}=${session.sessionToken}`,
-        )
+        .set('Cookie', session.sessionCookie)
         .expect(200);
       const body = response.body as {
         items: Array<Record<string, unknown>>;
@@ -160,31 +146,7 @@ describe('Audit HTTP', () => {
     } finally {
       const database = prisma;
       if (database) {
-        await deleteAuditArtifactsForOrganizations(
-          database,
-          cleanup.organizationIds,
-        );
-        await database.userSession.deleteMany({
-          where: { id: { in: cleanup.sessionIds } },
-        });
-        await database.employeeRole.deleteMany({
-          where: { employeeId: { in: cleanup.employeeIds } },
-        });
-        await database.rolePermission.deleteMany({
-          where: { roleId: { in: cleanup.roleIds } },
-        });
-        await database.role.deleteMany({
-          where: { id: { in: cleanup.roleIds } },
-        });
-        await database.employee.deleteMany({
-          where: { id: { in: cleanup.employeeIds } },
-        });
-        await database.user.deleteMany({
-          where: { id: { in: cleanup.userIds } },
-        });
-        await database.organization.deleteMany({
-          where: { id: { in: cleanup.organizationIds } },
-        });
+        await cleanupCoreHttpTestData(database, cleanup);
       }
       await app?.close();
       await moduleRef?.close();
