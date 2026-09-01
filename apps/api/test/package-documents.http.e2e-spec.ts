@@ -1,16 +1,10 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test, type TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import { Readable } from 'node:stream';
 import request from 'supertest';
 
-import { PasswordHasher } from '../src/accounts/password-hasher';
-import { AppModule } from '../src/app.module';
-import { AuthCookieService } from '../src/auth/http/auth-cookie.service';
-import { configureHttpApp } from '../src/http/configure-http-app';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { RbacService } from '../src/rbac/rbac.service';
-import { SessionsService } from '../src/sessions/sessions.service';
 import { StoredObjectNotFoundInStorageError } from '../src/storage/storage.errors';
 import { ObjectStorageService } from '../src/storage/object-storage.service';
 import type {
@@ -23,31 +17,13 @@ import type {
   StoredObjectHead,
 } from '../src/storage/storage.types';
 import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
-
-const LOCAL_DATABASE_URL =
-  process.env.DATABASE_URL ??
-  'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
-const ALLOWED_ORIGIN = 'http://localhost:3000';
-
-function extractCookiePair(
-  cookies: string | string[] | undefined,
-  cookieName: string,
-): string {
-  const normalizedCookies = Array.isArray(cookies)
-    ? cookies
-    : typeof cookies === 'string'
-      ? [cookies]
-      : [];
-  const cookie = normalizedCookies.find((entry) =>
-    entry.startsWith(`${cookieName}=`),
-  );
-
-  if (!cookie) {
-    throw new Error(`Missing cookie ${cookieName}`);
-  }
-
-  return cookie.split(';')[0];
-}
+import {
+  configureHttpE2eEnvironment,
+  createAuthenticatedHttpSession,
+  createHttpE2eContext,
+  fetchCsrfContext,
+  HTTP_TEST_ORIGIN as ALLOWED_ORIGIN,
+} from './http-e2e-test-kit';
 
 class FakeObjectStorageService implements ObjectStorageService {
   private readonly objects = new Map<
@@ -154,34 +130,26 @@ describe('Package documents HTTP', () => {
     sessionIds: [] as string[],
   };
 
-  beforeAll(() => {
-    process.env.DATABASE_URL = LOCAL_DATABASE_URL;
-    process.env.NODE_ENV = 'test';
-    process.env.COOKIE_SECURE = 'false';
-    process.env.CORS_ORIGINS = ALLOWED_ORIGIN;
-  });
+  beforeAll(configureHttpE2eEnvironment);
 
   it('serves upload intent, completion, listing, download and delete with tenant-safe authorization', async () => {
     try {
       storageService = new FakeObjectStorageService();
 
-      moduleRef = await Test.createTestingModule({
-        imports: [AppModule],
-      })
-        .overrideProvider(ObjectStorageService)
-        .useValue(storageService)
-        .compile();
-
-      app = moduleRef.createNestApplication<NestExpressApplication>();
-      configureHttpApp(app);
-      await app.init();
-
-      const prisma = moduleRef.get(PrismaService);
+      const httpContext = await createHttpE2eContext((builder) =>
+        builder.overrideProvider(ObjectStorageService).useValue(storageService),
+      );
+      moduleRef = httpContext.moduleRef;
+      app = httpContext.app;
+      const {
+        prisma,
+        passwordHasher,
+        rbacService,
+        sessionsService,
+        authCookieService,
+        server,
+      } = httpContext;
       prismaService = prisma;
-      const passwordHasher = moduleRef.get(PasswordHasher);
-      const rbacService = moduleRef.get(RbacService);
-      const sessionsService = moduleRef.get(SessionsService);
-      const authCookieService = moduleRef.get(AuthCookieService);
 
       await rbacService.syncPermissionCatalog();
 
@@ -372,42 +340,43 @@ describe('Package documents HTTP', () => {
       ]);
       cleanup.packageIds.push(packageRecord.id, otherPackage.id);
 
-      const mainSession = await sessionsService.createSession({
+      const mainSession = await createAuthenticatedHttpSession({
+        sessionsService,
+        authCookieService,
         userId: user.id,
         organizationId: organization.id,
         ipAddress: '127.0.0.1',
         userAgent: 'supertest',
+        cleanupSessionIds: cleanup.sessionIds,
       });
-      cleanup.sessionIds.push(mainSession.session.sessionId);
-      const restrictedSession = await sessionsService.createSession({
+      const restrictedSession = await createAuthenticatedHttpSession({
+        sessionsService,
+        authCookieService,
         userId: restrictedUser.id,
         organizationId: organization.id,
         ipAddress: '127.0.0.1',
         userAgent: 'supertest',
+        cleanupSessionIds: cleanup.sessionIds,
       });
-      cleanup.sessionIds.push(restrictedSession.session.sessionId);
-      const otherSession = await sessionsService.createSession({
+      const otherSession = await createAuthenticatedHttpSession({
+        sessionsService,
+        authCookieService,
         userId: otherUser.id,
         organizationId: otherOrganization.id,
         ipAddress: '127.0.0.1',
         userAgent: 'supertest',
+        cleanupSessionIds: cleanup.sessionIds,
       });
-      cleanup.sessionIds.push(otherSession.session.sessionId);
 
-      const sessionCookie = `${authCookieService.getSessionCookieName()}=${mainSession.sessionToken}`;
-      const restrictedSessionCookie = `${authCookieService.getSessionCookieName()}=${restrictedSession.sessionToken}`;
-      const otherSessionCookie = `${authCookieService.getSessionCookieName()}=${otherSession.sessionToken}`;
-
-      const csrfResponse = await request(app.getHttpServer())
-        .get('/auth/csrf')
-        .set('Origin', ALLOWED_ORIGIN)
-        .set('Cookie', sessionCookie)
-        .expect(200);
-      const csrfBody = csrfResponse.body as { csrfToken: string };
-      const csrfCookie = extractCookiePair(
-        csrfResponse.headers['set-cookie'],
-        authCookieService.getCsrfCookieName(),
-      );
+      const sessionCookie = mainSession.sessionCookie;
+      const restrictedSessionCookie = restrictedSession.sessionCookie;
+      const otherSessionCookie = otherSession.sessionCookie;
+      const { csrfToken, csrfCookie } = await fetchCsrfContext({
+        server,
+        authCookieService,
+        sessionCookie,
+      });
+      const csrfBody = { csrfToken };
 
       await request(app.getHttpServer())
         .get(`/packages/${packageRecord.id}/documents`)

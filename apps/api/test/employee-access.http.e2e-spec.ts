@@ -1,21 +1,17 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test, type TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 
-import { PasswordHasher } from '../src/accounts/password-hasher';
-import { AppModule } from '../src/app.module';
-import { AuthCookieService } from '../src/auth/http/auth-cookie.service';
-import { configureHttpApp } from '../src/http/configure-http-app';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { RbacService } from '../src/rbac/rbac.service';
-import { SessionsService } from '../src/sessions/sessions.service';
 import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
-
-const LOCAL_DATABASE_URL =
-  process.env.DATABASE_URL ??
-  'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
-const ALLOWED_ORIGIN = 'http://localhost:3000';
+import {
+  configureHttpE2eEnvironment,
+  createAuthenticatedHttpSession,
+  createHttpE2eContext,
+  fetchCsrfContext,
+  HTTP_TEST_ORIGIN as ALLOWED_ORIGIN,
+} from './http-e2e-test-kit';
 
 type InvitationHttpBody = {
   status: 'invited' | 'membership_created';
@@ -68,26 +64,6 @@ type PermissionHttpBody = Array<{
   code: string;
 }>;
 
-function extractCookiePair(
-  cookies: string | string[] | undefined,
-  cookieName: string,
-): string {
-  const normalizedCookies = Array.isArray(cookies)
-    ? cookies
-    : typeof cookies === 'string'
-      ? [cookies]
-      : [];
-  const cookie = normalizedCookies.find((entry) =>
-    entry.startsWith(`${cookieName}=`),
-  );
-
-  if (!cookie) {
-    throw new Error(`Missing cookie ${cookieName}`);
-  }
-
-  return cookie.split(';')[0];
-}
-
 describe('Employee access administration HTTP', () => {
   let app: NestExpressApplication | null = null;
   let moduleRef: TestingModule | null = null;
@@ -102,29 +78,22 @@ describe('Employee access administration HTTP', () => {
     tokenIds: [] as string[],
   };
 
-  beforeAll(() => {
-    process.env.DATABASE_URL = LOCAL_DATABASE_URL;
-    process.env.NODE_ENV = 'test';
-    process.env.COOKIE_SECURE = 'false';
-    process.env.CORS_ORIGINS = ALLOWED_ORIGIN;
-  });
+  beforeAll(configureHttpE2eEnvironment);
 
   it('invites employees, activates accounts, manages roles and facilities, protects self access changes, and revokes sessions only in the current courier', async () => {
     try {
-      moduleRef = await Test.createTestingModule({
-        imports: [AppModule],
-      }).compile();
-
-      app = moduleRef.createNestApplication<NestExpressApplication>();
-      configureHttpApp(app);
-      await app.init();
-
-      const prisma = moduleRef.get(PrismaService);
+      const httpContext = await createHttpE2eContext();
+      moduleRef = httpContext.moduleRef;
+      app = httpContext.app;
+      const {
+        prisma,
+        passwordHasher,
+        rbacService,
+        sessionsService,
+        authCookieService,
+        server,
+      } = httpContext;
       prismaService = prisma;
-      const passwordHasher = moduleRef.get(PasswordHasher);
-      const rbacService = moduleRef.get(RbacService);
-      const sessionsService = moduleRef.get(SessionsService);
-      const authCookieService = moduleRef.get(AuthCookieService);
 
       await rbacService.syncPermissionCatalog();
 
@@ -299,39 +268,37 @@ describe('Employee access administration HTTP', () => {
         roleId: adminRole.id,
       });
 
-      const adminSession = await sessionsService.createSession({
+      const adminSession = await createAuthenticatedHttpSession({
+        sessionsService,
+        authCookieService,
         userId: adminUser.id,
         organizationId: organizationOne.id,
+        cleanupSessionIds: cleanup.sessionIds,
       });
-      cleanup.sessionIds.push(adminSession.session.sessionId);
 
-      const sharedSessionOrgOne = await sessionsService.createSession({
+      const sharedSessionOrgOne = await createAuthenticatedHttpSession({
+        sessionsService,
+        authCookieService,
         userId: sharedUser.id,
         organizationId: organizationOne.id,
+        cleanupSessionIds: cleanup.sessionIds,
       });
-      cleanup.sessionIds.push(sharedSessionOrgOne.session.sessionId);
 
-      const sharedSessionOrgTwo = await sessionsService.createSession({
+      const sharedSessionOrgTwo = await createAuthenticatedHttpSession({
+        sessionsService,
+        authCookieService,
         userId: sharedUser.id,
         organizationId: organizationTwo.id,
+        cleanupSessionIds: cleanup.sessionIds,
       });
-      cleanup.sessionIds.push(sharedSessionOrgTwo.session.sessionId);
 
-      const sessionCookieName = authCookieService.getSessionCookieName();
-      const adminSessionCookie = `${sessionCookieName}=${adminSession.sessionToken}`;
-      const sharedSessionCookieOrgOne = `${sessionCookieName}=${sharedSessionOrgOne.sessionToken}`;
-      const sharedSessionCookieOrgTwo = `${sessionCookieName}=${sharedSessionOrgTwo.sessionToken}`;
-      const server = app.getHttpServer() as Parameters<typeof request>[0];
-
-      const csrfResponse = await request(server)
-        .get('/auth/csrf')
-        .set('Origin', ALLOWED_ORIGIN)
-        .expect(200);
-      const csrfToken = (csrfResponse.body as { csrfToken: string }).csrfToken;
-      const csrfCookie = extractCookiePair(
-        csrfResponse.headers['set-cookie'],
-        authCookieService.getCsrfCookieName(),
-      );
+      const adminSessionCookie = adminSession.sessionCookie;
+      const sharedSessionCookieOrgOne = sharedSessionOrgOne.sessionCookie;
+      const sharedSessionCookieOrgTwo = sharedSessionOrgTwo.sessionCookie;
+      const { csrfToken, csrfCookie } = await fetchCsrfContext({
+        server,
+        authCookieService,
+      });
 
       await request(server).get('/employees').expect(401);
 

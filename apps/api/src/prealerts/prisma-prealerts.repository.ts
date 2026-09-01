@@ -7,6 +7,7 @@ import {
 } from '../generated/prisma/client';
 
 import { PrismaAuditOutboxWriter } from '../audit/prisma-audit-outbox.writer';
+import { matchesPrismaUniqueConstraint } from '../prisma/prisma-error.utils';
 import { PrismaService } from '../prisma/prisma.service';
 import type { CommandContext } from '../request-context/request-context.types';
 import { PrealertCodeService } from './prealert-code.service';
@@ -656,7 +657,7 @@ export class PrismaPrealertsRepository implements PrealertsRepository {
   }
 
   private isPrealertCodeConflictError(error: unknown): boolean {
-    return this.hasKnownTarget(
+    return matchesPrismaUniqueConstraint(
       error,
       'prealerts_organization_id_prealert_code_key',
       'prealertCode',
@@ -666,82 +667,12 @@ export class PrismaPrealertsRepository implements PrealertsRepository {
   }
 
   private isTrackingConflictError(error: unknown): boolean {
-    return this.hasKnownTarget(
+    return matchesPrismaUniqueConstraint(
       error,
       'prealerts_one_pending_tracking_per_organization',
       'externalTrackingNumberNormalized',
       'external_tracking_number_normalized',
       'organizationId',
     );
-  }
-
-  private hasKnownTarget(
-    error: unknown,
-    targetName: string,
-    ...candidateFragments: string[]
-  ): boolean {
-    if (!this.isKnownRequestError(error) || error.code !== 'P2002') {
-      return false;
-    }
-
-    const target = error.meta?.target;
-    const targetText = Array.isArray(target)
-      ? target.join(',')
-      : typeof target === 'string'
-        ? target
-        : '';
-    const driverAdapterCause = this.readDriverAdapterCause(error.meta);
-    const constraintFields = Array.isArray(
-      driverAdapterCause?.constraint?.fields,
-    )
-      ? driverAdapterCause.constraint.fields.join(',')
-      : '';
-    const originalMessage =
-      typeof driverAdapterCause?.originalMessage === 'string'
-        ? driverAdapterCause.originalMessage
-        : '';
-    const haystack = [targetText, constraintFields, originalMessage]
-      .filter((value) => value.length > 0)
-      .join(',');
-
-    return (
-      haystack.includes(targetName) ||
-      candidateFragments.some((fragment) => haystack.includes(fragment))
-    );
-  }
-
-  private isKnownRequestError(
-    error: unknown,
-  ): error is Prisma.PrismaClientKnownRequestError {
-    return error instanceof Error && 'code' in error && 'meta' in error;
-  }
-
-  private readDriverAdapterCause(
-    meta: Prisma.PrismaClientKnownRequestError['meta'],
-  ):
-    | {
-        constraint?: {
-          fields?: unknown;
-        };
-        originalMessage?: unknown;
-      }
-    | undefined {
-    if (!meta || typeof meta !== 'object' || !('driverAdapterError' in meta)) {
-      return undefined;
-    }
-
-    const driverAdapterError = meta.driverAdapterError;
-
-    if (
-      !driverAdapterError ||
-      typeof driverAdapterError !== 'object' ||
-      !('cause' in driverAdapterError)
-    ) {
-      return undefined;
-    }
-
-    const cause = driverAdapterError.cause;
-
-    return cause && typeof cause === 'object' ? cause : undefined;
   }
 }

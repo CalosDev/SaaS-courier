@@ -1,21 +1,18 @@
 import type { NestExpressApplication } from '@nestjs/platform-express';
-import { Test, type TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 
-import { PasswordHasher } from '../src/accounts/password-hasher';
-import { AppModule } from '../src/app.module';
-import { AuthCookieService } from '../src/auth/http/auth-cookie.service';
-import { configureHttpApp } from '../src/http/configure-http-app';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { RbacService } from '../src/rbac/rbac.service';
-import { SessionsService } from '../src/sessions/sessions.service';
-import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
-
-const LOCAL_DATABASE_URL =
-  process.env.DATABASE_URL ??
-  'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
-const ALLOWED_ORIGIN = 'http://localhost:3000';
+import {
+  cleanupCoreHttpTestData,
+  configureHttpE2eEnvironment,
+  createAuthenticatedHttpSession,
+  createHttpE2eContext,
+  fetchCsrfContext,
+  grantPermission,
+  HTTP_TEST_ORIGIN as ALLOWED_ORIGIN,
+} from './http-e2e-test-kit';
 
 interface CsrfResponseBody {
   csrfToken: string;
@@ -85,26 +82,6 @@ interface CustomsProfileHttpResponse {
   updatedAt: string;
 }
 
-function extractCookiePair(
-  cookies: string | string[] | undefined,
-  cookieName: string,
-): string {
-  const normalizedCookies = Array.isArray(cookies)
-    ? cookies
-    : typeof cookies === 'string'
-      ? [cookies]
-      : [];
-  const cookie = normalizedCookies.find((entry) =>
-    entry.startsWith(`${cookieName}=`),
-  );
-
-  if (!cookie) {
-    throw new Error(`Missing cookie ${cookieName}`);
-  }
-
-  return cookie.split(';')[0];
-}
-
 function expectNoHiddenFields(payload: Record<string, unknown>): void {
   expect(payload).not.toHaveProperty('organizationId');
   expect(payload).not.toHaveProperty('deletedAt');
@@ -125,31 +102,21 @@ describe('Customers admin HTTP', () => {
     sessionIds: [] as string[],
   };
 
-  beforeAll(() => {
-    process.env.DATABASE_URL = LOCAL_DATABASE_URL;
-    process.env.NODE_ENV = 'test';
-    process.env.COOKIE_SECURE = 'false';
-    process.env.CORS_ORIGINS = ALLOWED_ORIGIN;
-  });
+  beforeAll(configureHttpE2eEnvironment);
 
   it('serves customer, address, and customs-profile endpoints with real sessions and permissions', async () => {
     try {
-      moduleRef = await Test.createTestingModule({
-        imports: [AppModule],
-      }).compile();
-
-      app = moduleRef.createNestApplication<NestExpressApplication>();
-      configureHttpApp(app);
-      await app.init();
-
-      const prisma = moduleRef.get(PrismaService);
+      const httpContext = await createHttpE2eContext();
+      moduleRef = httpContext.moduleRef;
+      app = httpContext.app;
+      const prisma = httpContext.prisma;
       prismaService = prisma;
-      const passwordHasher = moduleRef.get(PasswordHasher);
-      const rbacService = moduleRef.get(RbacService);
-      const sessionsService = moduleRef.get(SessionsService);
-      const authCookieService = moduleRef.get(AuthCookieService);
-
-      await rbacService.syncPermissionCatalog();
+      const {
+        passwordHasher,
+        rbacService,
+        sessionsService,
+        authCookieService,
+      } = httpContext;
 
       const suffix = randomUUID();
       const shortCode = suffix.slice(0, 8).toUpperCase();
@@ -223,23 +190,24 @@ describe('Customers admin HTTP', () => {
         roleId: role.id,
       });
 
-      const session = await sessionsService.createSession({
+      const session = await createAuthenticatedHttpSession({
+        sessionsService,
+        authCookieService,
         userId: user.id,
         organizationId: organization.id,
       });
-      cleanup.sessionIds.push(session.session.sessionId);
+      cleanup.sessionIds.push(session.sessionId);
 
-      const sessionCookie = `${authCookieService.getSessionCookieName()}=${session.sessionToken}`;
-      const server = app.getHttpServer() as Parameters<typeof request>[0];
-      const csrfResponse = await request(server)
-        .get('/auth/csrf')
-        .set('Origin', ALLOWED_ORIGIN)
-        .expect(200);
-      const csrfBody = csrfResponse.body as CsrfResponseBody;
-      const csrfCookie = extractCookiePair(
-        csrfResponse.headers['set-cookie'],
-        authCookieService.getCsrfCookieName(),
-      );
+      const sessionCookie = session.sessionCookie;
+      const server = httpContext.server;
+      const csrfContext = await fetchCsrfContext({
+        server,
+        authCookieService,
+      });
+      const csrfBody: CsrfResponseBody = {
+        csrfToken: csrfContext.csrfToken,
+      };
+      const csrfCookie = csrfContext.csrfCookie;
 
       await request(server).get('/health').expect(200);
       await request(server)
@@ -253,18 +221,11 @@ describe('Customers admin HTTP', () => {
         .set('Cookie', sessionCookie)
         .expect(403);
 
-      const customersReadPermission = await prisma.permission.findUniqueOrThrow(
-        {
-          where: { code: 'customers.read' },
-          select: { id: true },
-        },
-      );
-      await prisma.rolePermission.create({
-        data: {
-          organizationId: organization.id,
-          roleId: role.id,
-          permissionId: customersReadPermission.id,
-        },
+      await grantPermission({
+        prisma,
+        organizationId: organization.id,
+        roleId: role.id,
+        permissionCode: 'customers.read',
       });
 
       const emptyListResponse = await request(server)
@@ -294,17 +255,11 @@ describe('Customers admin HTTP', () => {
         })
         .expect(403);
 
-      const customersManagePermission =
-        await prisma.permission.findUniqueOrThrow({
-          where: { code: 'customers.manage' },
-          select: { id: true },
-        });
-      await prisma.rolePermission.create({
-        data: {
-          organizationId: organization.id,
-          roleId: role.id,
-          permissionId: customersManagePermission.id,
-        },
+      await grantPermission({
+        prisma,
+        organizationId: organization.id,
+        roleId: role.id,
+        permissionCode: 'customers.manage',
       });
 
       const individualResponse = await request(server)
@@ -715,89 +670,7 @@ describe('Customers admin HTTP', () => {
             },
           });
         }
-        if (cleanup.sessionIds.length > 0) {
-          await prismaService.userSession.deleteMany({
-            where: {
-              id: {
-                in: cleanup.sessionIds,
-              },
-            },
-          });
-        }
-        if (cleanup.employeeIds.length > 0) {
-          await prismaService.employeeRole.deleteMany({
-            where: {
-              employeeId: {
-                in: cleanup.employeeIds,
-              },
-            },
-          });
-        }
-        if (cleanup.roleIds.length > 0) {
-          await prismaService.rolePermission.deleteMany({
-            where: {
-              roleId: {
-                in: cleanup.roleIds,
-              },
-            },
-          });
-        }
-        if (cleanup.customerIds.length > 0) {
-          await prismaService.customer.deleteMany({
-            where: {
-              id: {
-                in: cleanup.customerIds,
-              },
-            },
-          });
-        }
-        if (cleanup.roleIds.length > 0) {
-          await prismaService.role.deleteMany({
-            where: {
-              id: {
-                in: cleanup.roleIds,
-              },
-            },
-          });
-        }
-        if (cleanup.employeeIds.length > 0) {
-          await prismaService.employee.deleteMany({
-            where: {
-              id: {
-                in: cleanup.employeeIds,
-              },
-            },
-          });
-        }
-        if (cleanup.userIds.length > 0) {
-          await prismaService.user.deleteMany({
-            where: {
-              id: {
-                in: cleanup.userIds,
-              },
-            },
-          });
-        }
-        if (cleanup.organizationIds.length > 0) {
-          await deleteAuditArtifactsForOrganizations(
-            prismaService,
-            cleanup.organizationIds,
-          );
-          await prismaService.organizationSettings.deleteMany({
-            where: {
-              organizationId: {
-                in: cleanup.organizationIds,
-              },
-            },
-          });
-          await prismaService.organization.deleteMany({
-            where: {
-              id: {
-                in: cleanup.organizationIds,
-              },
-            },
-          });
-        }
+        await cleanupCoreHttpTestData(prismaService, cleanup);
       }
 
       if (app) {
