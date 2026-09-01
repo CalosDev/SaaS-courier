@@ -1,41 +1,17 @@
-import { Test, TestingModule } from '@nestjs/testing';
+import type { TestingModule } from '@nestjs/testing';
 import { randomUUID } from 'node:crypto';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import request from 'supertest';
 
-import { AppModule } from '../src/app.module';
-import { configureHttpApp } from '../src/http/configure-http-app';
-import { PasswordHasher } from '../src/accounts/password-hasher';
 import { PrismaService } from '../src/prisma/prisma.service';
-import { RbacService } from '../src/rbac/rbac.service';
-import { SessionsService } from '../src/sessions/sessions.service';
-import { AuthCookieService } from '../src/auth/http/auth-cookie.service';
 import { deleteAuditArtifactsForOrganizations } from './audit-test-cleanup';
-
-const LOCAL_DATABASE_URL =
-  process.env.DATABASE_URL ??
-  'postgresql://courier:courier_dev_password@localhost:5432/courier_saas?schema=public';
-const ALLOWED_ORIGIN = 'http://localhost:3000';
-
-function extractCookiePair(
-  cookies: string | string[] | undefined,
-  cookieName: string,
-): string {
-  const normalizedCookies = Array.isArray(cookies)
-    ? cookies
-    : typeof cookies === 'string'
-      ? [cookies]
-      : [];
-  const cookie = normalizedCookies.find((entry) =>
-    entry.startsWith(`${cookieName}=`),
-  );
-
-  if (!cookie) {
-    throw new Error(`Missing cookie ${cookieName}`);
-  }
-
-  return cookie.split(';')[0];
-}
+import {
+  configureHttpE2eEnvironment,
+  createAuthenticatedHttpSession,
+  createHttpE2eContext,
+  fetchCsrfContext,
+  HTTP_TEST_ORIGIN as ALLOWED_ORIGIN,
+} from './http-e2e-test-kit';
 
 describe('Organization and facilities admin HTTP', () => {
   let app: NestExpressApplication | null = null;
@@ -50,28 +26,21 @@ describe('Organization and facilities admin HTTP', () => {
     sessionIds: [] as string[],
   };
 
-  beforeAll(() => {
-    process.env.DATABASE_URL = LOCAL_DATABASE_URL;
-    process.env.NODE_ENV = 'test';
-    process.env.COOKIE_SECURE = 'false';
-    process.env.CORS_ORIGINS = 'http://localhost:3000';
-  });
+  beforeAll(configureHttpE2eEnvironment);
 
   it('serves the approved organization and facilities endpoints with real sessions and permissions', async () => {
     try {
-      moduleRef = await Test.createTestingModule({
-        imports: [AppModule],
-      }).compile();
-
-      app = moduleRef.createNestApplication<NestExpressApplication>();
-      configureHttpApp(app);
-      await app.init();
-
-      const prisma = moduleRef.get(PrismaService);
-      const passwordHasher = moduleRef.get(PasswordHasher);
-      const rbacService = moduleRef.get(RbacService);
-      const sessionsService = moduleRef.get(SessionsService);
-      const authCookieService = moduleRef.get(AuthCookieService);
+      const httpContext = await createHttpE2eContext();
+      moduleRef = httpContext.moduleRef;
+      app = httpContext.app;
+      const {
+        prisma,
+        passwordHasher,
+        rbacService,
+        sessionsService,
+        authCookieService,
+        server,
+      } = httpContext;
       prismaService = prisma;
 
       const passwordHash = await passwordHasher.hash(
@@ -79,8 +48,6 @@ describe('Organization and facilities admin HTTP', () => {
       );
       const suffix = randomUUID();
       const shortCode = suffix.slice(0, 8).toUpperCase();
-
-      await rbacService.syncPermissionCatalog();
 
       const organization = await prisma.organization.create({
         data: {
@@ -140,22 +107,20 @@ describe('Organization and facilities admin HTTP', () => {
         roleId: role.id,
       });
 
-      const session = await sessionsService.createSession({
+      const session = await createAuthenticatedHttpSession({
+        sessionsService,
+        authCookieService,
         userId: user.id,
         organizationId: organization.id,
+        cleanupSessionIds: cleanup.sessionIds,
       });
-      cleanup.sessionIds.push(session.session.sessionId);
-      const sessionCookie = `${authCookieService.getSessionCookieName()}=${session.sessionToken}`;
-      const server = app.getHttpServer() as Parameters<typeof request>[0];
-      const csrfResponse = await request(server)
-        .get('/auth/csrf')
-        .set('Origin', ALLOWED_ORIGIN)
-        .expect(200);
-      const csrfBody = csrfResponse.body as { csrfToken: string };
-      const csrfCookie = extractCookiePair(
-        csrfResponse.headers['set-cookie'],
-        authCookieService.getCsrfCookieName(),
-      );
+
+      const sessionCookie = session.sessionCookie;
+      const { csrfToken, csrfCookie } = await fetchCsrfContext({
+        server,
+        authCookieService,
+      });
+      const csrfBody = { csrfToken };
 
       await request(server).get('/health').expect(200);
       await request(server)
