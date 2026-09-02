@@ -12,6 +12,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DetailList } from "@/components/ui/detail-list";
 import { ErrorState } from "@/components/ui/error-state";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -222,30 +223,27 @@ export default function PackageDetailPage({
 
           <Card>
             <h2>Resumen operativo</h2>
-            <ul className="detail-list">
-              {detailMetadata?.map((entry) => (
-                <li key={entry.label}>
-                  <span>{entry.label}</span>
-                  <strong>{entry.value}</strong>
-                </li>
-              ))}
-              <li>
-                <span>Tracking externo</span>
-                <strong>{resource.data.externalTrackingNumber}</strong>
-              </li>
-              <li>
-                <span>Cancelado por</span>
-                <strong>{resource.data.cancelledBy?.displayName || "No aplica"}</strong>
-              </li>
-              <li>
-                <span>Motivo</span>
-                <strong>{resource.data.cancellationReason || "No aplica"}</strong>
-              </li>
-              <li>
-                <span>Fecha de cancelacion</span>
-                <strong>{resource.data.cancelledAt?.slice(0, 10) || "No aplica"}</strong>
-              </li>
-            </ul>
+            <DetailList
+              entries={[
+                ...(detailMetadata ?? []),
+                {
+                  label: "Tracking externo",
+                  value: resource.data.externalTrackingNumber,
+                },
+                {
+                  label: "Cancelado por",
+                  value: resource.data.cancelledBy?.displayName || "No aplica",
+                },
+                {
+                  label: "Motivo",
+                  value: resource.data.cancellationReason || "No aplica",
+                },
+                {
+                  label: "Fecha de cancelacion",
+                  value: resource.data.cancelledAt?.slice(0, 10) || "No aplica",
+                },
+              ]}
+            />
           </Card>
         </section>
 

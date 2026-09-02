@@ -12,6 +12,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { DetailList } from "@/components/ui/detail-list";
 import { ErrorState } from "@/components/ui/error-state";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useAsyncState } from "@/hooks/use-async-state";
@@ -208,48 +209,40 @@ export default function PrealertDetailPage({
 
           <Card>
             <h2>Resumen operativo</h2>
-            <ul className="detail-list">
-              {detailMetadata?.map((entry) => (
-                <li key={entry.label}>
-                  <span>{entry.label}</span>
-                  <strong>{entry.value}</strong>
-                </li>
-              ))}
-              <li>
-                <span>Tracking</span>
-                <strong>{resource.data.externalTrackingNumber}</strong>
-              </li>
-              <li>
-                <span>Paquete vinculado</span>
-                <strong>
-                  {resource.data.matchedPackage?.internalTrackingNumber ||
-                    "No aplica"}
-                </strong>
-              </li>
-              <li>
-                <span>Valor</span>
-                <strong>
-                  {formatPrealertMoney(
+            <DetailList
+              entries={[
+                ...(detailMetadata ?? []),
+                {
+                  label: "Tracking",
+                  value: resource.data.externalTrackingNumber,
+                },
+                {
+                  label: "Paquete vinculado",
+                  value:
+                    resource.data.matchedPackage?.internalTrackingNumber ||
+                    "No aplica",
+                },
+                {
+                  label: "Valor",
+                  value: formatPrealertMoney(
                     resource.data.declaredValue,
                     resource.data.currencyCode,
-                  )}
-                </strong>
-              </li>
-              <li>
-                <span>Cancelada por</span>
-                <strong>
-                  {resource.data.cancelledBy?.displayName || "No aplica"}
-                </strong>
-              </li>
-              <li>
-                <span>Motivo</span>
-                <strong>{resource.data.cancellationReason || "No aplica"}</strong>
-              </li>
-              <li>
-                <span>Fecha de cancelacion</span>
-                <strong>{resource.data.cancelledAt?.slice(0, 10) || "No aplica"}</strong>
-              </li>
-            </ul>
+                  ),
+                },
+                {
+                  label: "Cancelada por",
+                  value: resource.data.cancelledBy?.displayName || "No aplica",
+                },
+                {
+                  label: "Motivo",
+                  value: resource.data.cancellationReason || "No aplica",
+                },
+                {
+                  label: "Fecha de cancelacion",
+                  value: resource.data.cancelledAt?.slice(0, 10) || "No aplica",
+                },
+              ]}
+            />
           </Card>
 
         </section>
