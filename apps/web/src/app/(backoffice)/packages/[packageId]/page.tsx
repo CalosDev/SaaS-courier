@@ -4,6 +4,7 @@ import { use, useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 
 import { PermissionBoundary } from "@/components/auth/permission-boundary";
+import { CancellationDialog } from "@/components/operations/cancellation-dialog";
 import { PackageDocumentsSection } from "@/components/packages/package-documents-section";
 import { PackageCustomerSelector } from "@/components/packages/package-customer-selector";
 import { CarrierEventsSection } from "@/components/packages/carrier-events-section";
@@ -11,7 +12,6 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/error-state";
 import { FormField } from "@/components/ui/form-field";
 import { Input } from "@/components/ui/input";
@@ -283,42 +283,16 @@ export default function PackageDetailPage({
           </Card>
         ) : null}
 
-        <Dialog
+        <CancellationDialog
           open={cancelOpen}
           title="Cancelar paquete"
-          onClose={() => {
-            if (!submitting) {
-              setCancelOpen(false);
-            }
-          }}
-          actions={
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => setCancelOpen(false)}
-                disabled={submitting}
-              >
-                Volver
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => void handleCancel()}
-                disabled={submitting || cancelReason.trim().length < 3}
-              >
-                {submitting ? "Cancelando..." : "Confirmar cancelacion"}
-              </Button>
-            </>
-          }
-        >
-          <FormField label="Motivo">
-            <Textarea
-              rows={4}
-              value={cancelReason}
-              onChange={(event) => setCancelReason(event.target.value)}
-              placeholder="Explica por que el registro operativo debe cancelarse."
-            />
-          </FormField>
-        </Dialog>
+          reason={cancelReason}
+          reasonPlaceholder="Explica por que el registro operativo debe cancelarse."
+          submitting={submitting}
+          onClose={() => setCancelOpen(false)}
+          onReasonChange={setCancelReason}
+          onConfirm={() => void handleCancel()}
+        />
       </div>
     </PermissionBoundary>
   );

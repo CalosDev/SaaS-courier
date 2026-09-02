@@ -3,6 +3,7 @@
 import { use, useCallback, useMemo, useState } from "react";
 
 import { PermissionBoundary } from "@/components/auth/permission-boundary";
+import { CancellationDialog } from "@/components/operations/cancellation-dialog";
 import {
   PrealertForm,
   type PrealertSubmitPayload,
@@ -11,11 +12,8 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Dialog } from "@/components/ui/dialog";
 import { ErrorState } from "@/components/ui/error-state";
-import { FormField } from "@/components/ui/form-field";
 import { LoadingState } from "@/components/ui/loading-state";
-import { Textarea } from "@/components/ui/textarea";
 import { useAsyncState } from "@/hooks/use-async-state";
 import { ApiError } from "@/lib/api/api-error";
 import { backofficeApi } from "@/lib/api/backoffice";
@@ -273,42 +271,16 @@ export default function PrealertDetailPage({
           </Card>
         ) : null}
 
-        <Dialog
+        <CancellationDialog
           open={cancelOpen}
           title="Cancelar prealerta"
-          onClose={() => {
-            if (!submitting) {
-              setCancelOpen(false);
-            }
-          }}
-          actions={
-            <>
-              <Button
-                variant="secondary"
-                onClick={() => setCancelOpen(false)}
-                disabled={submitting}
-              >
-                Volver
-              </Button>
-              <Button
-                variant="danger"
-                onClick={() => void handleCancel()}
-                disabled={submitting || cancelReason.trim().length < 3}
-              >
-                {submitting ? "Cancelando..." : "Confirmar cancelacion"}
-              </Button>
-            </>
-          }
-        >
-          <FormField label="Motivo">
-            <Textarea
-              rows={4}
-              value={cancelReason}
-              onChange={(event) => setCancelReason(event.target.value)}
-              placeholder="Explica por que la compra esperada fue cancelada."
-            />
-          </FormField>
-        </Dialog>
+          reason={cancelReason}
+          reasonPlaceholder="Explica por que la compra esperada fue cancelada."
+          submitting={submitting}
+          onClose={() => setCancelOpen(false)}
+          onReasonChange={setCancelReason}
+          onConfirm={() => void handleCancel()}
+        />
       </div>
     </PermissionBoundary>
   );
