@@ -18,8 +18,7 @@ export type FacilityType = (typeof FACILITY_TYPE_VALUES)[number];
 export type FacilityOwnershipType =
   (typeof FACILITY_OWNERSHIP_TYPE_VALUES)[number];
 
-export interface FacilityRecord {
-  id: string;
+interface FacilityProperties {
   code: string;
   name: string;
   type: FacilityType;
@@ -35,6 +34,10 @@ export interface FacilityRecord {
   isPackageOrigin: boolean;
   isDistributionCenter: boolean;
   isActive: boolean;
+}
+
+export interface FacilityRecord extends FacilityProperties {
+  id: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -56,23 +59,8 @@ export interface CreateFacilityInput {
   isDistributionCenter?: boolean;
 }
 
-export interface CreateFacilityRecord {
+export interface CreateFacilityRecord extends FacilityProperties {
   organizationId: string;
-  code: string;
-  name: string;
-  type: FacilityType;
-  ownershipType: FacilityOwnershipType;
-  countryCode: string;
-  province: string | null;
-  city: string | null;
-  addressLine1: string | null;
-  addressLine2: string | null;
-  phone: string | null;
-  email: string | null;
-  isCustomerFacing: boolean;
-  isPackageOrigin: boolean;
-  isDistributionCenter: boolean;
-  isActive: boolean;
 }
 
 export interface UpdateFacilityInput {
