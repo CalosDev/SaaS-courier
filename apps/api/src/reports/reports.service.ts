@@ -89,13 +89,7 @@ export class ReportsService {
       _count: { _all: true },
       orderBy: { status: 'asc' },
     });
-    return this.reportEnvelope(filters, {
-      total: byStatus.reduce((sum, item) => sum + item._count._all, 0),
-      byStatus: byStatus.map((item) => ({
-        status: item.status,
-        count: item._count._all,
-      })),
-    });
+    return this.reportEnvelope(filters, this.statusSummary(byStatus));
   }
 
   async getInventoryReport(organizationId: string, input: ReportFilterDto) {
@@ -146,13 +140,7 @@ export class ReportsService {
       _count: { _all: true },
       orderBy: { status: 'asc' },
     });
-    return this.reportEnvelope(filters, {
-      total: byStatus.reduce((sum, item) => sum + item._count._all, 0),
-      byStatus: byStatus.map((item) => ({
-        status: item.status,
-        count: item._count._all,
-      })),
-    });
+    return this.reportEnvelope(filters, this.statusSummary(byStatus));
   }
 
   async getCustomsReport(organizationId: string, input: ReportFilterDto) {
@@ -163,13 +151,7 @@ export class ReportsService {
       _count: { _all: true },
       orderBy: { status: 'asc' },
     });
-    return this.reportEnvelope(filters, {
-      total: byStatus.reduce((sum, item) => sum + item._count._all, 0),
-      byStatus: byStatus.map((item) => ({
-        status: item.status,
-        count: item._count._all,
-      })),
-    });
+    return this.reportEnvelope(filters, this.statusSummary(byStatus));
   }
 
   async requestExport(
@@ -541,6 +523,18 @@ export class ReportsService {
     data: T,
   ) {
     return { generatedAt: new Date().toISOString(), filters, data };
+  }
+
+  private statusSummary<TStatus extends string>(
+    groups: Array<{ status: TStatus; _count: { _all: number } }>,
+  ) {
+    return {
+      total: groups.reduce((sum, item) => sum + item._count._all, 0),
+      byStatus: groups.map((item) => ({
+        status: item.status,
+        count: item._count._all,
+      })),
+    };
   }
 
   private normalizeIdempotencyKey(value: string) {

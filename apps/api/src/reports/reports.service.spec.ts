@@ -65,6 +65,37 @@ describe('ReportsService', () => {
     );
   });
 
+  it('returns tenant-scoped status summaries for shipments and customs', async () => {
+    prisma.dispatch.groupBy.mockResolvedValue([
+      { status: 'IN_TRANSIT', _count: { _all: 3 } },
+    ]);
+    prisma.customsCase.groupBy.mockResolvedValue([
+      { status: 'OPEN', _count: { _all: 2 } },
+    ]);
+
+    const shipments = await service.getShipmentsReport('org-3', {});
+    const customs = await service.getCustomsReport('org-3', {});
+
+    expect(shipments.data).toEqual({
+      total: 3,
+      byStatus: [{ status: 'IN_TRANSIT', count: 3 }],
+    });
+    expect(customs.data).toEqual({
+      total: 2,
+      byStatus: [{ status: 'OPEN', count: 2 }],
+    });
+    expect(prisma.dispatch.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: 'org-3' }),
+      }),
+    );
+    expect(prisma.customsCase.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ organizationId: 'org-3' }),
+      }),
+    );
+  });
+
   it('rejects reversed and oversized report ranges', async () => {
     await expect(
       service.getOperationsReport('org-1', {
