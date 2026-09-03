@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 
 import { PasswordHasher } from '../src/accounts/password-hasher';
 import { AppModule } from '../src/app.module';
+import { upsertLocalAdministratorEmployee } from '../src/local-development/local-bootstrap.employee';
 import { getLocalBootstrapConfig } from '../src/local-development/local-bootstrap.guard';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { RbacService } from '../src/rbac/rbac.service';
@@ -97,25 +98,9 @@ async function main(): Promise<void> {
         },
       });
 
-      const employee = await tx.employee.upsert({
-        where: {
-          organizationId_userId: {
-            organizationId: organization.id,
-            userId: user.id,
-          },
-        },
-        create: {
-          organizationId: organization.id,
-          userId: user.id,
-          employeeCode: 'ADMIN-LOCAL',
-          firstName: 'Administrador',
-          lastName: 'Local',
-          status: 'ACTIVE',
-        },
-        update: {
-          status: 'ACTIVE',
-          deletedAt: null,
-        },
+      const employee = await upsertLocalAdministratorEmployee(tx, {
+        organizationId: organization.id,
+        userId: user.id,
       });
 
       const role = await tx.role.upsert({
