@@ -4,7 +4,7 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import useSWR from "swr";
-import { Badge } from "@/components/ui/badge";
+import { CorrectionStatusBadge } from "@/components/corrections/CorrectionStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { FormField } from "@/components/ui/form-field";
@@ -12,26 +12,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/components/ui/toast";
 import { ApiError } from "@/lib/api/api-error";
 import { backofficeApi } from "@/lib/api/backoffice";
-import type { CorrectionRequest } from "@/lib/api/contracts";
-
-const STATUS_LABEL: Record<CorrectionRequest["status"], string> = {
-  REQUESTED: "Solicitada",
-  APPROVED: "Aprobada",
-  REJECTED: "Rechazada",
-  APPLIED: "Aplicada",
-  CANCELLED: "Cancelada",
-};
-
-const STATUS_TONE: Record<
-  CorrectionRequest["status"],
-  "neutral" | "success" | "warning" | "danger"
-> = {
-  REQUESTED: "warning",
-  APPROVED: "success",
-  REJECTED: "danger",
-  APPLIED: "success",
-  CANCELLED: "neutral",
-};
 
 function formatProposedData(value: Record<string, unknown>) {
   return JSON.stringify(value, null, 2);
@@ -134,9 +114,7 @@ export default function CorrectionDetailPage({
               <ArrowLeft className="h-5 w-5" />
             </Link>
             <h1>Correccion {correction.id}</h1>
-            <Badge tone={STATUS_TONE[correction.status]}>
-              {STATUS_LABEL[correction.status]}
-            </Badge>
+            <CorrectionStatusBadge status={correction.status} />
           </div>
           <p>Decision controlada sin recibir tenant desde el cliente.</p>
         </div>

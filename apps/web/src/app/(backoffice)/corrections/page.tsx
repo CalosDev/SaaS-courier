@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form";
 import useSWR from "swr";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Badge } from "@/components/ui/badge";
+import { CorrectionStatusBadge } from "@/components/corrections/CorrectionStatusBadge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Dialog } from "@/components/ui/dialog";
@@ -43,25 +43,6 @@ const createCorrectionSchema = z.object({
 });
 
 type CreateCorrectionForm = z.infer<typeof createCorrectionSchema>;
-
-const STATUS_LABEL: Record<CorrectionRequest["status"], string> = {
-  REQUESTED: "Solicitada",
-  APPROVED: "Aprobada",
-  REJECTED: "Rechazada",
-  APPLIED: "Aplicada",
-  CANCELLED: "Cancelada",
-};
-
-const STATUS_TONE: Record<
-  CorrectionRequest["status"],
-  "neutral" | "success" | "warning" | "danger"
-> = {
-  REQUESTED: "warning",
-  APPROVED: "success",
-  REJECTED: "danger",
-  APPLIED: "success",
-  CANCELLED: "neutral",
-};
 
 export default function CorrectionsPage() {
   const [showCreate, setShowCreate] = useState(false);
@@ -138,12 +119,10 @@ export default function CorrectionsPage() {
               </span>,
               correction.targetType,
               correction.reason,
-              <Badge
+              <CorrectionStatusBadge
                 key={`s-${correction.id}`}
-                tone={STATUS_TONE[correction.status]}
-              >
-                {STATUS_LABEL[correction.status]}
-              </Badge>,
+                status={correction.status}
+              />,
               new Date(correction.createdAt).toLocaleDateString("es-DO"),
               <Link
                 key={`a-${correction.id}`}
