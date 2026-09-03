@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { PermissionBoundary } from "@/components/auth/permission-boundary";
+import { InventoryFiltersCard } from "@/components/inventory/inventory-filters-card";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,6 @@ import { Card } from "@/components/ui/card";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { FormField } from "@/components/ui/form-field";
-import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/loading-state";
 import { Pagination } from "@/components/ui/pagination";
 import { Select } from "@/components/ui/select";
@@ -159,6 +159,17 @@ export default function InventoryPackagesPage() {
     );
   }
 
+  const facilities = locationsResource.data.items
+    .map((location) => location.facility)
+    .filter(
+      (facility, index, array) =>
+        array.findIndex((entry) => entry.id === facility.id) === index,
+    )
+    .map((facility) => ({
+      value: facility.id,
+      label: `${facility.code} · ${facility.name}`,
+    }));
+
   return (
     <PermissionBoundary
       requiredPermissions={["inventory.read"]}
@@ -183,48 +194,31 @@ export default function InventoryPackagesPage() {
         {message ? <Alert tone="success">{message}</Alert> : null}
         {error ? <Alert tone="error">{error}</Alert> : null}
 
-        <Card>
-          <div className="filters-row">
-            <FormField label="Buscar">
-              <Input value={q} onChange={(event) => setQ(event.target.value)} />
-            </FormField>
-            <FormField label="Facility">
-              <Select
-                value={facilityId}
-                onChange={(event) => {
-                  setFacilityId(event.target.value);
-                  setLocationId("");
-                }}
-              >
-                <option value="">Todos</option>
-                {locationsResource.data.items
-                  .map((location) => location.facility)
-                  .filter(
-                    (facility, index, array) =>
-                      array.findIndex((entry) => entry.id === facility.id) === index,
-                  )
-                  .map((facility) => (
-                    <option key={facility.id} value={facility.id}>
-                      {facility.code} · {facility.name}
-                    </option>
-                  ))}
-              </Select>
-            </FormField>
-            <FormField label="Ubicación">
-              <Select
-                value={locationId}
-                onChange={(event) => setLocationId(event.target.value)}
-              >
-                <option value="">Todas</option>
-                {locationsResource.data.items.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.code} · {location.name}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-          </div>
-        </Card>
+        <InventoryFiltersCard
+          facilities={facilities}
+          facilityPlaceholder="Todos"
+          facilityValue={facilityId}
+          onFacilityChange={(value) => {
+            setFacilityId(value);
+            setLocationId("");
+          }}
+          onSearchChange={setQ}
+          searchValue={q}
+        >
+          <FormField label="Ubicación">
+            <Select
+              value={locationId}
+              onChange={(event) => setLocationId(event.target.value)}
+            >
+              <option value="">Todas</option>
+              {locationsResource.data.items.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.code} · {location.name}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+        </InventoryFiltersCard>
 
         <Card>
           {packagesResource.data.items.length === 0 ? (

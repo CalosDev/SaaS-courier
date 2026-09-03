@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState } from "react";
 
 import { PermissionBoundary } from "@/components/auth/permission-boundary";
+import { InventoryFiltersCard } from "@/components/inventory/inventory-filters-card";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -161,46 +162,35 @@ export default function InventoryLocationsPage() {
         {message ? <Alert tone="success">{message}</Alert> : null}
         {error ? <Alert tone="error">{error}</Alert> : null}
 
-        <Card>
-          <div className="filters-row">
-            <FormField label="Buscar">
-              <Input value={q} onChange={(event) => setQ(event.target.value)} />
-            </FormField>
-            <FormField label="Facility">
-              <Select
-                value={facilityId}
-                onChange={(event) => setFacilityId(event.target.value)}
-              >
-                <option value="">Todas</option>
-                {facilities.map((facility) => (
-                  <option key={facility.value} value={facility.value}>
-                    {facility.label}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="Tipo">
-              <Select value={type} onChange={(event) => setType(event.target.value)}>
-                <option value="">Todos</option>
-                {Object.entries(WAREHOUSE_LOCATION_TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </FormField>
-            <FormField label="Estado">
-              <Select
-                value={isActive}
-                onChange={(event) => setIsActive(event.target.value)}
-              >
-                <option value="">Todos</option>
-                <option value="true">Activas</option>
-                <option value="false">Inactivas</option>
-              </Select>
-            </FormField>
-          </div>
-        </Card>
+        <InventoryFiltersCard
+          facilities={facilities}
+          facilityPlaceholder="Todas"
+          facilityValue={facilityId}
+          onFacilityChange={setFacilityId}
+          onSearchChange={setQ}
+          searchValue={q}
+        >
+          <FormField label="Tipo">
+            <Select value={type} onChange={(event) => setType(event.target.value)}>
+              <option value="">Todos</option>
+              {Object.entries(WAREHOUSE_LOCATION_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+          <FormField label="Estado">
+            <Select
+              value={isActive}
+              onChange={(event) => setIsActive(event.target.value)}
+            >
+              <option value="">Todos</option>
+              <option value="true">Activas</option>
+              <option value="false">Inactivas</option>
+            </Select>
+          </FormField>
+        </InventoryFiltersCard>
 
         <Card>
           {locationsResource.data.items.length === 0 ? (
