@@ -6,6 +6,7 @@ import { Plus } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { CustomerSelectField } from "@/components/customers/customer-select-field";
 import { backofficeApi } from "@/lib/api/backoffice";
 import type { PaymentRecord, PaymentMethod } from "@/lib/api/contracts";
 import { Badge } from "@/components/ui/badge";
@@ -273,16 +274,12 @@ export default function PaymentsPage() {
           className="form-grid"
           onSubmit={handleSubmit(onSubmit)}
         >
-          <FormField label="Cliente" error={errors.customerId?.message}>
-            <Select {...register("customerId")}>
-              <option value="">— Selecciona un cliente —</option>
-              {(customersData?.items ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.customerCode} · {c.displayName}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+          <CustomerSelectField
+            customers={customersData?.items ?? []}
+            error={errors.customerId?.message}
+            placeholder="— Selecciona un cliente —"
+            {...register("customerId")}
+          />
 
           <FormField label="Método de pago" error={errors.method?.message}>
             <Select {...register("method")}>

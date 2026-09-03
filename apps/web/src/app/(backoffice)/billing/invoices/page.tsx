@@ -7,6 +7,7 @@ import { Plus } from "lucide-react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { CustomerSelectField } from "@/components/customers/customer-select-field";
 import { backofficeApi } from "@/lib/api/backoffice";
 import type { InvoiceRecord, InvoiceLineType } from "@/lib/api/contracts";
 import { Badge } from "@/components/ui/badge";
@@ -234,16 +235,12 @@ export default function InvoicesPage() {
           className="form-grid"
           onSubmit={handleSubmit(onSubmit)}
         >
-          <FormField label="Cliente" error={errors.customerId?.message}>
-            <Select {...register("customerId")}>
-              <option value="">— Selecciona un cliente —</option>
-              {(customersData?.items ?? []).map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.customerCode} · {c.displayName}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+          <CustomerSelectField
+            customers={customersData?.items ?? []}
+            error={errors.customerId?.message}
+            placeholder="— Selecciona un cliente —"
+            {...register("customerId")}
+          />
 
           <FormField label="Moneda" error={errors.currencyCode?.message}>
             <Select {...register("currencyCode")}>
